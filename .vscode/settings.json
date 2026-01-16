@@ -1,0 +1,67 @@
+{
+    // Python Configuration
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/src"
+    ],
+    
+    // Formatting
+    "editor.formatOnSave": true,
+    "python.formatting.provider": "none",
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
+    
+    // GitHub Copilot Configuration
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": true,
+        "markdown": true,
+        "python": true
+    },
+    
+    // Markdown Configuration
+    "editor.wordWrap": "on",
+    "editor.rulers": [80, 120],
+    "[markdown]": {
+        "editor.wordWrap": "on",
+        "editor.quickSuggestions": {
+            "comments": "on",
+            "strings": "on",
+            "other": "on"
+        }
+    },
+    
+    // File Associations
+    "files.associations": {
+        "*.md": "markdown",
+        ".akr-config.json": "jsonc",
+        "TEMPLATE_MANIFEST.json": "json"
+    },
+    
+    // Files to Exclude
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        ".pytest_cache": true,
+        "**/venv": true,
+        "**/logs": false
+    },
+    
+    // Search Configuration
+    "search.exclude": {
+        "**/venv": true,
+        "**/logs": true,
+        "**/__pycache__": true
+    },
+    
+    // Terminal Configuration
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "${workspaceFolder}/src",
+        "AKR_TEMPLATES_DIR": "${env:USERPROFILE}/.akr/templates"
+    }
+}

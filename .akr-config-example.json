@@ -1,0 +1,79 @@
+{
+  "version": "2.1",
+  "projectName": "Multi-Repo Feature Documentation System",
+  "description": "Example configuration for cross-repository feature consolidation",
+  
+  "documentation": {
+    "rootPath": "docs/",
+    "components": {
+      "services": "services/",
+      "controllers": "controllers/",
+      "models": "models/"
+    }
+  },
+  
+  "crossRepository": {
+    "enabled": true,
+    
+    "relatedRepositories": [
+      {
+        "name": "webapp-ui",
+        "url": "https://github.com/your-org/webapp-ui.git",
+        "branch": "main",
+        "layer": "UI",
+        "docsPath": "docs/",
+        "enabled": true
+      },
+      {
+        "name": "webapp-api",
+        "url": "https://github.com/your-org/webapp-api.git",
+        "branch": "main",
+        "layer": "API",
+        "docsPath": "docs/",
+        "enabled": true
+      },
+      {
+        "name": "webapp-db",
+        "url": "https://github.com/your-org/webapp-db.git",
+        "branch": "main",
+        "layer": "Database",
+        "docsPath": "docs/",
+        "enabled": true
+      }
+    ],
+    
+    "cache": {
+      "directory": "~/.akr/repos/webapp1",
+      "updateInterval": "1h",
+      "cleanupStrategy": "lru"
+    },
+    
+    "tagRegistry": {
+      "path": ".akr/tags/tag-registry.json",
+      "syncInterval": "5m",
+      "validationMode": "strict"
+    },
+    
+    "consolidation": {
+      "enabled": true,
+      "outputPath": "docs/features/",
+      "templatePath": ".akr/templates/feature-consolidated.md",
+      
+      "outputBranch": {
+        "strategy": "feature-branch",
+        "namePattern": "docs/consolidate-{feature}-{date}",
+        "autoCreatePR": true,
+        "prReviewers": ["tech-lead", "product-owner"],
+        "prLabels": ["documentation", "auto-generated"],
+        "requireApproval": true
+      },
+      
+      "aggregation": {
+        "mode": "smart",
+        "includeArchitecture": true,
+        "includeDiagrams": true,
+        "includeRelationships": true
+      }
+    }
+  }
+}

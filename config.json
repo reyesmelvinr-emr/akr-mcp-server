@@ -1,0 +1,36 @@
+{
+    "server": {
+        "name": "akr-documentation-server",
+        "version": "0.1.0",
+        "description": "MCP server for AKR documentation generation and validation"
+    },
+    "paths": {
+        "akr_content": "./akr_content",
+        "charters": "./akr_content/charters",
+        "templates": "./akr_content/templates",
+        "guides": "./akr_content/guides",
+        "logs": "./logs"
+    },
+    "logging": {
+        "level": "INFO",
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "file": "./logs/akr-mcp-server.log"
+    },
+    "resources": {
+        "file_extensions": [".md"],
+        "categories": {
+            "charter": {
+                "pattern": "*CHARTER*.md",
+                "description": "AKR charter files defining documentation standards"
+            },
+            "template": {
+                "pattern": "*template*.md",
+                "description": "Documentation templates for different project types"
+            },
+            "guide": {
+                "pattern": "*Guide*.md",
+                "description": "Developer guides and reference documentation"
+            }
+        }
+    }
+}

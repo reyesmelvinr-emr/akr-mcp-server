@@ -1,0 +1,30 @@
+{
+    "$schema": "./akr-config-schema.json",
+    
+    "_comment": "AKR Documentation Configuration - Place this file in your project root as .akr-config.json",
+    
+    "projectName": "MyProject",
+    "projectType": "backend",
+    
+    "documentation": {
+        "outputStrategy": "docs-folder",
+        "outputPath": "./docs",
+        "fileNaming": "match-source",
+        "createSubfolders": true
+    },
+    
+    "templates": {
+        "default": "comprehensive",
+        "overrides": {
+            "*.cs": "comprehensive_service_template",
+            "*.tsx": "ui_component_template",
+            "*.ts": "ui_component_template",
+            "*.sql": "table_doc_template"
+        }
+    },
+    
+    "validation": {
+        "minimumScore": 80,
+        "requiredSections": []
+    }
+}

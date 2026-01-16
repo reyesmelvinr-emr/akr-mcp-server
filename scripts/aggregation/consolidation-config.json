@@ -1,0 +1,81 @@
+{
+  "$schema": "../schemas/consolidation-config-schema.json",
+  "version": "1.0.0",
+  "description": "Configuration for cross-repository documentation consolidation",
+  "cacheDir": "./.doc-cache",
+  "tagRegistryPath": "../../core-akr-templates/.akr/tags/tag-registry.json",
+  "templatePath": "../../core-akr-templates/.akr/templates/feature-consolidated.md",
+  "outputDir": "./docs/features",
+  
+  "repositories": [
+    {
+      "name": "web-ui",
+      "url": "https://github.com/your-org/web-ui.git",
+      "branch": "main",
+      "layer": "UI",
+      "docsPath": "docs/",
+      "includePatterns": ["docs/**/*.md"],
+      "excludePatterns": ["docs/archive/**", "docs/drafts/**"]
+    },
+    {
+      "name": "api-services",
+      "url": "https://github.com/your-org/api-services.git",
+      "branch": "main",
+      "layer": "API",
+      "docsPath": "docs/",
+      "includePatterns": ["docs/services/**/*.md", "docs/controllers/**/*.md"],
+      "excludePatterns": []
+    },
+    {
+      "name": "database",
+      "url": "https://github.com/your-org/database.git",
+      "branch": "main",
+      "layer": "Database",
+      "docsPath": "docs/",
+      "includePatterns": ["docs/tables/**/*.md", "docs/procedures/**/*.md"],
+      "excludePatterns": []
+    }
+  ],
+  
+  "features": {
+    "generateOn": ["schedule", "manual", "webhook"],
+    "schedule": {
+      "enabled": true,
+      "cron": "0 2 * * *",
+      "timezone": "UTC"
+    },
+    "webhook": {
+      "enabled": false,
+      "endpoint": "/webhook/consolidate",
+      "secret": "${WEBHOOK_SECRET}"
+    }
+  },
+  
+  "output": {
+    "format": "markdown",
+    "includeGeneratedMarkers": true,
+    "includeChangelog": true,
+    "publishToWiki": false,
+    "createIndex": true
+  },
+  
+  "validation": {
+    "requireApprovedTags": true,
+    "minComponentsPerFeature": 1,
+    "warnOnMissingLayers": true,
+    "requireHumanReview": ["security", "architecture"]
+  },
+  
+  "notifications": {
+    "onSuccess": {
+      "enabled": false,
+      "channels": ["slack", "teams"],
+      "webhook": "${NOTIFICATION_WEBHOOK}"
+    },
+    "onFailure": {
+      "enabled": true,
+      "channels": ["email"],
+      "recipients": ["docs-team@company.com"]
+    }
+  }
+}

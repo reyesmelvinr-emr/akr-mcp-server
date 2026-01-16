@@ -1,0 +1,186 @@
+{
+    "$schema": "https://modelcontextprotocol.io/schema/mcp-config.json",
+    "servers": {
+        "akr-documentation-server": {
+            "type": "stdio",
+            "command": "${workspaceFolder}/venv/Scripts/python.exe",
+            "args": [
+                "${workspaceFolder}/src/server.py"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "AKR_TEMPLATES_DIR": "${env:USERPROFILE}/.akr/templates",
+                "AKR_LOG_LEVEL": "INFO"
+            },
+            "metadata": {
+                "name": "AKR Documentation Server",
+                "version": "1.0.0",
+                "description": "Provides AKR documentation templates, standards, and automated generation tools",
+                "author": "AKR Development Team",
+                "capabilities": [
+                    "template-management",
+                    "documentation-generation",
+                    "interview-workflow",
+                    "surgical-updates",
+                    "branch-management",
+                    "pr-operations"
+                ]
+            },
+            "slashCommands": {
+                "docs.list-templates": {
+                    "description": "List all available AKR documentation templates",
+                    "tool": "list_all_templates",
+                    "examples": [
+                        "@workspace /docs.list-templates",
+                        "@workspace /docs.list-templates --verbose"
+                    ]
+                },
+                "docs.suggest-template": {
+                    "description": "Suggest the most appropriate template for a file",
+                    "tool": "suggest_template_for_file",
+                    "parameters": {
+                        "file_path": {
+                            "type": "string",
+                            "required": true,
+                            "description": "Path to the source file"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.suggest-template src/components/Button.tsx",
+                        "@workspace /docs.suggest-template src/services/UserService.cs"
+                    ]
+                },
+                "docs.generate": {
+                    "description": "Generate documentation for a source file",
+                    "tool": "write_documentation",
+                    "parameters": {
+                        "source_file": {
+                            "type": "string",
+                            "required": true,
+                            "description": "Path to source file to document"
+                        },
+                        "template_name": {
+                            "type": "string",
+                            "required": false,
+                            "description": "Template to use (auto-detected if not specified)"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.generate src/components/LoginForm.tsx",
+                        "@workspace /docs.generate src/services/AuthService.cs --template service-comprehensive"
+                    ]
+                },
+                "docs.update": {
+                    "description": "Surgically update existing documentation (preserves human content)",
+                    "tool": "update_documentation_sections",
+                    "parameters": {
+                        "file_path": {
+                            "type": "string",
+                            "required": true,
+                            "description": "Path to documentation file"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.update docs/components/Button.md",
+                        "@workspace /docs.update docs/services/UserService.md"
+                    ]
+                },
+                "docs.analyze-impact": {
+                    "description": "Analyze impact of proposed documentation updates",
+                    "tool": "analyze_documentation_impact",
+                    "parameters": {
+                        "file_path": {
+                            "type": "string",
+                            "required": true,
+                            "description": "Path to documentation file"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.analyze-impact docs/api/endpoints.md"
+                    ]
+                },
+                "docs.interview": {
+                    "description": "Start interactive interview to gather human context",
+                    "tool": "start_documentation_interview",
+                    "parameters": {
+                        "source_file": {
+                            "type": "string",
+                            "required": true,
+                            "description": "Source file to document"
+                        },
+                        "role": {
+                            "type": "string",
+                            "required": false,
+                            "description": "Your role: technical_lead, developer, product_owner, qa_tester, scrum_master"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.interview src/features/auth/Login.tsx",
+                        "@workspace /docs.interview src/services/PaymentService.cs --role technical_lead"
+                    ]
+                },
+                "docs.my-role": {
+                    "description": "Show your current role for interview questions",
+                    "tool": "get_user_role",
+                    "examples": [
+                        "@workspace /docs.my-role"
+                    ]
+                },
+                "docs.set-role": {
+                    "description": "Set your role for interview questions",
+                    "tool": "set_user_role",
+                    "parameters": {
+                        "role": {
+                            "type": "string",
+                            "required": true,
+                            "description": "technical_lead, developer, product_owner, qa_tester, scrum_master"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.set-role technical_lead",
+                        "@workspace /docs.set-role developer"
+                    ]
+                },
+                "docs.init-session": {
+                    "description": "Initialize documentation session with branch management",
+                    "tool": "initialize_documentation_session",
+                    "parameters": {
+                        "workspace_path": {
+                            "type": "string",
+                            "required": true,
+                            "description": "Path to workspace/repository root"
+                        },
+                        "branch_strategy": {
+                            "type": "string",
+                            "required": false,
+                            "description": "create_new, use_current, or use_existing"
+                        }
+                    },
+                    "examples": [
+                        "@workspace /docs.init-session .",
+                        "@workspace /docs.init-session . --branch-strategy create_new"
+                    ]
+                },
+                "docs.create-pr": {
+                    "description": "Create pull request for documentation changes",
+                    "tool": "create_documentation_pr",
+                    "examples": [
+                        "@workspace /docs.create-pr"
+                    ]
+                }
+            },
+            "settings": {
+                "autoReload": true,
+                "enableDiagnostics": true,
+                "templateSyncOnStartup": true
+            }
+        }
+    },
+    "mcpServers": {
+        "globalSettings": {
+            "timeout": 30000,
+            "maxConcurrentRequests": 5,
+            "retryAttempts": 3
+        }
+    }
+}

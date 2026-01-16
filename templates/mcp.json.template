@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "akr-documentation-server": {
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/src/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "${env:AKR_MCP_SERVER_PATH}/src",
+        "VSCODE_WORKSPACE_FOLDER": "${workspaceFolder}",
+        "AKR_TEMPLATES_DIR": "${env:HOME}/.akr/templates"
+      }
+    }
+  }
+}
