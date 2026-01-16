@@ -1,4 +1,4 @@
-# AKR MCP Documentation Server
+# Application Knowledge Repository (AKR) MCP Documentation Server
 
 A Model Context Protocol (MCP) server that provides AKR documentation resources and tools to GitHub Copilot in VS Code.
 
