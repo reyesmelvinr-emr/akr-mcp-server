@@ -1,9 +1,20 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: UI
+component: [Component Name]
+status: deployed
+version: 1.0
+componentType: UIComponent
+priority: P1
+lastUpdated: YYYY-MM-DD
+---
+
 # Component Documentation: [Component Name]
 
 **File**: `src/components/[path]/[ComponentName].tsx`  
 **Type**: [Presentational | Container | Page | Composite | HOC]  
 **Complexity**: [Simple | Medium | Complex]  
-**Last Updated**: YYYY-MM-DD  
 **Author**: [Developer Name]
 
 ---
@@ -954,31 +965,6 @@ npx @company/codemod migrate-component-v2
 10. Review with team, create PR
 
 **Total Time**: ~20-25 minutes for baseline documentation
-
----
-
-## Tags & Metadata
-
-**Tags**: 🤖 #[feature-domain] #[cross-cutting] #ui-component #[priority] #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tags (e.g., #enrollment, #course-catalog, #user-profile)
-- Cross-Cutting tags (e.g., #authentication, #validation, #error-handling)
-- Technical tag: #ui-component (or #page, #form, #button, #modal)
-- Priority tag (e.g., #core-feature, #important, #nice-to-have)
-- Status tag (e.g., #deployed, #stable, #beta)
-
-**Example**: `#enrollment #authentication #ui-component #core-feature #deployed`
-
-**Related Features**:
-- 🤖 [Feature documentation that uses this component]
-- ❓ [Add links to features in AKR_Main/features/ folder]
-
-**Component Metadata**:
-- **Domain**: ❓ [Business domain this component belongs to]
-- **Priority**: ❓ [P0: Core | P1: Important | P2: Nice-to-have]
-- **User Stories**: ❓ [US#12345, US#12467]
-- **Sprint**: ❓ [Sprint number or date deployed]
 
 ---
 

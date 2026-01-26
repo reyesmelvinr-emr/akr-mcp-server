@@ -1,8 +1,19 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: Database
+component: [TABLE_NAME]
+status: deployed
+version: 1.0
+componentType: Table
+priority: P1
+lastUpdated: [YYYY-MM-DD]
+---
+
 # Table: [TABLE_NAME]
 
 **Schema/Namespace**: [schema]  
 **Object Type**: Table  
-**Last Updated**: [YYYY-MM-DD]
 
 ---
 
@@ -157,31 +168,6 @@ git log --grep="FN#####" docs/tables/[TABLE_NAME]_doc.md
 ```bash
 git commit -m "docs: update [TableName] table - add [ColumnName] (FN#####_US#####)"
 ```
-
----
-
-## Tags & Metadata
-
-**Tags**: 🤖 #[feature-domain] #[cross-cutting] #table #[priority] #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tags (e.g., #enrollment, #course-catalog, #user-profile)
-- Cross-Cutting tags (e.g., #audit-logging, #data-validation)
-- Technical tag: #table
-- Priority tag (e.g., #core-feature, #important, #nice-to-have)
-- Status tag (e.g., #deployed, #stable)
-
-**Example**: `#enrollment #audit-logging #table #core-feature #deployed`
-
-**Related Features**:
-- 🤖 [Feature documentation that uses this table]
-- ❓ [Add links to features in AKR_Main/features/ folder]
-
-**Table Metadata**:
-- **Domain**: ❓ [Business domain this table belongs to]
-- **Priority**: ❓ [P0: Core | P1: Important | P2: Nice-to-have]
-- **User Stories**: ❓ [US#12345, US#12467]
-- **Schema Version**: ❓ [Version when table was added]
 
 ---
 

@@ -1,10 +1,21 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: Database
+component: Legacy Inventory
+status: investigation
+version: 1.0
+componentType: LegacyInventory
+priority: P2
+lastUpdated: [YYYY-MM-DD]
+---
+
 # Legacy Database Object Inventory
 
 **Application**: [Application Name]  
 **Database**: [Database Name]  
 **Last Reviewed**: [YYYY-MM-DD]  
-**Reviewed By**: ❓ [@team-member]  
-**Tags**: #database #legacy #technical-debt #embedded-schema
+**Reviewed By**: ❓ [@team-member]
 
 ---
 
@@ -300,29 +311,7 @@ PRINT 'Object [ObjectName] removed successfully';
 | 1.0 | ❓ | ❓ | Initial inventory |
 
 ---
-## Tags & Metadata
 
-**Tags**: 🤖 #legacy-inventory #database #technical-debt #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tags (if applicable - e.g., #legacy-reporting)
-- Cross-Cutting tags: #technical-debt
-- Technical tag: #database, #legacy-inventory
-- Status tag (e.g., #investigation, #cleanup-in-progress)
-
-**Example**: `#legacy-inventory #database #technical-debt #investigation`
-
-**Related Documentation**:
-- ❓ [Link to parent embedded_database_template.md doc]
-- ❓ [Link to database cleanup initiative or ADR]
-
-**Inventory Metadata**:
-- **Total Objects**: 🤖 [Count]
-- **Tier 3 Objects**: 🤖 [Count]
-- **Investigation Status**: ❓ [% complete]
-- **Last Review**: ❓ [Date]
-
----
 ## Template Metadata
 
 **Template Version**: 1.0  

@@ -1,8 +1,19 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: API
+component: [SERVICE_NAME]
+status: deployed
+version: 1.0
+componentType: Service
+priority: P1
+lastUpdated: [YYYY-MM-DD]
+---
+
 # Service: [SERVICE_NAME]
 
 **Namespace/Project**: [Project.Services]  
-**File Location**: `src/Services/[ServiceName].cs`  
-**Last Updated**: [YYYY-MM-DD]  
+**File Location**: `src/Services/[ServiceName].cs`   
 **Complexity**: [Simple / Medium / Complex]  
 **Documentation Level**: 🔶 Baseline (70% complete)
 
@@ -551,24 +562,6 @@ The sections below are optional. Add them when you have real information to shar
 
 **Related Services:** Link to dependent/consumer service docs:
 - `[ServiceName](./ServiceName_doc.md)`
-
----
-
-## Tags & Metadata
-
-**Tags**: 🤖 #[feature-domain] #[cross-cutting] #service #[priority] #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tags (e.g., #enrollment, #course-catalog)
-- Cross-Cutting tags (e.g., #authentication, #validation)
-- Technical tag: #service
-- Priority tag (e.g., #core-feature, #important)
-- Status tag (e.g., #deployed, #stable)
-
-**Example**: `#enrollment #validation #service #core-feature #deployed`
-
-**Related Features**:
-- ❓ [Links to features in AKR_Main/features/ folder]
 
 ---
 

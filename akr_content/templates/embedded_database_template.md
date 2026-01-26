@@ -1,11 +1,22 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: Database
+component: [Application Name] Database
+status: deployed
+version: 1.0
+componentType: Database
+priority: P1
+lastUpdated: [YYYY-MM-DD]
+---
+
 # [Application Name] - Database Documentation
 
 **Documentation Type**: Embedded Database (No Dedicated DB Project)  
 **Repository**: [backend-api / monorepo / standalone]  
 **Database Platform**: [SQL Server / PostgreSQL / MySQL / MongoDB / etc.]  
 **Schema Name**: [dbo / public / custom]  
-**Last Updated**: [YYYY-MM-DD]  
-**Tags**: #database #embedded-schema #[app-name] [feature-tags]
+
 
 ---
 
@@ -470,31 +481,6 @@ After AI generates baseline:
 6. Create individual docs for Tier 1 objects (15-30 min each)
 
 **Total Time (Initial):** 2-4 hours for full database documentation
-
----
-
-## Tags & Metadata
-
-**Tags**: 🤖 #[feature-domain] #database #[priority] #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tags (e.g., #user-profile, #course-catalog)
-- Cross-Cutting tags (e.g., #audit-logging, #data-validation)
-- Technical tag: #database
-- Priority tag (e.g., #core-feature, #important)
-- Status tag (e.g., #deployed, #stable, #legacy)
-
-**Example**: `#enrollment #audit-logging #database #core-feature #stable`
-
-**Related Features**:
-- 🤖 [Feature documentation that uses this database]
-- ❓ [Add links to features in AKR_Main/features/ folder]
-
-**Database Metadata**:
-- **Domain**: ❓ [Primary business domain]
-- **Priority**: ❓ [P0: Core | P1: Important | P2: Legacy]
-- **Management Approach**: ❓ [Manual scripts | Transitioning to formal tool]
-- **Owner**: ❓ [Team responsible]
 
 ---
 

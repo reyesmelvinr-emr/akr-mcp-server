@@ -1,8 +1,19 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: API
+component: [SERVICE_NAME]
+status: deployed
+version: 1.0
+componentType: Service
+priority: P2
+lastUpdated: [YYYY-MM-DD]
+---
+
 # Service: [SERVICE_NAME]
 
 **Namespace/Project**: [Project.Services]  
-**File Location**: `src/Services/[ServiceName].cs`  
-**Last Updated**: [YYYY-MM-DD]  
+**File Location**: `src/Services/[ServiceName].cs`   
 **Complexity**: Simple (CRUD operations)
 
 ---
@@ -109,21 +120,6 @@
 **Example:**
 - ❓ Should deleted courses be hidden from admin panel too?
 - ❓ Need validation for course duration (currently unconstrained)
-
----
-
-## Tags & Metadata
-
-**Tags**: 🤖 #[feature-domain] #service #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tag (e.g., #course-catalog)
-- Technical tag: #service
-- Status tag (e.g., #deployed)
-
-**Example**: `#course-catalog #service #deployed`
-
-**Related Features**: ❓ [Links to features in AKR_Main/features/]
 
 ---
 

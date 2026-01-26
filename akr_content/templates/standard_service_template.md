@@ -1,8 +1,19 @@
+---
+feature: [FEATURE_NAME]
+domain: [DOMAIN]
+layer: API
+component: [SERVICE_NAME]
+status: deployed
+version: 1.0
+componentType: Service
+priority: P1
+lastUpdated: [YYYY-MM-DD]
+---
+
 # Service: [SERVICE_NAME]
 
 **Namespace/Project**: [Project.Services]  
 **File Location**: `src/Services/[ServiceName].cs`  
-**Last Updated**: [YYYY-MM-DD]  
 **Complexity**: [Simple / Medium / Complex]  
 **Criticality**: [High / Medium / Low]  
 **Documentation Level**: 🟢 Standard (85% complete)
@@ -554,31 +565,6 @@ For table schema details, see:
 
 **Architecture Decisions:**  
 [Link to ADR (Architecture Decision Records) if applicable]
-
----
-
-## Tags & Metadata
-
-**Tags**: 🤖 #[feature-domain] #[cross-cutting] #service #[priority] #[status]
-
-❓ **Add feature tags** (see TAGGING_STRATEGY_TAXONOMY.md):
-- Feature Domain tags (e.g., #enrollment, #course-catalog, #user-profile)
-- Cross-Cutting tags (e.g., #authentication, #audit-logging, #validation)
-- Technical tag: #service
-- Priority tag (e.g., #core-feature, #important, #nice-to-have)
-- Status tag (e.g., #deployed, #stable, #beta)
-
-**Example**: `#enrollment #prerequisite-validation #authentication #service #core-feature #deployed`
-
-**Related Features**:
-- 🤖 [Feature documentation that uses this service]
-- ❓ [Add links to features in AKR_Main/features/ folder]
-
-**Component Metadata**:
-- **Domain**: ❓ [Business domain this service belongs to]
-- **Priority**: ❓ [P0: Core | P1: Important | P2: Nice-to-have]
-- **User Stories**: ❓ [US#12345, US#12467]
-- **Sprint**: ❓ [Sprint number or date deployed]
 
 ---
 
