@@ -166,543 +166,318 @@ cross_repo_state = {
 
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    """List all available tools."""
+    """List all available tools - optimized with consolidated actions."""
     logger.debug("Listing available tools")
     return [
-        # ===== Read-Only Tools =====
+        # ===== Server Utilities (Consolidated) =====
         Tool(
-            name="health_check",
-            description="Check the health status of the AKR documentation server. Returns server uptime, version, and statistics.",
+            name="server",
+            description="Server utilities: health check and capabilities info",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "verbose": {
-                        "type": "boolean",
-                        "description": "If true, include detailed statistics",
-                        "default": False
-                    }
-                },
-                "required": []
-            }
-        ),
-        Tool(
-            name="get_server_info",
-            description="Get information about the AKR documentation server capabilities and available resources.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        ),
-        Tool(
-            name="list_templates",
-            description="List all available documentation templates. Templates provide structured formats for consistent documentation. Can filter by project type (backend, ui, database) and show detailed information.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "project_type": {
+                    "action": {
                         "type": "string",
-                        "description": "Filter templates by project type: 'backend', 'ui', 'database', or 'all'",
-                        "enum": ["backend", "ui", "database", "all"],
-                        "default": "all"
+                        "description": "Action to perform",
+                        "enum": ["health", "info"]
                     },
                     "verbose": {
                         "type": "boolean",
-                        "description": "If true, include detailed use cases and required sections",
+                        "description": "Include detailed statistics (for health action)",
                         "default": False
                     }
                 },
-                "required": []
-            }
-        ),
-        Tool(
-            name="suggest_template",
-            description="Suggest the most appropriate documentation template for a given file. Analyzes the file extension to determine project type and recommends matching templates.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the file you want to document (e.g., 'src/services/UserService.cs')"
-                    },
-                    "complexity": {
-                        "type": "string",
-                        "description": "Preferred template complexity: 'minimal', 'lean', 'standard', or 'comprehensive'",
-                        "enum": ["minimal", "lean", "standard", "comprehensive"],
-                        "default": "standard"
-                    }
-                },
-                "required": ["file_path"]
+                "required": ["action"]
             }
         ),
         
-        # ===== Write Capability Tools - Session Management =====
+        # ===== Templates (Consolidated) =====
         Tool(
-            name="initialize_documentation_session",
-            description="Initialize a documentation session for a workspace. This sets up branch management and loads project configuration. Must be called before any write operations.",
+            name="templates",
+            description="Documentation template operations: list, suggest, or get details",
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["list", "suggest"]
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "File path (required for suggest action)"
+                    },
+                    "project_type": {
+                        "type": "string",
+                        "description": "Filter by type (for list action)",
+                        "enum": ["backend", "ui", "database", "all"],
+                        "default": "all"
+                    },
+                    "complexity": {
+                        "type": "string",
+                        "description": "Template complexity (for suggest action)",
+                        "enum": ["minimal", "lean", "standard", "comprehensive"],
+                        "default": "standard"
+                    },
+                    "verbose": {
+                        "type": "boolean",
+                        "description": "Include detailed info",
+                        "default": False
+                    },
+                    "page": {
+                        "type": "integer",
+                        "description": "Page number for pagination (for list action)",
+                        "default": 1,
+                        "minimum": 1
+                    },
+                    "page_size": {
+                        "type": "integer",
+                        "description": "Items per page (max 20)",
+                        "default": 10,
+                        "minimum": 1,
+                        "maximum": 20
+                    }
+                },
+                "required": ["action"]
+            }
+        ),
+        
+        # ===== Session Management (Consolidated) =====
+        Tool(
+            name="session",
+            description="Documentation session operations: initialize, get config, suggest paths, or end session",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["initialize", "get_config", "suggest_path", "end"]
+                    },
                     "workspace_path": {
                         "type": "string",
-                        "description": "Absolute path to the workspace/repository root"
+                        "description": "Workspace/repository root path (required for most actions)"
                     },
                     "branch_strategy": {
                         "type": "string",
-                        "description": "Branch strategy: 'create_new' (create docs/timestamp branch), 'use_current' (use current branch), 'use_existing' (specify branch name)",
+                        "description": "Branch strategy (for initialize)",
                         "enum": ["create_new", "use_current", "use_existing"],
                         "default": "create_new"
                     },
                     "branch_name": {
                         "type": "string",
-                        "description": "Branch name (required if branch_strategy is 'use_existing')"
-                    }
-                },
-                "required": ["workspace_path"]
-            }
-        ),
-        Tool(
-            name="get_project_config",
-            description="Get the project configuration from .akr-config.json. Shows documentation paths, component mappings, and team settings.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the workspace/repository root"
-                    }
-                },
-                "required": ["workspace_path"]
-            }
-        ),
-        Tool(
-            name="suggest_documentation_path",
-            description="Suggest the appropriate documentation path for a source file based on project configuration.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "source_file": {
-                        "type": "string",
-                        "description": "Path to the source file to document"
-                    },
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the workspace/repository root"
-                    }
-                },
-                "required": ["source_file", "workspace_path"]
-            }
-        ),
-        
-        # ===== Write Capability Tools - Documentation Writing =====
-        Tool(
-            name="write_documentation",
-            description="Write new documentation to a file in the repository. Creates the file with AI markers and commits to the current documentation branch. Only works on documentation branches, not main.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "doc_path": {
-                        "type": "string",
-                        "description": "Relative path where documentation should be written"
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Documentation content (markdown)"
+                        "description": "Branch name (for use_existing strategy)"
                     },
                     "source_file": {
                         "type": "string",
-                        "description": "Path to the source file being documented"
+                        "description": "Source file path (for suggest_path action)"
                     },
-                    "component_type": {
-                        "type": "string",
-                        "description": "Type of component (services, controllers, etc.)"
-                    },
-                    "template_used": {
-                        "type": "string",
-                        "description": "Name of the template used for generation"
-                    },
-                    "overwrite": {
-                        "type": "boolean",
-                        "description": "Allow overwriting existing files",
-                        "default": False
-                    }
-                },
-                "required": ["doc_path", "content", "source_file"]
-            }
-        ),
-        
-        # ===== Write Capability Tools - Surgical Updates =====
-        Tool(
-            name="analyze_documentation_impact",
-            description="Analyze the impact of proposed updates to existing documentation. Shows which sections are AI-generated (can be updated) vs human-authored (will be preserved).",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the existing documentation file"
-                    },
-                    "proposed_sections": {
-                        "type": "object",
-                        "description": "Dictionary of section_id -> new_content to analyze"
-                    }
-                },
-                "required": ["file_path", "proposed_sections"]
-            }
-        ),
-        Tool(
-            name="update_documentation_sections",
-            description="Perform surgical updates to specific sections of documentation. Only updates AI-generated sections while preserving human-authored content.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the documentation file to update"
-                    },
-                    "section_updates": {
-                        "type": "object",
-                        "description": "Dictionary of section_id -> new_content"
-                    },
-                    "add_changelog": {
-                        "type": "boolean",
-                        "description": "Add changelog entry for the update",
-                        "default": True
-                    },
-                    "dry_run": {
-                        "type": "boolean",
-                        "description": "Preview changes without writing",
-                        "default": False
-                    }
-                },
-                "required": ["file_path", "section_updates"]
-            }
-        ),
-        Tool(
-            name="get_document_structure",
-            description="Get the structure of an existing documentation file. Shows all sections, their types, and which are AI-generated vs human-authored.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the documentation file"
-                    }
-                },
-                "required": ["file_path"]
-            }
-        ),
-        
-        # ===== Write Capability Tools - Pull Request =====
-        Tool(
-            name="create_documentation_pr",
-            description="Create a Pull Request for documentation changes. Pushes the current documentation branch and creates a PR against main.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "PR title"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "PR description explaining the documentation changes"
-                    },
-                    "draft": {
-                        "type": "boolean",
-                        "description": "Create as draft PR (recommended for review)",
-                        "default": True
-                    }
-                },
-                "required": ["title", "description"]
-            }
-        ),
-        Tool(
-            name="check_pr_requirements",
-            description="Check if all requirements are met for creating a documentation PR. Verifies GitHub CLI, authentication, and branch status.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        ),
-        Tool(
-            name="end_documentation_session",
-            description="End the current documentation session. Optionally creates a PR and returns a summary of documented files.",
-            inputSchema={
-                "type": "object",
-                "properties": {
                     "create_pr": {
                         "type": "boolean",
-                        "description": "Create a PR before ending the session",
+                        "description": "Create PR when ending session",
                         "default": False
                     },
                     "pr_title": {
                         "type": "string",
-                        "description": "PR title (required if create_pr is true)"
+                        "description": "PR title (if create_pr is true)"
                     },
                     "pr_description": {
                         "type": "string",
-                        "description": "PR description (required if create_pr is true)"
+                        "description": "PR description (if create_pr is true)"
                     }
                 },
-                "required": []
+                "required": ["action"]
             }
         ),
         
-        # ===== Human Input Interview Tools =====
+        # ===== Documentation Operations (Consolidated) =====
         Tool(
-            name="start_documentation_interview",
-            description="Start an interactive interview session to collect human context for documentation sections that AI cannot infer from code. Returns questions about business context, historical background, team ownership, etc. Users can answer or skip questions. Supports role-based filtering to show only questions relevant to the user's expertise.",
+            name="documentation",
+            description="Documentation operations: write, analyze impact, update sections, get structure, create PR, or check requirements",
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["write", "analyze_impact", "update_sections", "get_structure", "create_pr", "check_pr_requirements"]
+                    },
+                    "doc_path": {
+                        "type": "string",
+                        "description": "Documentation file path (for write)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Documentation content (for write)"
+                    },
                     "source_file": {
                         "type": "string",
-                        "description": "Path to the source file being documented"
-                    },
-                    "template_content": {
-                        "type": "string",
-                        "description": "The template or generated documentation content to analyze for human input sections"
-                    },
-                    "template_name": {
-                        "type": "string",
-                        "description": "Name of the template used"
+                        "description": "Source file being documented (for write)"
                     },
                     "component_type": {
                         "type": "string",
-                        "description": "Type of component (services, ui, database)"
+                        "description": "Component type (for write)"
+                    },
+                    "template_used": {
+                        "type": "string",
+                        "description": "Template name used (for write)"
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "description": "Allow overwriting (for write)",
+                        "default": False
+                    },
+                    "file_path": {
+                        "type": "string",
+                        "description": "File path (for analyze_impact, update_sections, get_structure)"
+                    },
+                    "proposed_sections": {
+                        "type": "object",
+                        "description": "Section updates (for analyze_impact)"
+                    },
+                    "section_updates": {
+                        "type": "object",
+                        "description": "Section updates (for update_sections)"
+                    },
+                    "add_changelog": {
+                        "type": "boolean",
+                        "description": "Add changelog entry (for update_sections)",
+                        "default": True
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "Preview changes only (for update_sections)",
+                        "default": False
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "PR title (for create_pr)"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "PR description (for create_pr)"
+                    },
+                    "draft": {
+                        "type": "boolean",
+                        "description": "Create draft PR (for create_pr)",
+                        "default": True
+                    }
+                },
+                "required": ["action"]
+            }
+        ),
+        
+        # ===== Interview Operations (Consolidated) =====
+        Tool(
+            name="interview",
+            description="Interactive documentation interview: start, get question, submit answer, skip, check progress, or end session",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["start", "get_question", "submit_answer", "skip", "progress", "end"]
+                    },
+                    "source_file": {
+                        "type": "string",
+                        "description": "Source file path (for start)"
+                    },
+                    "template_content": {
+                        "type": "string",
+                        "description": "Template/generated content to analyze (for start)"
+                    },
+                    "template_name": {
+                        "type": "string",
+                        "description": "Template name (for start)"
+                    },
+                    "component_type": {
+                        "type": "string",
+                        "description": "Component type (for start)"
                     },
                     "priority_filter": {
                         "type": "string",
-                        "description": "Only ask questions of this priority or higher: 'critical', 'important', or 'optional' (includes all)",
+                        "description": "Question priority filter (for start)",
                         "enum": ["critical", "important", "optional"],
                         "default": "optional"
                     },
                     "role": {
                         "type": "string",
-                        "description": "Interview role to filter questions by expertise area. 'general' shows all questions.",
+                        "description": "Interview role (for start)",
                         "enum": ["technical_lead", "developer", "product_owner", "qa_tester", "scrum_master", "general"],
                         "default": "general"
-                    }
-                },
-                "required": ["source_file", "template_content", "template_name", "component_type"]
-            }
-        ),
-        Tool(
-            name="get_next_interview_question",
-            description="Get the current/next question in the documentation interview. Returns the question text, follow-up prompts, examples, and progress information.",
-            inputSchema={
-                "type": "object",
-                "properties": {
+                    },
                     "session_id": {
                         "type": "string",
-                        "description": "Active interview session ID"
-                    }
-                },
-                "required": ["session_id"]
-            }
-        ),
-        Tool(
-            name="submit_interview_answer",
-            description="Submit an answer to the current interview question. The system will generate a polished draft from your answer that can be inserted into the documentation.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "description": "Active interview session ID"
+                        "description": "Session ID (required for all actions except start)"
                     },
                     "answer": {
                         "type": "string",
-                        "description": "User's answer to the question (can be informal, will be polished)"
+                        "description": "Answer text (for submit_answer)"
                     },
                     "generate_draft": {
                         "type": "boolean",
-                        "description": "Auto-generate polished draft from the answer",
+                        "description": "Auto-generate polished draft (for submit_answer)",
                         "default": True
-                    }
-                },
-                "required": ["session_id", "answer"]
-            }
-        ),
-        Tool(
-            name="skip_interview_question",
-            description="Skip the current interview question if you don't have the information right now. You can provide a reason to remind yourself later.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "description": "Active interview session ID"
                     },
                     "reason": {
                         "type": "string",
-                        "description": "Reason for skipping (e.g., 'Need to check with team lead', 'Will research later')",
+                        "description": "Skip reason (for skip)",
                         "default": "Will provide later"
                     }
                 },
-                "required": ["session_id"]
-            }
-        ),
-        Tool(
-            name="get_interview_progress",
-            description="Get the current progress of the documentation interview including answered questions, skipped questions, and drafted content.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "description": "Active interview session ID"
-                    }
-                },
-                "required": ["session_id"]
-            }
-        ),
-        Tool(
-            name="end_documentation_interview",
-            description="End the interview session and get all collected answers with drafted content. Use this to finalize the interview and get content ready for insertion into documentation.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "description": "Active interview session ID"
-                    }
-                },
-                "required": ["session_id"]
+                "required": ["action"]
             }
         ),
         
-        # ===== Cross-Repository Consolidation Tools =====
+        # ===== Cross-Repository Operations (Consolidated) =====
         Tool(
-            name="consolidate_feature",
-            description="Generate consolidated documentation for a feature by collecting components from multiple repositories. Creates feature branch for review, generates documentation with architecture diagrams, and optionally creates a pull request.",
+            name="cross_repository",
+            description="Cross-repo operations: consolidate feature, generate testing docs, detect changes, list features, refresh repos, or check states",
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["consolidate_feature", "generate_testing", "detect_changes", "list_features", "refresh_repos", "check_states", "validate_traceability"]
+                    },
                     "feature_name": {
                         "type": "string",
-                        "description": "Name of the feature to consolidate"
+                        "description": "Feature name (for consolidate_feature, generate_testing)"
                     },
                     "workspace_path": {
                         "type": "string",
-                        "description": "Absolute path to the feature repository workspace"
-                    }
-                },
-                "required": ["feature_name", "workspace_path"]
-            }
-        ),
-        Tool(
-            name="generate_testing_documentation",
-            description="Generate testing documentation for a feature based on its feature documentation. Automatically creates test context, test scenarios, and traceability links using the consolidated testing template.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "feature_name": {
-                        "type": "string",
-                        "description": "Name of the feature to generate testing documentation for"
-                    },
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the feature repository workspace"
+                        "description": "Workspace path (required for most actions)"
                     },
                     "test_type": {
                         "type": "string",
-                        "description": "Type of testing documentation (e.g., 'integration', 'e2e', 'unit')",
+                        "description": "Test type (for generate_testing)",
                         "default": "integration"
-                    }
-                },
-                "required": ["feature_name", "workspace_path"]
-            }
-        ),
-        Tool(
-            name="detect_feature_changes",
-            description="Detect which features were affected by recent changes in component repositories. Only scans main/stable branches, ignoring feature branches.",
-            inputSchema={
-                "type": "object",
-                "properties": {
+                    },
                     "since": {
                         "type": "string",
-                        "description": "Time reference (e.g., 'yesterday', '7d', '2026-01-10')"
+                        "description": "Time reference (for detect_changes)"
                     },
                     "author": {
                         "type": "string",
-                        "description": "Optional author email filter"
+                        "description": "Author filter (for detect_changes)"
                     },
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the feature repository workspace"
-                    }
-                },
-                "required": ["since", "workspace_path"]
-            }
-        ),
-        Tool(
-            name="list_features",
-            description="List all features discovered across related repositories with their component counts and layers.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the feature repository workspace"
-                    }
-                },
-                "required": ["workspace_path"]
-            }
-        ),
-        Tool(
-            name="refresh_repositories",
-            description="Clone or update all related repositories to local cache. Only fetches configured branches (main/stable) for consolidation.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the feature repository workspace"
-                    }
-                },
-                "required": ["workspace_path"]
-            }
-        ),
-        Tool(
-            name="check_repository_states",
-            description="Check the current state of all cached repositories including branch names, latest commits, and sync status.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "workspace_path": {
-                        "type": "string",
-                        "description": "Absolute path to the feature repository workspace"
-                    }
-                },
-                "required": ["workspace_path"]
-            }
-        ),
-        
-        # ===== Testing Documentation Validation Tools =====
-        Tool(
-            name="validate_testing_traceability",
-            description="Validate bidirectional links between feature and testing documentation. Checks for missing testing docs, broken links, and orphaned documentation.",
-            inputSchema={
-                "type": "object",
-                "properties": {
                     "docs_dir": {
                         "type": "string",
-                        "description": "Root documentation directory (default: docs)",
+                        "description": "Docs directory (for validate_traceability)",
                         "default": "docs"
                     },
                     "features_dir": {
                         "type": "string",
-                        "description": "Optional: Specific features directory path"
+                        "description": "Features directory (for validate_traceability)"
                     },
                     "testing_dir": {
                         "type": "string",
-                        "description": "Optional: Specific testing directory path"
+                        "description": "Testing directory (for validate_traceability)"
                     }
                 },
-                "required": []
+                "required": ["action"]
             }
         )
     ]
@@ -710,170 +485,198 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Handle tool calls."""
-    logger.info(f"Tool called: {name} with arguments: {arguments}")
+    """Handle tool calls with consolidated action-based routing."""
+    logger.info(f"Tool called: {name} with action: {arguments.get('action', 'N/A')}")
     server_state["tool_calls"] += 1
     
     try:
-        # Read-only tools
-        if name == "health_check":
-            return await health_check(arguments.get("verbose", False))
-        elif name == "get_server_info":
-            return await get_server_info()
-        elif name == "list_templates":
-            return await handle_list_templates(
-                project_type=arguments.get("project_type", "all"),
-                verbose=arguments.get("verbose", False)
-            )
-        elif name == "suggest_template":
-            return await handle_suggest_template(
-                file_path=arguments.get("file_path", ""),
-                complexity=arguments.get("complexity", "standard")
-            )
+        # Server utilities
+        if name == "server":
+            action = arguments.get("action")
+            if action == "health":
+                return await health_check(arguments.get("verbose", False))
+            elif action == "info":
+                return await get_server_info()
+            else:
+                raise ValueError(f"Unknown server action: {action}")
         
-        # Write capability tools - Session Management
-        elif name == "initialize_documentation_session":
-            return await handle_initialize_session(
-                workspace_path=arguments.get("workspace_path"),
-                branch_strategy=arguments.get("branch_strategy", "create_new"),
-                branch_name=arguments.get("branch_name")
-            )
-        elif name == "get_project_config":
-            return await handle_get_project_config(
-                workspace_path=arguments.get("workspace_path")
-            )
-        elif name == "suggest_documentation_path":
-            return await handle_suggest_doc_path(
-                source_file=arguments.get("source_file"),
-                workspace_path=arguments.get("workspace_path")
-            )
+        # Templates
+        elif name == "templates":
+            action = arguments.get("action")
+            if action == "list":
+                return await handle_list_templates(
+                    project_type=arguments.get("project_type", "all"),
+                    verbose=arguments.get("verbose", False),
+                    page=arguments.get("page", 1),
+                    page_size=arguments.get("page_size", 10)
+                )
+            elif action == "suggest":
+                return await handle_suggest_template(
+                    file_path=arguments.get("file_path", ""),
+                    complexity=arguments.get("complexity", "standard")
+                )
+            else:
+                raise ValueError(f"Unknown templates action: {action}")
         
-        # Write capability tools - Documentation Writing
-        elif name == "write_documentation":
-            return await handle_write_documentation(
-                doc_path=arguments.get("doc_path"),
-                content=arguments.get("content"),
-                source_file=arguments.get("source_file"),
-                component_type=arguments.get("component_type", "unknown"),
-                template_used=arguments.get("template_used", "standard"),
-                overwrite=arguments.get("overwrite", False)
-            )
+        # Session management
+        elif name == "session":
+            action = arguments.get("action")
+            if action == "initialize":
+                return await handle_initialize_session(
+                    workspace_path=arguments.get("workspace_path"),
+                    branch_strategy=arguments.get("branch_strategy", "create_new"),
+                    branch_name=arguments.get("branch_name")
+                )
+            elif action == "get_config":
+                return await handle_get_project_config(
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "suggest_path":
+                return await handle_suggest_doc_path(
+                    source_file=arguments.get("source_file"),
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "end":
+                return await handle_end_session(
+                    create_pr=arguments.get("create_pr", False),
+                    pr_title=arguments.get("pr_title"),
+                    pr_description=arguments.get("pr_description")
+                )
+            else:
+                raise ValueError(f"Unknown session action: {action}")
         
-        # Write capability tools - Surgical Updates
-        elif name == "analyze_documentation_impact":
-            return await handle_analyze_impact(
-                file_path=arguments.get("file_path"),
-                proposed_sections=arguments.get("proposed_sections", {})
-            )
-        elif name == "update_documentation_sections":
-            return await handle_update_sections(
-                file_path=arguments.get("file_path"),
-                section_updates=arguments.get("section_updates", {}),
-                add_changelog=arguments.get("add_changelog", True),
-                dry_run=arguments.get("dry_run", False)
-            )
-        elif name == "get_document_structure":
-            return await handle_get_structure(
-                file_path=arguments.get("file_path")
-            )
+        # Documentation operations
+        elif name == "documentation":
+            action = arguments.get("action")
+            if action == "write":
+                return await handle_write_documentation(
+                    doc_path=arguments.get("doc_path"),
+                    content=arguments.get("content"),
+                    source_file=arguments.get("source_file"),
+                    component_type=arguments.get("component_type", "unknown"),
+                    template_used=arguments.get("template_used", "standard"),
+                    overwrite=arguments.get("overwrite", False)
+                )
+            elif action == "analyze_impact":
+                return await handle_analyze_impact(
+                    file_path=arguments.get("file_path"),
+                    proposed_sections=arguments.get("proposed_sections", {})
+                )
+            elif action == "update_sections":
+                return await handle_update_sections(
+                    file_path=arguments.get("file_path"),
+                    section_updates=arguments.get("section_updates", {}),
+                    add_changelog=arguments.get("add_changelog", True),
+                    dry_run=arguments.get("dry_run", False)
+                )
+            elif action == "get_structure":
+                return await handle_get_structure(
+                    file_path=arguments.get("file_path")
+                )
+            elif action == "create_pr":
+                return await handle_create_pr(
+                    title=arguments.get("title"),
+                    description=arguments.get("description"),
+                    draft=arguments.get("draft", True)
+                )
+            elif action == "check_pr_requirements":
+                return await handle_check_pr_requirements()
+            else:
+                raise ValueError(f"Unknown documentation action: {action}")
         
-        # Write capability tools - Pull Request
-        elif name == "create_documentation_pr":
-            return await handle_create_pr(
-                title=arguments.get("title"),
-                description=arguments.get("description"),
-                draft=arguments.get("draft", True)
-            )
-        elif name == "check_pr_requirements":
-            return await handle_check_pr_requirements()
-        elif name == "end_documentation_session":
-            return await handle_end_session(
-                create_pr=arguments.get("create_pr", False),
-                pr_title=arguments.get("pr_title"),
-                pr_description=arguments.get("pr_description")
-            )
+        # Interview operations
+        elif name == "interview":
+            action = arguments.get("action")
+            if action == "start":
+                return await handle_start_interview(
+                    source_file=arguments.get("source_file"),
+                    template_content=arguments.get("template_content"),
+                    template_name=arguments.get("template_name"),
+                    component_type=arguments.get("component_type"),
+                    priority_filter=arguments.get("priority_filter", "optional"),
+                    role=arguments.get("role", "general")
+                )
+            elif action == "get_question":
+                return await handle_get_next_question(
+                    session_id=arguments.get("session_id")
+                )
+            elif action == "submit_answer":
+                return await handle_submit_answer(
+                    session_id=arguments.get("session_id"),
+                    answer=arguments.get("answer"),
+                    generate_draft=arguments.get("generate_draft", True)
+                )
+            elif action == "skip":
+                return await handle_skip_question(
+                    session_id=arguments.get("session_id"),
+                    reason=arguments.get("reason", "Will provide later")
+                )
+            elif action == "progress":
+                return await handle_get_progress(
+                    session_id=arguments.get("session_id")
+                )
+            elif action == "end":
+                return await handle_end_interview(
+                    session_id=arguments.get("session_id")
+                )
+            else:
+                raise ValueError(f"Unknown interview action: {action}")
         
-        # Human Input Interview Tools
-        elif name == "start_documentation_interview":
-            return await handle_start_interview(
-                source_file=arguments.get("source_file"),
-                template_content=arguments.get("template_content"),
-                template_name=arguments.get("template_name"),
-                component_type=arguments.get("component_type"),
-                priority_filter=arguments.get("priority_filter", "optional"),
-                role=arguments.get("role", "general")
-            )
-        elif name == "get_next_interview_question":
-            return await handle_get_next_question(
-                session_id=arguments.get("session_id")
-            )
-        elif name == "submit_interview_answer":
-            return await handle_submit_answer(
-                session_id=arguments.get("session_id"),
-                answer=arguments.get("answer"),
-                generate_draft=arguments.get("generate_draft", True)
-            )
-        elif name == "skip_interview_question":
-            return await handle_skip_question(
-                session_id=arguments.get("session_id"),
-                reason=arguments.get("reason", "Will provide later")
-            )
-        elif name == "get_interview_progress":
-            return await handle_get_interview_progress(
-                session_id=arguments.get("session_id")
-            )
-        elif name == "end_documentation_interview":
-            return await handle_end_interview(
-                session_id=arguments.get("session_id")
-            )
-        
-        # Cross-Repository Consolidation Tools
-        elif name == "consolidate_feature":
-            return await handle_consolidate_feature(
-                feature_name=arguments.get("feature_name"),
-                workspace_path=arguments.get("workspace_path")
-            )
-        elif name == "generate_testing_documentation":
-            return await handle_generate_testing_doc(
-                feature_name=arguments.get("feature_name"),
-                workspace_path=arguments.get("workspace_path"),
-                test_type=arguments.get("test_type", "integration")
-            )
-        elif name == "detect_feature_changes":
-            return await handle_detect_changes(
-                since=arguments.get("since"),
-                author=arguments.get("author"),
-                workspace_path=arguments.get("workspace_path")
-            )
-        elif name == "list_features":
-            return await handle_list_features(
-                workspace_path=arguments.get("workspace_path")
-            )
-        elif name == "refresh_repositories":
-            return await handle_refresh_repositories(
-                workspace_path=arguments.get("workspace_path")
-            )
-        elif name == "check_repository_states":
-            return await handle_check_repo_states(
-                workspace_path=arguments.get("workspace_path")
-            )
-        
-        # Testing Documentation Validation Tools
-        elif name == "validate_testing_traceability":
-            return await handle_validate_traceability(
-                docs_dir=arguments.get("docs_dir", "docs"),
-                features_dir=arguments.get("features_dir"),
-                testing_dir=arguments.get("testing_dir")
-            )
+        # Cross-repository operations
+        elif name == "cross_repository":
+            action = arguments.get("action")
+            if action == "consolidate_feature":
+                return await handle_consolidate_feature(
+                    feature_name=arguments.get("feature_name"),
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "generate_testing":
+                return await handle_generate_testing(
+                    feature_name=arguments.get("feature_name"),
+                    workspace_path=arguments.get("workspace_path"),
+                    test_type=arguments.get("test_type", "integration")
+                )
+            elif action == "detect_changes":
+                return await handle_detect_changes(
+                    since=arguments.get("since"),
+                    author=arguments.get("author"),
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "list_features":
+                return await handle_list_features(
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "refresh_repos":
+                return await handle_refresh_repos(
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "check_states":
+                return await handle_check_states(
+                    workspace_path=arguments.get("workspace_path")
+                )
+            elif action == "validate_traceability":
+                return await handle_validate_traceability(
+                    docs_dir=arguments.get("docs_dir", "docs"),
+                    features_dir=arguments.get("features_dir"),
+                    testing_dir=arguments.get("testing_dir")
+                )
+            else:
+                raise ValueError(f"Unknown cross_repository action: {action}")
         
         else:
-            logger.warning(f"Unknown tool: {name}")
-            return [TextContent(
-                type="text",
-                text=f"Error: Unknown tool '{name}'"
-            )]
+            raise ValueError(f"Unknown tool: {name}")
+    
     except Exception as e:
-        server_state["errors"] += 1
+        logger.error(f"Error in tool {name}: {str(e)}", exc_info=True)
+        return [TextContent(
+            type="text",
+            text=f"❌ Error executing {name}: {str(e)}"
+        )]
+
+
+# =============================================================================
+# Resource Handlers
+# =============================================================================
         logger.error(f"Error in tool {name}: {str(e)}", exc_info=True)
         return [TextContent(
             type="text",
@@ -977,32 +780,59 @@ async def read_resource(uri: str) -> str:
 # Tool Handlers
 # =============================================================================
 
-async def handle_list_templates(project_type: str = "all", verbose: bool = False) -> list[TextContent]:
+async def handle_list_templates(
+    project_type: str = "all", 
+    verbose: bool = False,
+    page: int = 1,
+    page_size: int = 10
+) -> list[TextContent]:
     """
-    Handle the list_templates tool call.
+    Handle the list_templates tool call with pagination support.
     
     Args:
         project_type: Filter by project type ('backend', 'ui', 'database', 'all')
         verbose: Include detailed information if True
+        page: Page number (1-indexed)
+        page_size: Items per page (max 20)
         
     Returns:
-        Formatted list of templates
+        Formatted list of templates with pagination info
     """
-    logger.debug(f"list_templates called (project_type={project_type}, verbose={verbose})")
+    logger.debug(f"list_templates called (project_type={project_type}, verbose={verbose}, page={page}, page_size={page_size})")
     
+    # Get all templates first
     if project_type == "all":
-        templates = list_all_templates()
+        all_templates = list_all_templates()
     else:
         try:
             pt = ProjectType(project_type)
-            templates = list_templates_by_project_type(pt)
+            all_templates = list_templates_by_project_type(pt)
         except ValueError:
             return [TextContent(
                 type="text",
                 text=f"Invalid project type: '{project_type}'. Use 'backend', 'ui', 'database', or 'all'."
             )]
     
-    result = format_templates_list(templates, verbose=verbose)
+    # Apply pagination
+    total_templates = len(all_templates)
+    page_size = min(page_size, 20)  # Max 20 per page
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    
+    templates_page = all_templates[start_idx:end_idx]
+    total_pages = (total_templates + page_size - 1) // page_size
+    has_more = end_idx < total_templates
+    
+    # Format the results
+    result = format_templates_list(templates_page, verbose=verbose)
+    
+    # Add pagination info
+    pagination_info = f"\n\n📄 **Pagination**: Page {page} of {total_pages} | Showing {len(templates_page)} of {total_templates} templates"
+    if has_more:
+        pagination_info += f"\n💡 Use `page={page + 1}` to see more templates"
+    
+    result += pagination_info
+    
     return [TextContent(type="text", text=result)]
 
 
@@ -2105,7 +1935,7 @@ Use `end_documentation_interview` to get all drafted content.
     return [TextContent(type="text", text=response)]
 
 
-async def handle_get_interview_progress(session_id: str) -> list[TextContent]:
+async def handle_get_progress(session_id: str) -> list[TextContent]:
     """Get the current progress of the documentation interview."""
     logger.debug(f"Getting interview progress for session: {session_id}")
     
@@ -2392,7 +2222,7 @@ A pull request has been created for review:
         )]
 
 
-async def handle_generate_testing_doc(
+async def handle_generate_testing(
     feature_name: str,
     workspace_path: str,
     test_type: str = "integration"
@@ -2755,7 +2585,7 @@ layer: API
         )]
 
 
-async def handle_refresh_repositories(workspace_path: str) -> list[TextContent]:
+async def handle_refresh_repos(workspace_path: str) -> list[TextContent]:
     """Handle repository refresh request."""
     logger.info("Refreshing repositories")
     
@@ -2823,7 +2653,7 @@ All related repositories have been cloned or updated to the latest versions.
         )]
 
 
-async def handle_check_repo_states(workspace_path: str) -> list[TextContent]:
+async def handle_check_states(workspace_path: str) -> list[TextContent]:
     """Handle repository state check request."""
     logger.info("Checking repository states")
     

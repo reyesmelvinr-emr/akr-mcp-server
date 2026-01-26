@@ -1,50 +1,208 @@
-# AKR MCP Server - Complete Setup Guide
+# AKR MCP Server - Setup Guide
 
-> **Estimated Setup Time:** 15-30 minutes  
-> **Last Updated:** January 14, 2026
-
-## 📋 Table of Contents
-
-- [Prerequisites](#prerequisites)
-- [Quick Start (Automated Setup)](#quick-start-automated-setup)
-- [Manual Setup](#manual-setup)
-- [VS Code Configuration](#vs-code-configuration)
-- [Verification](#verification)
-- [Application Repository Setup](#application-repository-setup)
-- [Troubleshooting](#troubleshooting)
-- [Advanced Configuration](#advanced-configuration)
+> **Welcome!** This guide helps you set up the AKR MCP server to automatically generate documentation for your codebase.
 
 ---
 
-## Prerequisites
+## 🎯 Choose Your Path
 
-### Required Software
+### 👤 Are you new to the team?
 
-| Software | Minimum Version | Download Link | Purpose |
-|----------|----------------|---------------|---------|
-| **Python** | 3.10+ | [python.org](https://www.python.org/downloads/) | MCP server runtime |
-| **VS Code** | Latest | [code.visualstudio.com](https://code.visualstudio.com/) | Development environment |
-| **Git** | 2.x+ | [git-scm.com](https://git-scm.com/downloads) | Template synchronization |
-| **GitHub Copilot** | Latest | [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) | AI assistance |
+**First time setting up AKR MCP server on your laptop?**
 
-### Verify Prerequisites
+➡️ **[First-Time Installation Guide](docs/FIRST_TIME_INSTALL.md)** (15-30 minutes, one-time only)
 
-```powershell
-# Check Python version (must be 3.10+)
-python --version
+---
 
-# Check Git installation
-git --version
+### 📂 Already have AKR MCP server installed?
 
-# Check VS Code installation
-code --version
+**Want to add a new codebase/repository for documentation?**
+
+Choose the guide that matches your repository type:
+
+| Repository Type | Description | Guide |
+|----------------|-------------|-------|
+| **🎨 UI/Frontend** | React, Angular, Vue components | **[UI Repository Setup](docs/QUICK_START_UI_REPO.md)** ⭐ Most Common |
+| **⚙️ API/Backend** | REST APIs, Services, Controllers | **[API Repository Setup](docs/QUICK_START_API_REPO.md)** ⭐ Most Common |
+| **🗄️ Database** | SQL Tables, Views, Stored Procedures<br>*Also works for Database folders in API repos* | **[Database Repository Setup](docs/QUICK_START_DATABASE_REPO.md)** |
+| **📦 Monorepo** | Single repo with UI, API, DB together | **[Monorepo Setup](docs/QUICK_START_MONOREPO.md)** |
+
+⏱️ **Time Required:** 5 minutes per repository
+
+---
+
+## ❓ Need Help?
+
+- **Something not working?** → [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+- **How do I generate documentation?** → [Documentation Generation Guide](docs/HOW_TO_GENERATE_DOCUMENTATION.md) ⭐ **Important!**
+- **Questions?** → Contact the AKR team
+
+---
+
+## 📖 After Setup
+
+Once your repository is set up, learn how to generate documentation:
+
+➡️ **[How to Generate Documentation](docs/HOW_TO_GENERATE_DOCUMENTATION.md)**
+
+**Key Points:**
+- ✅ Use natural language prompts (not slash commands!)
+- ✅ Generate single files or logical batches
+- ✅ Follow recommended documentation strategies
+- ❌ Don't try to document 10+ files at once
+
+**Note:** Use these commands directly in Copilot Chat **without** `@workspace` prefix.
+
+---
+
+## 📚 Documentation Structure
+
+```
+akr-mcp-server/
+├── SETUP.md                    ← You are here (navigation hub)
+├── README.md                   ← Feature overview
+└── docs/
+    ├── FIRST_TIME_INSTALL.md   ← One-time machine setup
+    ├── QUICK_START_UI_REPO.md  ← Add UI repository
+    ├── QUICK_START_API_REPO.md ← Add API repository
+    ├── QUICK_START_DATABASE_REPO.md
+    ├── QUICK_START_MONOREPO.md
+    └── TROUBLESHOOTING.md      ← Common issues
 ```
 
-### GitHub Copilot License
+---
 
-- ✅ Active GitHub Copilot subscription required
-- ✅ GitHub Copilot Chat extension installed
-- ✅ Organization policies allow MCP servers (verify with IT admin)
+**Last Updated:** January 23, 2026  
+**Maintained by:** AKR Development Team
+
+---
+
+## Quick Start: New Repository Setup
+
+> **⚠️ Prerequisites:** MCP server must already be installed on your machine. If not, go to [Quick Start (Automated Setup)](#quick-start-automated-setup) first.
+
+### For Users Who Already Have MCP Server Installed
+
+**This is the most common workflow:** You've already installed the AKR MCP server once on your machine. Now you want to document a new codebase.
+
+#### Step 1: Open Your Application Repository in VS Code
+
+```powershell
+# Navigate to your application codebase
+cd "C:\path\to\your\application"
+
+# Open in VS Code
+code .
+```
+
+#### Step 2: Create `.vscode/mcp.json` in Your Application Repository
+
+Create `.vscode/mcp.json` in your application workspace root:
+
+```powershell
+# Create .vscode directory
+New-Item -ItemType Directory -Path ".vscode" -Force
+```
+
+Create file: `.vscode/mcp.json`
+
+```json
+{
+    "mcpServers": {
+        "akr-documentation-server": {
+            "command": "python",
+            "args": [
+                "C:\\Users\\E1481541\\OneDrive - Emerson\\Documents\\CDS - Team Hawkeye\\AKR with MCP\\akr-mcp-server\\src\\server.py"
+            ],
+            "env": {
+                "PYTHONPATH": "C:\\Users\\E1481541\\OneDrive - Emerson\\Documents\\CDS - Team Hawkeye\\AKR with MCP\\akr-mcp-server\\src",
+                "VSCODE_WORKSPACE_FOLDER": "${workspaceFolder}",
+                "AKR_TEMPLATES_DIR": "C:\\Users\\E1481541\\OneDrive - Emerson\\Documents\\CDS - Team Hawkeye\\AKR with MCP\\core-akr-templates"
+            }
+        }
+    }
+}
+```
+
+**⚠️ IMPORTANT:** Replace the paths with your actual MCP server installation location:
+- Update `command` path to point to your Python executable (or just use `python` if it's in PATH)
+- Update `args[0]` path to your `akr-mcp-server\src\server.py` location
+- Update `PYTHONPATH` to your `akr-mcp-server\src` location
+
+#### Step 3: Create `.akr-config.json` in Your Application Repository
+
+Choose the appropriate template based on your repository type:
+
+**⚠️ Templates Location:** If templates are in your project directory instead of `$env:USERPROFILE\.akr\templates`, update the paths accordingly:
+- **Standard location:** `$env:USERPROFILE\.akr\templates\.akr\examples\`
+- **Project directory:** `<AKR-MCP-path>\core-akr-templates\.akr\examples\`
+
+**For API/Backend:**
+```powershell
+# Option 1: Standard location (if symlink/junction created)
+Copy-Item "$env:USERPROFILE\.akr\templates\.akr\examples\akr-config-webapp1-api.json" ".akr-config.json"
+
+# Option 2: Project directory
+Copy-Item "c:\Users\E1481541\OneDrive - Emerson\Documents\CDS - Team Hawkeye\AKR with MCP\core-akr-templates\.akr\examples\akr-config-webapp1-api.json" ".akr-config.json"
+```
+
+**For UI/Frontend:**
+```powershell
+# Option 1: Standard location (if symlink/junction created)
+Copy-Item "$env:USERPROFILE\.akr\templates\.akr\examples\akr-config-webapp1-ui.json" ".akr-config.json"
+
+# Option 2: Project directory
+Copy-Item "c:\Users\E1481541\OneDrive - Emerson\Documents\CDS - Team Hawkeye\AKR with MCP\core-akr-templates\.akr\examples\akr-config-webapp1-ui.json" ".akr-config.json"
+```
+
+**For Database:**
+```powershell
+# Option 1: Standard location (if symlink/junction created)
+Copy-Item "$env:USERPROFILE\.akr\templates\.akr\examples\akr-config-webapp1-db.json" ".akr-config.json"
+
+# Option 2: Project directory (update path to your actual location)
+Copy-Item "c:\Users\E1481541\OneDrive - Emerson\Documents\CDS - Team Hawkeye\AKR with MCP\core-akr-templates\.akr\examples\akr-config-webapp1-db.json" ".akr-config.json"
+```
+
+**For Monorepo:**
+```powershell
+# Option 1: Standard location (if symlink/junction created)
+Copy-Item "$env:USERPROFILE\.akr\templates\.akr\examples\akr-config-monorepo.json" ".akr-config.json"
+
+# Option 2: Project directory (update path to your actual location)
+Copy-Item "c:\Users\E1481541\OneDrive - Emerson\Documents\CDS - Team Hawkeye\AKR with MCP\core-akr-templates\.akr\examples\akr-config-monorepo.json" ".akr-config.json"
+```
+
+Edit the file to match your project structure (see [Application Repository Setup](#application-repository-setup) for details).
+
+#### Step 4: Reload VS Code
+
+1. Press `Ctrl+Shift+P`
+2. Type: **"Developer: Reload Window"**
+3. Press Enter
+
+#### Step 5: Verify Connection
+
+Open GitHub Copilot Chat (Ctrl+Shift+I) and test:
+
+```
+@workspace /docs.health-check
+```
+
+**Expected Response:**
+```
+✅ AKR MCP Server - Health Check
+Server Status: Running
+Templates Available: 8
+Workspace: Your Application Name
+Configuration: Loaded
+```
+
+#### Step 6: Start Documenting!
+
+```
+@workspace /docs.generate path/to/your/file.cs
+```
 
 ---
 
@@ -148,6 +306,20 @@ New-Item -ItemType Directory -Path "logs" -Force
 ---
 
 ## VS Code Configuration
+
+> **📍 This section is for the MCP server workspace only** (`akr-mcp-server` folder).  
+> Application repositories use a different configuration (see [Application Repository Setup](#application-repository-setup)).
+
+### Understanding Two Different Configurations
+
+The AKR MCP server uses **two different** `.vscode/mcp.json` configurations:
+
+| Configuration | Location | Purpose | Path Type |
+|---------------|----------|---------|-----------|
+| **MCP Server Config** | `akr-mcp-server/.vscode/mcp.json` | For testing/developing the MCP server itself | Relative paths (`${workspaceFolder}`) |
+| **Application Config** | `your-app/.vscode/mcp.json` | For using MCP server to document your app | Absolute paths to MCP server |
+
+**You are currently configuring:** The MCP Server workspace (first-time setup only).
 
 ### Step 1: Install Required Extensions
 
@@ -356,32 +528,72 @@ Edit `.akr-config.json` to match your project:
 
 #### Step 3: Create VS Code MCP Configuration
 
-**Automated (Recommended):**
-```powershell
-# From akr-mcp-server directory
-.\setup.ps1 --ConfigureRepo
-```
+**Important:** Each application repository needs its own `.vscode/mcp.json` that points to your MCP server installation.
 
-**Manual:**
+**Manual Configuration:**
 ```powershell
 # Create .vscode directory if it doesn't exist
 New-Item -ItemType Directory -Path ".vscode" -Force
 
-# Copy MCP config template
-Copy-Item "$env:AKR_MCP_SERVER_PATH\templates\mcp.json.template" ".vscode\mcp.json"
+# Create .vscode/mcp.json file (see example below)
 ```
 
-The `.vscode/mcp.json` will contain:
+Create `.vscode/mcp.json` with **absolute paths** to your MCP server installation:
+
 ```json
 {
   "mcpServers": {
     "akr-documentation-server": {
       "command": "python",
-      "args": ["${env:AKR_MCP_SERVER_PATH}/src/server.py"],
+      "args": [
+        "C:\\Users\\YourUsername\\path\\to\\akr-mcp-server\\src\\server.py"
+      ],
       "env": {
-        "PYTHONPATH": "${env:AKR_MCP_SERVER_PATH}/src",
+        "PYTHONPATH": "C:\\Users\\YourUsername\\path\\to\\akr-mcp-server\\src",
         "VSCODE_WORKSPACE_FOLDER": "${workspaceFolder}",
-        "AKR_TEMPLATES_DIR": "${env:HOME}/.akr/templates"
+        "AKR_TEMPLATES_DIR": "${env:USERPROFILE}\\.akr\\templates"
+      }
+    }
+  }
+}
+```
+
+**⚠️ Replace these paths:**
+- `C:\\Users\\YourUsername\\path\\to\\akr-mcp-server\\src\\server.py` → Your actual MCP server location
+- `C:\\Users\\YourUsername\\path\\to\\akr-mcp-server\\src` → Your actual src directory
+
+**Example for typical installation:**
+```json
+{
+  "mcpServers": {
+    "akr-documentation-server": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\E1481541\\Documents\\akr-mcp-server\\src\\server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "C:\\Users\\E1481541\\Documents\\akr-mcp-server\\src",
+        "VSCODE_WORKSPACE_FOLDER": "${workspaceFolder}",
+        "AKR_TEMPLATES_DIR": "${env:USERPROFILE}\\.akr\\templates"
+      }
+    }
+  }
+}
+```
+
+**💡 Pro Tip:** You can also use just `python` as the command if Python is in your PATH:
+```json
+{
+  "mcpServers": {
+    "akr-documentation-server": {
+      "command": "python",
+      "args": [
+        "C:\\path\\to\\akr-mcp-server\\src\\server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "C:\\path\\to\\akr-mcp-server\\src",
+        "VSCODE_WORKSPACE_FOLDER": "${workspaceFolder}",
+        "AKR_TEMPLATES_DIR": "${env:USERPROFILE}\\.akr\\templates"
       }
     }
   }
@@ -636,13 +848,26 @@ Edit `config.json` to customize logging:
 
 ## Quick Reference
 
+### Setup Scenarios Comparison
+
+| Task | First-Time Installation | Add New Repository |
+|------|------------------------|-------------------|
+| **Frequency** | Once per machine | Per codebase |
+| **Time** | 15-30 minutes | 5 minutes |
+| **Prerequisites** | None | MCP server installed |
+| **Steps** | 1. Install Python<br>2. Clone templates<br>3. Setup venv<br>4. Configure MCP server workspace | 1. Create `.vscode/mcp.json`<br>2. Create `.akr-config.json`<br>3. Reload VS Code |
+| **Configuration File** | `akr-mcp-server/.vscode/mcp.json` (relative paths) | `your-app/.vscode/mcp.json` (absolute paths) |
+| **Section to Follow** | [Quick Start (Automated Setup)](#quick-start-automated-setup) | [Quick Start: New Repository Setup](#quick-start-new-repository-setup) |
+
 ### File Locations
 
 | Item | Location |
 |------|----------|
 | MCP Server | `akr-mcp-server/src/server.py` |
 | Templates | `~/.akr/templates/.akr/templates/` |
-| Configuration | `.vscode/mcp.json` |
+| MCP Server Config | `akr-mcp-server/.vscode/mcp.json` (relative paths) |
+| Application Config | `your-app/.vscode/mcp.json` (absolute paths to MCP server) |
+| Application Settings | `your-app/.akr-config.json` |
 | Logs | `akr-mcp-server/logs/` |
 | Git Hooks | `.git/hooks/post-merge.ps1` |
 
