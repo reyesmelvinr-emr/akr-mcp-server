@@ -415,7 +415,7 @@ def format_templates_list(templates: list[TemplateMetadata], verbose: bool = Fal
 def format_template_suggestion(
     file_path: str,
     template: TemplateMetadata,
-    alternatives: list[TemplateMetadata] = None
+    alternatives: Optional[list[TemplateMetadata]] = None
 ) -> str:
     """
     Format a template suggestion as markdown.

@@ -20,17 +20,34 @@
         "file_extensions": [".md"],
         "categories": {
             "charter": {
-                "pattern": "*CHARTER*.md",
                 "description": "AKR charter files defining documentation standards"
             },
             "template": {
-                "pattern": "*template*.md",
-                "description": "Documentation templates for different project types"
+                "description": "AKR documentation templates for consistent formatting"
             },
             "guide": {
-                "pattern": "*Guide*.md",
-                "description": "Developer guides and reference documentation"
+                "description": "Developer guides for documentation best practices"
             }
         }
+    },
+    "initialization": {
+        "skipConsolidationScan": true,
+        "skipTemplateValidation": false,
+        "skipWorkspaceScan": false,
+        "lazyLoadRepositories": true,
+        "lazyLoadResources": true,
+        "lazyLoadTemplates": true
+    },
+    "fastMode": {
+        "enabled": false,
+        "comment": "Set enabled: true to skip workspace and repository initialization",
+        "environment_variable": "AKR_FAST_MODE=true",
+        "startup_time": "< 1 second vs 30-60 seconds in normal mode"
+    },
+    "skipInitialization": {
+        "enabled": false,
+        "comment": "Set enabled: true to completely skip initialization",
+        "environment_variable": "AKR_SKIP_INITIALIZATION=true",
+        "startup_time": "< 500 milliseconds"
     }
 }

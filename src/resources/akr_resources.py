@@ -14,13 +14,18 @@ Examples:
 """
 
 import logging
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 from datetime import datetime
 
 logger = logging.getLogger("akr-mcp-server.resources")
+
+# ==================== NEW CODE: FAST MODE FLAG ====================
+FAST_MODE = os.getenv('AKR_FAST_MODE', 'false').lower() == 'true'
+# ==================================================================
 
 
 class ResourceCategory(Enum):
@@ -28,372 +33,273 @@ class ResourceCategory(Enum):
     CHARTER = "charter"
     TEMPLATE = "template"
     GUIDE = "guide"
-    
-    @classmethod
-    def from_folder(cls, folder_name: str) -> Optional["ResourceCategory"]:
-        """Get category from folder name."""
-        mapping = {
-            "charters": cls.CHARTER,
-            "templates": cls.TEMPLATE,
-            "guides": cls.GUIDE
-        }
-        return mapping.get(folder_name.lower())
-    
-    @property
-    def folder_name(self) -> str:
-        """Get the folder name for this category."""
-        mapping = {
-            ResourceCategory.CHARTER: "charters",
-            ResourceCategory.TEMPLATE: "templates",
-            ResourceCategory.GUIDE: "guides"
-        }
-        return mapping[self]
-    
-    @property
-    def description(self) -> str:
-        """Get a human-readable description for this category."""
-        descriptions = {
-            ResourceCategory.CHARTER: "Documentation standards and requirements",
-            ResourceCategory.TEMPLATE: "Documentation structure templates",
-            ResourceCategory.GUIDE: "Developer guides and best practices"
-        }
-        return descriptions[self]
 
 
 @dataclass
 class AKRResource:
-    """
-    Represents a single AKR documentation resource.
-    
-    Attributes:
-        uri: MCP resource URI (e.g., "akr://charter/AKR_CHARTER_BACKEND.md")
-        name: Display name of the resource
-        category: Resource category (charter, template, guide)
-        file_path: Absolute path to the file
-        description: Human-readable description
-        mime_type: MIME type (always text/markdown for AKR files)
-        metadata: Additional metadata like file size, modified date
-    """
-    uri: str
-    name: str
+    """Represents a single AKR resource file."""
     category: ResourceCategory
-    file_path: Path
-    description: str = ""
-    mime_type: str = "text/markdown"
-    metadata: dict = field(default_factory=dict)
+    filename: str
+    name: str
+    description: str
+    path: Path
+    content: Optional[str] = None
     
-    def __post_init__(self):
-        """Initialize metadata if not provided."""
-        if not self.metadata and self.file_path.exists():
-            stat = self.file_path.stat()
-            self.metadata = {
-                "size_bytes": stat.st_size,
-                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "extension": self.file_path.suffix
-            }
-    
-    def read_content(self) -> str:
-        """Read and return the file content."""
-        if not self.file_path.exists():
-            raise FileNotFoundError(f"Resource file not found: {self.file_path}")
-        return self.file_path.read_text(encoding='utf-8')
-    
-    def to_dict(self) -> dict:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "uri": self.uri,
-            "name": self.name,
-            "category": self.category.value,
-            "description": self.description,
-            "mimeType": self.mime_type,
-            "metadata": self.metadata
-        }
+    def load_content(self) -> str:
+        """Load resource content from file."""
+        if self.content is None:
+            try:
+                with open(self.path, 'r', encoding='utf-8') as f:
+                    self.content = f.read()
+            except Exception as e:
+                logger.error(f"Error loading {self.path}: {e}")
+                self.content = f"Error: Could not load resource: {e}"
+        return self.content
 
 
 class AKRResourceManager:
     """
-    Manages discovery, categorization, and serving of AKR resources.
+    Manages AKR resources (charters, templates, guides).
     
-    This class handles:
-    - Scanning the AKR content directory for markdown files
-    - Categorizing resources by type (charter, template, guide)
-    - Creating MCP-compatible resource URIs
-    - Reading resource content on demand
-    
-    Usage:
-        manager = AKRResourceManager("/path/to/akr_content")
-        resources = manager.list_resources()
-        content = manager.read_resource("akr://charter/AKR_CHARTER_BACKEND.md")
+    Implements lazy loading: resources are discovered on first access,
+    not at initialization.
     """
     
-    # File extensions to include as resources
-    SUPPORTED_EXTENSIONS = {".md", ".markdown"}
-    
-    # Files to exclude from resource listing
-    EXCLUDED_FILES = {".gitkeep", ".gitignore", "README.md"}
-    
-    def __init__(self, akr_content_path: str | Path):
+    def __init__(self, base_path: Optional[Path] = None):
         """
-        Initialize the resource manager.
+        Initialize resource manager.
         
         Args:
-            akr_content_path: Path to the akr_content directory
+            base_path: Base path for AKR resources. Defaults to ./akr_content
         """
-        self.akr_content_path = Path(akr_content_path)
-        self._resources_cache: dict[str, AKRResource] = {}
-        self._last_scan: Optional[datetime] = None
+        self.base_path = base_path or Path(__file__).parent.parent.parent / "akr_content"
         
-        logger.info(f"AKRResourceManager initialized with path: {self.akr_content_path}")
+        # ==================== NEW CODE: LAZY LOADING CACHES ====================
+        # Don't scan directories until resources are requested
+        self._charters: Optional[List[AKRResource]] = None
+        self._templates: Optional[List[AKRResource]] = None
+        self._guides: Optional[List[AKRResource]] = None
+        self._resource_cache: Dict[str, str] = {}
+        # =====================================================================
         
-        if not self.akr_content_path.exists():
-            logger.warning(f"AKR content path does not exist: {self.akr_content_path}")
+        logger.info(f"AKRResourceManager initialized at {self.base_path}")
+        logger.info(f"Fast mode: {FAST_MODE} (resources loaded on first access)")
     
-    def _should_include_file(self, file_path: Path) -> bool:
-        """Check if a file should be included as a resource."""
-        if file_path.name in self.EXCLUDED_FILES:
-            return False
-        if file_path.suffix.lower() not in self.SUPPORTED_EXTENSIONS:
-            return False
-        if not file_path.is_file():
-            return False
-        return True
-    
-    def _create_uri(self, category: ResourceCategory, filename: str) -> str:
-        """Create an MCP resource URI for a file."""
-        return f"akr://{category.value}/{filename}"
-    
-    def _parse_uri(self, uri: str) -> tuple[Optional[ResourceCategory], Optional[str]]:
-        """
-        Parse an MCP resource URI into category and filename.
+    # ==================== NEW CODE: LAZY DISCOVERY METHODS ====================
+    def _discover_charters(self) -> List[AKRResource]:
+        """Discover charter files (lazy load on first call)."""
+        if self._charters is not None:
+            return self._charters
         
-        Args:
-            uri: Resource URI (e.g., "akr://charter/AKR_CHARTER_BACKEND.md")
-            
-        Returns:
-            Tuple of (category, filename) or (None, None) if invalid
-        """
-        if not uri.startswith("akr://"):
-            logger.warning(f"Invalid URI scheme: {uri}")
-            return None, None
+        logger.info("📖 Discovering charter files...")
+        self._charters = []
+        charter_dir = self.base_path / "charters"
+        
+        if not charter_dir.exists():
+            logger.warning(f"Charter directory not found: {charter_dir}")
+            return self._charters
         
         try:
-            # Remove "akr://" prefix
-            path_part = uri[6:]
-            parts = path_part.split("/", 1)
-            
-            if len(parts) != 2:
-                logger.warning(f"Invalid URI format: {uri}")
-                return None, None
-            
-            category_str, filename = parts
-            category = None
-            for cat in ResourceCategory:
-                if cat.value == category_str:
-                    category = cat
-                    break
-            
-            if not category:
-                logger.warning(f"Unknown category in URI: {category_str}")
-                return None, None
-            
-            return category, filename
-        except Exception as e:
-            logger.error(f"Error parsing URI '{uri}': {e}")
-            return None, None
-    
-    def _generate_description(self, file_path: Path, category: ResourceCategory) -> str:
-        """Generate a description for a resource based on its name and category."""
-        name = file_path.stem
-        
-        # Common description patterns
-        descriptions = {
-            # Charters
-            "AKR_CHARTER": "Main AKR documentation charter with general standards",
-            "AKR_CHARTER_BACKEND": "Backend service documentation requirements and standards",
-            "AKR_CHARTER_DB": "Database documentation requirements and standards",
-            "AKR_CHARTER_UI": "UI component documentation requirements and standards",
-            
-            # Templates
-            "comprehensive_service_template": "Full-featured service documentation template with all sections",
-            "standard_service_template": "Standard service documentation template for most use cases",
-            "lean_baseline_service_template": "Minimal service documentation template for simple services",
-            "minimal_service_template": "Ultra-minimal documentation template",
-            "table_doc_template": "Database table documentation template",
-            "ui_component_template": "UI component documentation template",
-            
-            # Guides
-            "Backend_Service_Documentation_Developer_Guide": "Guide for documenting backend services",
-            "Backend_Service_Documentation_Guide": "Backend service documentation overview",
-            "Table_Documentation_Developer_Guide": "Guide for documenting database tables",
-            "UI_Component_Documentation_Developer_Guide": "Guide for documenting UI components",
-        }
-        
-        if name in descriptions:
-            return descriptions[name]
-        
-        # Generate generic description based on category
-        return f"{category.description}: {name.replace('_', ' ')}"
-    
-    def scan_resources(self, force: bool = False) -> dict[str, AKRResource]:
-        """
-        Scan the AKR content directory and discover all resources.
-        
-        Args:
-            force: If True, force rescan even if cache is recent
-            
-        Returns:
-            Dictionary mapping URIs to AKRResource objects
-        """
-        # Simple cache check - rescan if forced or first time
-        if not force and self._resources_cache and self._last_scan:
-            logger.debug("Using cached resources")
-            return self._resources_cache
-        
-        logger.info("Scanning AKR content directory for resources...")
-        resources = {}
-        
-        if not self.akr_content_path.exists():
-            logger.warning(f"AKR content path does not exist: {self.akr_content_path}")
-            return resources
-        
-        # Scan each category folder
-        for category in ResourceCategory:
-            folder_path = self.akr_content_path / category.folder_name
-            
-            if not folder_path.exists():
-                logger.debug(f"Category folder does not exist: {folder_path}")
-                continue
-            
-            for file_path in folder_path.iterdir():
-                if not self._should_include_file(file_path):
+            for charter_file in charter_dir.glob("*.md"):
+                if charter_file.name.startswith("."):
                     continue
                 
-                uri = self._create_uri(category, file_path.name)
-                description = self._generate_description(file_path, category)
-                
                 resource = AKRResource(
-                    uri=uri,
-                    name=file_path.stem.replace('_', ' '),
-                    category=category,
-                    file_path=file_path,
-                    description=description
+                    category=ResourceCategory.CHARTER,
+                    filename=charter_file.name,
+                    name=charter_file.stem,
+                    description=f"AKR Charter: {charter_file.stem}",
+                    path=charter_file
                 )
-                
-                resources[uri] = resource
-                logger.debug(f"Discovered resource: {uri}")
-        
-        self._resources_cache = resources
-        self._last_scan = datetime.now()
-        
-        logger.info(f"Discovered {len(resources)} resources: "
-                   f"{sum(1 for r in resources.values() if r.category == ResourceCategory.CHARTER)} charters, "
-                   f"{sum(1 for r in resources.values() if r.category == ResourceCategory.TEMPLATE)} templates, "
-                   f"{sum(1 for r in resources.values() if r.category == ResourceCategory.GUIDE)} guides")
-        
-        return resources
-    
-    def list_resources(self, category: Optional[ResourceCategory] = None) -> list[AKRResource]:
-        """
-        List all available resources, optionally filtered by category.
-        
-        Args:
-            category: Optional category to filter by
+                self._charters.append(resource)
+                logger.debug(f"  ✓ Found charter: {charter_file.name}")
             
-        Returns:
-            List of AKRResource objects
-        """
-        resources = self.scan_resources()
+            logger.info(f"✅ Discovered {len(self._charters)} charters")
         
-        if category:
-            return [r for r in resources.values() if r.category == category]
+        except Exception as e:
+            logger.error(f"Error discovering charters: {e}")
         
-        return list(resources.values())
+        return self._charters
     
-    def read_resource(self, uri: str) -> Optional[str]:
-        """
-        Read the content of a resource by URI.
+    def _discover_templates(self) -> List[AKRResource]:
+        """Discover template files (lazy load on first call)."""
+        if self._templates is not None:
+            return self._templates
         
-        Args:
-            uri: Resource URI (e.g., "akr://charter/AKR_CHARTER_BACKEND.md")
-            
-        Returns:
-            Resource content as string, or None if not found
-        """
-        resources = self.scan_resources()
+        logger.info("📋 Discovering template files...")
+        self._templates = []
+        template_dir = self.base_path / "templates"
         
-        if uri not in resources:
-            logger.warning(f"Resource not found: {uri}")
-            return None
+        if not template_dir.exists():
+            logger.warning(f"Template directory not found: {template_dir}")
+            return self._templates
         
         try:
-            content = resources[uri].read_content()
-            logger.debug(f"Read resource: {uri} ({len(content)} bytes)")
-            return content
+            for template_file in template_dir.glob("*.md"):
+                if template_file.name.startswith("."):
+                    continue
+                
+                resource = AKRResource(
+                    category=ResourceCategory.TEMPLATE,
+                    filename=template_file.name,
+                    name=template_file.stem,
+                    description=f"AKR Template: {template_file.stem}",
+                    path=template_file
+                )
+                self._templates.append(resource)
+                logger.debug(f"  ✓ Found template: {template_file.name}")
+            
+            logger.info(f"✅ Discovered {len(self._templates)} templates")
+        
         except Exception as e:
-            logger.error(f"Error reading resource {uri}: {e}")
-            return None
+            logger.error(f"Error discovering templates: {e}")
+        
+        return self._templates
     
-    def get_resource(self, uri: str) -> Optional[AKRResource]:
+    def _discover_guides(self) -> List[AKRResource]:
+        """Discover guide files (lazy load on first call)."""
+        if self._guides is not None:
+            return self._guides
+        
+        logger.info("📚 Discovering guide files...")
+        self._guides = []
+        guide_dir = self.base_path / "guides"
+        
+        if not guide_dir.exists():
+            logger.warning(f"Guide directory not found: {guide_dir}")
+            return self._guides
+        
+        try:
+            for guide_file in guide_dir.glob("*.md"):
+                if guide_file.name.startswith("."):
+                    continue
+                
+                resource = AKRResource(
+                    category=ResourceCategory.GUIDE,
+                    filename=guide_file.name,
+                    name=guide_file.stem,
+                    description=f"Developer Guide: {guide_file.stem}",
+                    path=guide_file
+                )
+                self._guides.append(resource)
+                logger.debug(f"  ✓ Found guide: {guide_file.name}")
+            
+            logger.info(f"✅ Discovered {len(self._guides)} guides")
+        
+        except Exception as e:
+            logger.error(f"Error discovering guides: {e}")
+        
+        return self._guides
+    # =====================================================================
+    
+    def list_charters(self) -> List[AKRResource]:
+        """List all available charter resources."""
+        return self._discover_charters()
+    
+    def list_templates(self) -> List[AKRResource]:
+        """List all available template resources."""
+        return self._discover_templates()
+    
+    def list_guides(self) -> List[AKRResource]:
+        """List all available guide resources."""
+        return self._discover_guides()
+    
+    def get_resource_content(self, category: str, filename: str) -> Optional[str]:
         """
-        Get a resource object by URI.
+        Get resource content by category and filename.
         
         Args:
-            uri: Resource URI
+            category: Resource category (charter, template, guide)
+            filename: Filename (e.g., "AKR_CHARTER_BACKEND.md")
+        
+        Returns:
+            Resource content, or None if not found.
+        """
+        # Check cache first
+        cache_key = f"{category}:{filename}"
+        if cache_key in self._resource_cache:
+            return self._resource_cache[cache_key]
+        
+        try:
+            if category == "charter":
+                resources = self.list_charters()
+            elif category == "template":
+                resources = self.list_templates()
+            elif category == "guide":
+                resources = self.list_guides()
+            else:
+                logger.warning(f"Unknown resource category: {category}")
+                return None
             
-        Returns:
-            AKRResource object or None if not found
-        """
-        resources = self.scan_resources()
-        return resources.get(uri)
+            # Find resource by filename
+            for resource in resources:
+                if resource.filename == filename:
+                    content = resource.load_content()
+                    self._resource_cache[cache_key] = content
+                    return content
+            
+            logger.warning(f"Resource not found: {category}/{filename}")
+            return None
+        
+        except Exception as e:
+            logger.error(f"Error getting resource {category}/{filename}: {e}")
+            return None
     
-    def get_resources_by_category(self) -> dict[str, list[AKRResource]]:
+    def get_charter(self, domain: str) -> Optional[AKRResource]:
         """
-        Get all resources grouped by category.
+        Get charter by domain (ui, backend, database).
+        
+        Args:
+            domain: Domain name (ui, backend, database)
         
         Returns:
-            Dictionary with category names as keys and lists of resources as values
+            Charter resource, or None if not found.
         """
-        result = {
-            "charters": [],
-            "templates": [],
-            "guides": []
+        domain_lower = domain.lower()
+        
+        # Map domain to charter filename
+        charter_map = {
+            "ui": "AKR_CHARTER_UI.md",
+            "backend": "AKR_CHARTER_BACKEND.md",
+            "database": "AKR_CHARTER_DB.md",
+            "api": "AKR_CHARTER_BACKEND.md",
+            "db": "AKR_CHARTER_DB.md"
         }
         
-        for resource in self.list_resources():
-            result[resource.category.folder_name].append(resource)
+        filename = charter_map.get(domain_lower)
+        if not filename:
+            logger.warning(f"No charter found for domain: {domain}")
+            return None
         
-        return result
-    
-    def get_resource_count(self) -> dict[str, int]:
-        """
-        Get count of resources by category.
+        for charter in self.list_charters():
+            if charter.filename == filename:
+                return charter
         
-        Returns:
-            Dictionary with category names and counts
-        """
-        resources = self.scan_resources()
-        return {
-            "total": len(resources),
-            "charters": sum(1 for r in resources.values() if r.category == ResourceCategory.CHARTER),
-            "templates": sum(1 for r in resources.values() if r.category == ResourceCategory.TEMPLATE),
-            "guides": sum(1 for r in resources.values() if r.category == ResourceCategory.GUIDE)
-        }
+        return None
 
 
-# Convenience function for creating a resource manager with default path
+# ==================== NEW CODE: FACTORY FUNCTION ====================
 def create_resource_manager(base_path: Optional[Path] = None) -> AKRResourceManager:
     """
-    Create an AKRResourceManager with the default or specified path.
+    Create and return a resource manager instance.
     
     Args:
-        base_path: Optional base path. If not provided, uses the default
-                   akr_content directory relative to this module.
-                   
-    Returns:
-        Configured AKRResourceManager instance
-    """
-    if base_path is None:
-        # Default: akr_content directory relative to src/resources
-        base_path = Path(__file__).parent.parent.parent / "akr_content"
+        base_path: Optional base path for AKR resources.
+                  Defaults to ./akr_content
     
-    return AKRResourceManager(base_path)
+    Returns:
+        Initialized AKRResourceManager instance.
+    
+    Note:
+        Resources are NOT discovered at initialization time.
+        Discovery happens lazily on first access.
+        This keeps startup fast even in large repositories.
+    
+    Example:
+        mgr = create_resource_manager()
+        # Server starts instantly
+        charters = mgr.list_charters()  # Discovery happens here
+    """
+    logger.info("Creating AKRResourceManager (lazy loading enabled)")
+    return AKRResourceManager(base_path=base_path)
+# =====================================================================
