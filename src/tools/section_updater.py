@@ -469,41 +469,22 @@ def analyze_documentation_impact(
 
 
 def update_documentation_sections(
-    file_path: str,
+    existing_content: str,
     section_updates: dict[str, str],
-    add_changelog: bool = True,
-    dry_run: bool = False
+    add_changelog: bool = True
 ) -> dict:
     """
-    Perform surgical updates to documentation sections.
+    Perform surgical updates to documentation sections (pure logic).
     
     Args:
-        file_path: Path to the documentation file
+        existing_content: Existing markdown content
         section_updates: Dict of section_id -> new_content
         add_changelog: Add changelog entry for updates
-        dry_run: If True, returns preview without writing
         
     Returns:
         Update results
     """
-    path = Path(file_path)
-    
-    if not path.exists():
-        return {
-            "success": False,
-            "error": f"File not found: {file_path}",
-            "file_exists": False
-        }
-    
-    try:
-        content = path.read_text(encoding='utf-8')
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to read file: {e}"
-        }
-    
-    updater = SurgicalUpdater(content)
+    updater = SurgicalUpdater(existing_content)
     
     # Perform updates
     results = []
@@ -556,31 +537,10 @@ def get_document_structure(file_path: str) -> dict:
     """
     Get the structure of a documentation file.
     
-    Args:
-        file_path: Path to the documentation file
-        
-    Returns:
-        Document structure information
-    """
-    path = Path(file_path)
-    
-    if not path.exists():
-        return {
-            "success": False,
-            "error": f"File not found: {file_path}"
-        }
-    
-    try:
-        content = path.read_text(encoding='utf-8')
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to read file: {e}"
-        }
     
     parser = MarkdownSectionParser(content)
-    sections = parser.parse()
     
+        "updated_content": updated_content,
     return {
         "success": True,
         "file_path": str(file_path),

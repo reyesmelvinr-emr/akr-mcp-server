@@ -21,6 +21,15 @@ from resources import AKRResourceManager, ResourceCategory, create_resource_mana
 # ==================== FIXED: Remove invalid imports ====================
 # Import workspace tools
 from tools.workspace import create_workspace_manager
+from tools.config_utils import validate_enforcement_config
+
+# CANONICAL IMPORTS (used consistently throughout)
+from tools.enforcement_tool import enforce_and_fix
+from tools.enforcement_tool_types import FileMetadata
+from tools.write_operations import (
+    write_documentation,
+    update_documentation_sections_and_commit
+)
 
 # ---- Lazy managers (avoid heavy work during import/startup) ----
 resource_manager = None  # type: ignore
@@ -62,6 +71,7 @@ server = Server("akr-documentation-server")
 resource_manager: Optional[AKRResourceManager] = None
 workspace_manager: Optional[object] = None
 config: Optional[dict] = None
+enforcement_logger = None
 
 
 # ==================== NEW CODE: CONFIG LOADER FUNCTION ====================
@@ -92,6 +102,17 @@ def load_config() -> dict:
 # ======================================================================
 
 
+# ==================== NEW CODE: ENFORCEMENT TELEMETRY ====================
+def init_enforcement_telemetry(log_path: str = "logs/enforcement.jsonl"):
+    global enforcement_logger
+    try:
+        from tools.enforcement_logger import EnforcementLogger
+        enforcement_logger = EnforcementLogger(log_path)
+    except Exception as e:
+        logger.warning(f"Could not init enforcement telemetry: {e}")
+# ======================================================================
+
+
 # ==================== NEW CODE: LAZY INITIALIZATION FUNCTION ====================
 def ensure_initialized():
     """
@@ -111,6 +132,13 @@ def ensure_initialized():
         # Load configuration
         config = load_config()
         logger.info("✅ Configuration loaded")
+
+        valid, errors = validate_enforcement_config(config)
+        if not valid:
+            logger.error(f"Invalid enforcement config: {errors}")
+            raise ValueError(f"Enforcement config validation failed: {errors}")
+
+        init_enforcement_telemetry()
         
         # Create resource manager (minimal, no scanning)
         resource_manager = create_resource_manager()
@@ -232,6 +260,43 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["domain"]
             }
+        ),
+        Tool(
+            name="write_documentation",
+            description="Write documentation with enforcement. Content validated against template before write. Staged and committed.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "content": {"type": "string", "description": "Markdown content (REQUIRED)"},
+                    "source_file": {"type": "string", "description": "Repo-relative source code file path, e.g. src/handler.cs"},
+                    "doc_path": {"type": "string", "description": "Repo-relative output doc path, e.g. docs/api.md"},
+                    "template": {"type": "string", "description": "Template filename, e.g. lean_baseline_service_template.md"},
+                    "component_type": {"type": "string", "description": "Component type, e.g. service, controller"},
+                    "overwrite": {"type": "boolean", "default": False}
+                },
+                "required": ["content", "source_file", "doc_path"]
+            }
+        ),
+        Tool(
+            name="update_documentation_sections",
+            description="Update specific doc sections with enforcement gate. Surgical updates: pass section names + new content.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "doc_path": {"type": "string", "description": "Repo-relative doc path, e.g. docs/api.md"},
+                    "section_updates": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                        "description": "Map of section_id to new content"
+                    },
+                    "template": {"type": "string", "description": "Template filename, e.g. lean_baseline_service_template.md"},
+                    "source_file": {"type": "string", "description": "Repo-relative source code file path"},
+                    "component_type": {"type": "string", "description": "Component type, e.g. service, controller"},
+                    "add_changelog": {"type": "boolean", "default": True},
+                    "overwrite": {"type": "boolean", "default": True}
+                },
+                "required": ["doc_path", "section_updates"]
+            }
         )
     ]
     
@@ -242,6 +307,9 @@ async def list_tools() -> list[Tool]:
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute an AKR documentation tool."""
     ensure_initialized()
+
+    global config
+    cfg = config
     
     logger.info(f"🔧 Tool called: {name}")
     
@@ -279,6 +347,76 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 return [TextContent(type="text", text=charter.content)]
         
         return [TextContent(type="text", text=f"Charter not found for domain: {domain}")]
+
+    elif name == "write_documentation":
+        try:
+            repo_path = str(Path(__file__).parent.parent)
+            result = write_documentation(
+                repo_path=repo_path,
+                content=arguments.get("content"),
+                source_file=arguments.get("source_file"),
+                doc_path=arguments.get("doc_path"),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                component_type=arguments.get("component_type", "unknown"),
+                overwrite=arguments.get("overwrite", False),
+                config=cfg,
+                telemetry_logger=enforcement_logger
+            )
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except TypeError:
+            repo_path = str(Path(__file__).parent.parent)
+            result = write_documentation(
+                repo_path=repo_path,
+                content=arguments.get("content"),
+                source_file=arguments.get("source_file"),
+                doc_path=arguments.get("doc_path"),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                component_type=arguments.get("component_type", "unknown"),
+                overwrite=arguments.get("overwrite", False)
+            )
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except Exception as e:
+            logger.error(f"write_documentation error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": str(e)
+            }))]
+
+    elif name == "update_documentation_sections":
+        try:
+            repo_path = str(Path(__file__).parent.parent)
+            result = update_documentation_sections_and_commit(
+                repo_path=repo_path,
+                doc_path=arguments.get("doc_path"),
+                section_updates=arguments.get("section_updates"),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                source_file=arguments.get("source_file", ""),
+                component_type=arguments.get("component_type", "unknown"),
+                add_changelog=arguments.get("add_changelog", True),
+                overwrite=arguments.get("overwrite", True),
+                config=cfg,
+                telemetry_logger=enforcement_logger
+            )
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except TypeError:
+            repo_path = str(Path(__file__).parent.parent)
+            result = update_documentation_sections_and_commit(
+                repo_path=repo_path,
+                doc_path=arguments.get("doc_path"),
+                section_updates=arguments.get("section_updates"),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                source_file=arguments.get("source_file", ""),
+                component_type=arguments.get("component_type", "unknown"),
+                add_changelog=arguments.get("add_changelog", True),
+                overwrite=arguments.get("overwrite", True)
+            )
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except Exception as e:
+            logger.error(f"update_documentation_sections error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": str(e)
+            }))]
     
     else:
         return [TextContent(type="text", text=f"Unknown tool: {name}")]

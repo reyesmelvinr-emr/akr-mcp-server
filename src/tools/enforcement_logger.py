@@ -187,6 +187,13 @@ class EnforcementLogger:
             }
         )
         self._append_event(event)
+
+    def log_event(self, event: Dict[str, Any]) -> None:
+        """Log a raw event payload to the log stream."""
+        event_type = event.get("event_type", "CUSTOM_EVENT")
+        timestamp = event.get("timestamp", self._get_timestamp())
+        details = {k: v for k, v in event.items() if k not in {"event_type", "timestamp"}}
+        self._append_event(LogEvent(timestamp=timestamp, event_type=event_type, details=details))
     
     def _append_event(self, event: LogEvent) -> None:
         """

@@ -1,664 +1,148 @@
 # Integration Plan: Template Enforcement Tool into AKR MCP Server
+## FINAL VERSION WITH REPO-SPECIFIC FIXES
 
-**Document Version:** 1.0  
+**Document Version:** 2.0 (Comprehensive Repository Assessment Applied)  
 **Date:** February 3, 2026  
 **Status:** Ready for Copilot Agent Execution  
 **Owner:** AKR MCP Server Team  
-**Based On:** IMPLEMENTATION_PLAN_TEMPLATE_ENFORCEMENT_TOOL.md v5.3
+**Revisions:** Applied critical M365 Copilot assessment identifying bypass paths in existing code
 
 ---
 
 ## 📋 Executive Summary
 
-This document outlines the **integration of the completed Template Enforcement Tool components** into the AKR MCP server's documentation generation workflow. All component work (validation engine, schema builder, document parser, YAML generator, file writer) is complete; this plan focuses on **wiring them together in `server.py`** and testing end-to-end.
+This document outlines integration of the completed Template Enforcement Tool components into the AKR MCP server's documentation generation workflow **with critical fixes for existing bypass paths** in your codebase.
 
-**Expected Timeline:** 2-3 days (4 focused batches)  
-**Deliverable:** Documentation generation with automatic format validation and enforcement
+**🔴 CRITICAL REPO REALITY:**
+Your codebase currently has **THREE ways to write docs WITHOUT enforcement**:
+1. `write_documentation()` → `DocumentationWriter.write_file()` (no enforcement gate)
+2. `update_documentation_sections()` → direct `Path.write_text()` (bypasses git AND enforcement)
+3. `add_ai_header()` prepends HTML comment BEFORE YAML (violates YAML-first rule)
 
----
+**This plan makes enforcement the UNAVOIDABLE gate for all paths and fixes the YAML conflict.**
 
-## 🔴 Critical Assessment Applied (M365 Copilot Feedback)
+**Expected Timeline:** 2-3 days (4 focused batches, ~20-25 hours total)  
+**Deliverable:** All doc writes enforced; no bypass paths; git workflow preserved
 
-This plan has been updated to address 6 critical integration risks identified in peer review:
-
-1. ✅ **Enforcement as hard gate**: Tool is the ONLY writer; no bypass paths
-2. ✅ **Minimal prompt strategy**: Removed full template text from prompt; use contract only
-3. ✅ **Tool dispatcher fix**: Integrate into existing dispatcher, not second `@server.call_tool()`
-4. ✅ **Config alignment**: Schema matches enforcement tool's actual contract
-5. ✅ **Update mode support**: Explicit handling of update/merge intent
-6. ✅ **Output validation tests**: E2E tests verify actual written file structure
-
-**See Section 🔧 Critical Improvements (below) for detailed changes**
+**Config Naming Convention:** JSON config uses **mixed-case naming for backward compatibility**:
+- Existing keys are mixed: `output_path` (snake_case), `pathMappings` (camelCase legacy)
+- New enforcement keys use camelCase: `writeMode`, `requireYamlFrontmatter`, `enforceSectionOrder`, `autoFixEnabled`, `allowRetry`, `maxRetries`
 
 ---
 
-## 🎯 Current State Assessment
+## 🎯 Architecture: How Enforcement Becomes the Only Writer
 
-### ✅ What's Complete (From Phase 1 MVP)
+Your repo uses `DocumentationWriter` to handle git operations (stage, commit, push). The enforcement tool's role is:
 
-| Component | File | Status | Batch Created |
-|-----------|------|--------|-----------------|
-| Data Structures | `src/tools/enforcement_tool_types.py` | ✅ Complete | Batch 1 |
-| Template Schema Builder | `src/tools/template_schema_builder.py` | ✅ Complete | Batch 1 |
-| Document Parser | `src/tools/document_parser.py` | ✅ Complete | Batch 2 |
-| YAML Front Matter Generator | `src/tools/yaml_frontmatter_generator.py` | ✅ Complete | Batch 2 |
-| Validation Engine | `src/tools/validation_engine.py` | ✅ Complete | Batch 3 |
-| File Writer | `src/tools/file_writer.py` | ✅ Complete | Batch 4 |
-| Enforcement Tool (Orchestrator) | `src/tools/enforcement_tool.py` | ✅ Complete | Batch 4 |
+1. **Validate** markdown against template schema (YAML, sections, order, heading hierarchy)
+2. **Auto-fix** fixable issues (missing YAML, wrong order)
+3. **Return validated markdown** to the caller
+4. **Caller writes via `DocumentationWriter`** (which stages and commits)
 
-### ❌ What's Missing (This Plan)
+**This diagram shows the hard-gate architecture:**
 
-| Item | File | Current State | Required |
-|------|------|---------------|----------|
-| Server integration | `src/server.py` | No enforcement calls | Wire enforcement tool calls |
-| MCP tool registration | `src/server.py` | Documentation tool exists | Add validate_and_write_documentation tool |
-| Config schema updates | `config.json` | Basic schema | Support pathMappings & validation config |
-| End-to-end testing | `tests/` | Component tests exist | E2E tests with real templates |
-| Documentation | `docs/` | User guide exists | Developer integration guide |
+```
+LLM Output
+   │
+   ▼
+[ENFORCEMENT: enforce_and_fix()]  ◄── HARD GATE
+   │
+   ├─→ INVALID? Return error, no write
+   │
+   └─→ VALID? 
+       │
+       ▼
+   [Inject AI header AFTER YAML]
+       │
+       ▼
+   [DocumentationWriter.write_file()]
+       │
+       ▼
+   stage → commit → push (git workflow)
+```
+
+**Key principle:** Enforcement is the ONLY path that can return "write-safe" markdown.
 
 ---
 
-## 🚀 Implementation Batches
+## 📊 Current State: What Needs Fixing
 
-### BATCH 1: Server Integration Preparation (4-6 hours)
-
-**Objective:** Import enforcement tool components and add telemetry setup
-
-**Priority:** 🔴 CRITICAL (blocks all downstream work)
+| Code Path | Current Issue | Fix in This Plan |
+|-----------|---------------|------------------|
+| `write_documentation()` | Writes without enforcement | Insert enforcement gate (Task 3.1) |
+| `update_documentation_sections()` | Direct `Path.write_text()` | Convert to pure logic; move write+enforce+commit to new function (Task 3.2) |
+| `add_ai_header()` | Prepends comment BEFORE YAML | Move insertion to AFTER YAML closing delimiter (Task 3.0) |
+| MCP dispatcher | Only 4 tools; most are placeholders | Wire real write/update functions (Task 2.1) |
+| Config schema | No enforcement controls | Add `enforcement` section with `writeMode` (Task 1.3) |
 
 ---
 
-#### Task 1.1: Add Imports to `server.py` (FIXED: Consistent absolute imports)
+## 🚀 Implementation Batches (4 Sequential)
+
+All batches must complete in order; each unblocks the next.
+
+### BATCH 1: Server Preparation (4-6 hours)
+
+**Objective:** Imports, config, telemetry (no logic changes yet)
+
+#### Task 1.1: Add Enforcement Imports to `server.py`
+
+**File:** `src/server.py` (after existing tool imports)
+
+**IMPORTANT:** Use the same import style as your existing server.py (`from tools...`, not `from src.tools...`):
+
+```python
+# CANONICAL IMPORTS (used consistently throughout)
+from tools.enforcement_tool import enforce_and_fix
+from tools.enforcement_tool_types import FileMetadata
+from tools.write_operations import (
+    write_documentation,
+    update_documentation_sections_and_commit
+)
+```
+
+**Acceptance:** All imports resolve using `from tools...` pattern; no circular dependencies; matches existing `from tools.workspace` style.
+
+#### Task 1.2: Add Telemetry Logger
 
 **File:** `src/server.py`
 
-**What to do:**
-Add import statements for all enforcement tool components at the top of the file (after existing imports). **CRITICAL**: Use consistent absolute imports (`from src.tools...`) to match project structure.
-
-**Specific Changes:**
 ```python
-# Add these imports after existing imports section (around line 10-20)
-
-# Enforcement Tool Components (absolute imports for safety)
-from src.tools.enforcement_tool import (
-    validate_and_write,
-    validate_and_write_async
-)
-from src.tools.document_parser import DocumentParser
-from src.tools.validation_engine import ValidationEngine
-from src.tools.yaml_frontmatter_generator import YAMLFrontmatterGenerator
-from src.tools.file_writer import FileWriter
-from src.tools.enforcement_tool_types import (
-    ValidationResult,
-    ViolationSeverity,
-    FileMetadata,
-    WriteResult
-)
-from src.tools.enforcement_logger import EnforcementLogger
-```
-
-**Verification:**
-```bash
-# Test imports resolve correctly
-python -c "from src.tools.enforcement_tool import validate_and_write_async"
-python -c "from src.tools.enforcement_tool_types import FileMetadata"
-```
-
-**Acceptance Criteria:**
-- ✅ All imports resolve without errors
-- ✅ No circular imports (test with `python -c "from src.server import *"`)
-- ✅ IDE shows no unresolved references
-
-**Status:** ⬜ Not Started
-
----
-
-#### Task 1.2: Add Telemetry Logger Setup
-
-**File:** `src/server.py`
-
-**What to do:**
-Initialize telemetry logger for enforcement tool operations (structured JSON Lines logging).
-
-**Specific Changes:**
-```python
-# Add after logger initialization (around line 30-40)
-
-# Initialize enforcement tool telemetry logger
+# Initialize enforcement telemetry
 enforcement_logger = None
 
 def init_enforcement_telemetry(log_path: str = "logs/enforcement.jsonl"):
-    """Initialize enforcement tool telemetry logging."""
     global enforcement_logger
     try:
         from tools.enforcement_logger import EnforcementLogger
         enforcement_logger = EnforcementLogger(log_path)
-        logger.info(f"Enforcement telemetry initialized: {log_path}")
     except Exception as e:
-        logger.warning(f"Could not initialize enforcement telemetry: {e}")
-        enforcement_logger = None
+        logger.warning(f"Could not init enforcement telemetry: {e}")
 ```
 
-**Acceptance Criteria:**
-- ✅ Logger initializes without errors
-- ✅ `logs/enforcement.jsonl` is created when tool runs
-- ✅ No side effects if telemetry disabled
+**Call this function in `ensure_initialized()`:**
 
-**Status:** ⬜ Not Started
-
----
-
-#### Task 1.3: Load Configuration Schema Updates
-
-**File:** `src/server.py`
-
-**What to do:**
-Add configuration loading for enforcement tool settings (pathMappings, validation strictness, merge policy).
-
-**Specific Changes:**
 ```python
-# Add after config loading (around line 50-70)
-
-def load_enforcement_config(config: dict) -> ValidationConfig:
-    """Extract enforcement tool configuration from server config."""
-    doc_config = config.get("documentation", {})
-    
-    validation_config = ValidationConfig(
-        output_path=doc_config.get("output_path", "docs/"),
-        path_mappings=doc_config.get("pathMappings", {}),
-        allow_local_templates=doc_config.get("allowLocalTemplates", False),
-        validation_strictness=doc_config.get("validationStrictness", "baseline"),
-        require_yaml_frontmatter=doc_config.get("requireYamlFrontmatter", True),
-        enforce_section_order=doc_config.get("enforceSectionOrder", True),
-        auto_fix_enabled=doc_config.get("autoFixEnabled", True),
-        merge_policy=doc_config.get("mergePolicy", "append"),
-        section_ownership=doc_config.get("sectionOwnership", {}),
-        rewrite_threshold=doc_config.get("rewriteThreshold", 0.8)
-    )
-    
-    return validation_config
+def ensure_initialized():
+    global resource_manager
+    if resource_manager is None:
+        resource_manager = get_resource_manager()
+        init_enforcement_telemetry()  # Add this line
 ```
 
-**Acceptance Criteria:**
-- ✅ Config loads without errors
-- ✅ Defaults applied when keys missing
-- ✅ No validation errors on well-formed config
+**IMPORTANT:** Preserve `config = load_config()` inside `ensure_initialized()`—Task 2.1 relies on global `config` being set.
 
-**Status:** ⬜ Not Started
+**Acceptance:** Logger initialized without errors at startup; `logs/enforcement.jsonl` file is created on first logged event (or immediately at startup depending on logger implementation); logger object passed to enforcement calls in dispatcher.
 
----
-
-### BATCH 2: MCP Tool Registration (3-4 hours)
-
-**Objective:** Add `validate_and_write_documentation` tool to MCP server
-
-**Priority:** 🔴 CRITICAL (enables tool invocation)
-
----
-
-#### Task 2.1: Register New MCP Tool (FIXED: Integrate into existing dispatcher)
-
-**File:** `src/server.py`
-
-**What to do:**
-**DO NOT create a new `@server.call_tool()` function.** Find the EXISTING tool dispatcher and add a case branch for the new tool. This is critical to avoid shadowing/breaking existing tools.
-
-**Specific Changes:**
-```python
-# STEP 1: Locate the existing @server.call_tool() dispatcher
-# It should look something like this (around line 150-250):
-
-@server.call_tool()  # ← This decorator already exists!
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Dispatch to appropriate tool implementation."""
-    
-    # STEP 2: Find existing tool branches
-    if name == "generate_documentation":
-        return await handle_generate_documentation(arguments)
-    
-    elif name == "analyze_codebase":
-        return await handle_analyze_codebase(arguments)
-    
-    # STEP 3: ADD this new branch (do NOT replace anything above)
-    elif name == "validate_and_write_documentation":
-        return await handle_validate_and_write(arguments)
-    
-    # Keep existing else clause
-    else:
-        raise ValueError(f"Unknown tool: {name}")
-
-
-async def handle_validate_and_write(arguments: dict) -> list[TextContent]:
-    """Handle validate_and_write_documentation tool call."""
-    
-    # Extract arguments
-    generated_markdown = arguments.get("generated_markdown", "")
-    template_name = arguments.get("template_name", "lean_baseline_service_template.md")
-    file_metadata = arguments.get("file_metadata", {})
-    update_mode = arguments.get("update_mode", "create")  # NEW: explicit intent
-    overwrite = arguments.get("overwrite", False)
-    dry_run = arguments.get("dry_run", False)
-    
-    # Validate inputs
-    if not generated_markdown:
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": False,
-                "error": "generated_markdown is required",
-                "valid": False
-            }, indent=2)
-        )]
-    
-    try:
-        # Load server config and merge with any call-specific overrides
-        server_config = load_server_config()  # Full server config
-        effective_config = deep_merge(server_config, arguments.get("config", {}))  # Merge overrides
-        enforcement_config = load_enforcement_config(effective_config)
-        
-        # Log telemetry event
-        if enforcement_logger:
-            enforcement_logger.log_validation_start(
-                template_name=template_name,
-                mode=file_metadata.get("documentation_mode", "per_file"),
-                user=arguments.get("user", "unknown")
-            )
-        
-        # Call enforcement tool (HARD GATE: This is the ONLY write path)
-        result = await validate_and_write_async(
-            generated_markdown=generated_markdown,
-            template_name=template_name,
-            file_metadata=FileMetadata(**file_metadata),
-            config=enforcement_config,
-            update_mode=update_mode,  # NEW: explicit create/replace intent
-            overwrite=overwrite,
-            dry_run=dry_run,
-            telemetry_logger=enforcement_logger
-        )
-        
-        # Log telemetry event
-        if enforcement_logger and result.valid:
-            enforcement_logger.log_validation_success(
-                file_path=result.file_path,
-                violations_count=len(result.violations),
-                confidence=result.confidence
-            )
-        elif enforcement_logger:
-            enforcement_logger.log_validation_failure(
-                violations=result.violations,
-                confidence=result.confidence
-            )
-        
-        # Return result
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": result.valid,
-                "valid": result.valid,
-                "file_path": result.file_path,
-                "violations": [v.dict() for v in result.violations],
-                "confidence": result.confidence,
-                "severity_summary": result.severity_summary,
-                "summary": result.summary
-            }, indent=2)
-        )]
-        
-    except Exception as e:
-        logger.error(f"Validation error: {e}", exc_info=True)
-        
-        if enforcement_logger:
-            enforcement_logger.log_validation_error(
-                error_type=type(e).__name__,
-                error_message=str(e)
-            )
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "success": False,
-                "valid": False,
-                "error": str(e),
-                "error_type": type(e).__name__
-            }, indent=2)
-        )]
-```
-
-**Acceptance Criteria:**
-- ✅ Tool is callable via MCP interface
-- ✅ Arguments parsed correctly
-- ✅ Result returned as JSON
-- ✅ Errors handled gracefully
-- ✅ Telemetry logged for all paths
-
-**Status:** ⬜ Not Started
-
----
-
-#### Task 2.2: Update Tool Schema (FIXED: Add update_mode and mode parameters)
-
-**File:** `src/server.py` or MCP resource definitions
-
-**What to do:**
-Define the JSON schema for the new tool's input/output for MCP clients. **CRITICAL**: Include `update_mode` and `mode` parameters that were missing.
-
-**Specific Changes:**
-```python
-# Add tool schema near server initialization
-
-VALIDATE_AND_WRITE_TOOL_SCHEMA = {
-    "name": "validate_and_write_documentation",
-    "description": "Validate generated documentation against template schema and write to filesystem. Auto-fixes structural issues (YAML, section order, heading levels) or retries LLM with stricter prompts. ENFORCES: All docs must pass validation before write.",
-    "inputSchema": {
-        "type": "object",
-        "properties": {
-            "generated_markdown": {
-                "type": "string",
-                "description": "The markdown content generated by LLM (REQUIRED)"
-            },
-            "template_name": {
-                "type": "string",
-                "description": "Name of the template to validate against",
-                "default": "lean_baseline_service_template.md"
-            },
-            "file_metadata": {
-                "type": "object",
-                "description": "File metadata for YAML generation (REQUIRED)",
-                "properties": {
-                    "file_path": {"type": "string"},
-                    "component_name": {"type": "string"},
-                    "feature_tag": {"type": "string"},
-                    "domain": {"type": "string"},
-                    "module_name": {"type": "string"},
-                    "documentation_mode": {"type": "string", "enum": ["per_file", "per_module"], "default": "per_file"}
-                },
-                "required": ["component_name"]
-            },
-            "update_mode": {
-                "type": "string",
-                "description": "How to handle existing files: 'create' (error if exists), 'replace' (overwrite), 'merge_sections' (Phase 2+)",
-                "enum": ["create", "replace"],
-                "default": "create"
-            },
-            "config": {
-                "type": "object",
-                "description": "Optional configuration overrides (merged with server config)"
-            },
-            "overwrite": {
-                "type": "boolean",
-                "description": "Explicit permission to overwrite (required if update_mode=replace and file exists)",
-                "default": false
-            },
-            "dry_run": {
-                "type": "boolean",
-                "description": "Validate but don't write to filesystem (for testing)",
-                "default": false
-            },
-            "user": {
-                "type": "string",
-                "description": "Username for audit logging (optional)"
-            }
-        },
-        "required": ["generated_markdown", "file_metadata"]
-    }
-}
-```
-
-**Acceptance Criteria:**
-- ✅ Schema is valid JSON Schema
-- ✅ All properties documented
-- ✅ Matches actual function parameters
-- ✅ Default values specified
-
-**Status:** ⬜ Not Started
-
----
-
-#### Task 2.3: Test Tool Registration
-
-**File:** `tests/test_server_enforcement_integration.py`
-
-**What to do:**
-Create unit tests to verify tool is registered and callable.
-
-**Specific Changes:**
-```python
-# Create new test file: tests/test_server_enforcement_integration.py
-
-import pytest
-import asyncio
-from src.server import server, handle_validate_and_write, VALIDATE_AND_WRITE_TOOL_SCHEMA
-
-
-class TestEnforcementToolRegistration:
-    """Test that enforcement tool is properly registered in MCP server."""
-    
-    def test_tool_schema_valid(self):
-        """Verify tool schema is valid JSON Schema."""
-        assert "name" in VALIDATE_AND_WRITE_TOOL_SCHEMA
-        assert VALIDATE_AND_WRITE_TOOL_SCHEMA["name"] == "validate_and_write_documentation"
-        assert "inputSchema" in VALIDATE_AND_WRITE_TOOL_SCHEMA
-        assert "description" in VALIDATE_AND_WRITE_TOOL_SCHEMA
-    
-    @pytest.mark.asyncio
-    async def test_validate_and_write_with_minimal_args(self):
-        """Test tool with minimal required arguments."""
-        result = await handle_validate_and_write({
-            "generated_markdown": "# Test\n\nSome content",
-            "file_metadata": {"component_name": "TestComponent"}
-        })
-        
-        assert len(result) == 1
-        assert result[0].type == "text"
-        # Should return JSON
-        import json
-        response = json.loads(result[0].text)
-        assert "valid" in response or "error" in response
-    
-    @pytest.mark.asyncio
-    async def test_validate_and_write_missing_markdown(self):
-        """Test tool with missing required markdown."""
-        result = await handle_validate_and_write({
-            "file_metadata": {"component_name": "TestComponent"}
-        })
-        
-        assert len(result) == 1
-        import json
-        response = json.loads(result[0].text)
-        assert response["success"] is False
-        assert "error" in response
-
-
-# Run tests: pytest tests/test_server_enforcement_integration.py -v
-```
-
-**Acceptance Criteria:**
-- ✅ All tests pass
-- ✅ Tool is callable with valid arguments
-- ✅ Tool returns proper error for missing args
-- ✅ Tool schema is valid
-
-**Status:** ⬜ Not Started
-
----
-
-### BATCH 3: Documentation Generation Flow Update (5-6 hours)
-
-**Objective:** Integrate enforcement into the documentation generation workflow (after LLM generation)
-
-**Priority:** 🟠 HIGH (core functionality)
-
----
-
-#### Task 3.1: Update `generate_documentation` Workflow (FIXED: Remove bypass path)
-
-**File:** `src/tools/documentation.py`
-
-**What to do:**
-Modify the documentation generation flow to call enforcement tool after LLM generation. **CRITICAL**: Remove the "legacy write without enforcement" bypass path to truly make enforcement the hard gate.
-
-**Specific Changes:**
-```python
-# In documentation.py, find the main generation function and add enforcement
-
-async def generate_documentation_with_enforcement(
-    component_path: str,
-    template_name: str,
-    config: dict,
-    dry_run: bool = False,
-    update_mode: str = "create",
-    overwrite: bool = False
-) -> dict:
-    """
-    Generate documentation with automatic template enforcement.
-    
-    CRITICAL: Enforcement is ALWAYS enabled. This is the ONLY write path.
-    
-    Steps:
-    1. Load template (for schema only, not for prompt)
-    2. Generate markdown via LLM (minimal prompt)
-    3. Validate and auto-fix via enforcement tool (HARD GATE)
-    4. Write to filesystem (via tool only)
-    5. Return results
-    """
-    
-    # Step 1: Prepare minimal LLM prompt (NO full template text)
-    component_content = read_component_file(component_path)
-    prompt = prepare_minimal_prompt(component_content, template_name)  # NEW: minimal
-    
-    # Step 2: Call LLM
-    generated_markdown = await call_llm(prompt)
-    
-    # Step 3: Validate and enforce template (HARD GATE - no bypass)
-    from src.tools.enforcement_tool import validate_and_write_async
-    from src.tools.enforcement_tool_types import FileMetadata
-    
-    file_metadata = FileMetadata(
-        file_path=component_path,
-        component_name=extract_component_name(component_path),
-        feature_tag=extract_feature_tag(config),
-        domain=extract_domain(config),
-        module_name=extract_module_name(component_path),
-        complexity="Medium"
-    )
-    
-    result = await validate_and_write_async(
-        generated_markdown=generated_markdown,
-        template_name=template_name,
-        file_metadata=file_metadata,
-        config=config,
-        update_mode=update_mode,
-        dry_run=dry_run,
-        overwrite=overwrite
-    )
-    
-    return {
-        "success": result.valid,
-        "file_path": result.file_path if result.valid else None,
-        "valid": result.valid,
-        "violations": result.violations,
-        "confidence": result.confidence,
-        "summary": result.summary,
-        "generated_markdown": generated_markdown  # For inspection
-    }
-    # NO ELSE CLAUSE - enforcement is the only path
-```
-
-**Acceptance Criteria:**
-- ✅ Function calls enforcement tool after LLM generation
-- ✅ Result includes validation outcome
-- ✅ Backward compatibility maintained (enforce=False)
-- ✅ Handles errors gracefully
-
-**Status:** ⬜ Not Started
-
----
-
-#### Task 3.2: Use Minimal Prompt Contract (FIXED: No full template embedding)
-
-**File:** `src/tools/documentation.py`
-
-**What to do:**
-Replace the function that embeds full template text with a **minimal contract prompt**. This is critical to prevent LLM from paraphrasing structure.
-
-**Specific Changes:**
-```python
-# Replace prepare_prompt() with prepare_minimal_prompt()
-
-def prepare_minimal_prompt(component_content: str, template_name: str) -> str:
-    """Prepare minimal LLM prompt (NO full template text).
-    
-    The enforcement tool is the schema authority, not the prompt.
-    Keep prompts lean to save context and prevent structure paraphrasing.
-    """
-    
-    # Template-specific minimal contract (section names only)
-    required_sections = {
-        "lean_baseline_service_template.md": [
-            "Quick Reference (TL;DR)",
-            "What & Why",
-            "How It Works",
-            "Business Rules",
-            "Architecture",
-            "Data Operations",
-            "Questions & Gaps"
-        ]
-    }
-    
-    sections_list = "\n".join(f"- {s}" for s in required_sections.get(template_name, []))
-    
-    prompt = f"""
-Generate AKR documentation for this component:
-
-{component_content}
-
-Documentation Contract:
-1. **YAML Front Matter**: Do NOT add (tool will auto-generate)
-2. **Required sections** (use these exact names, in this order):
-{sections_list}
-
-3. **Content rules**:
-   - Mark AI-generated content with 🤖
-   - Mark unknowns/business context with ❓ [HUMAN: description]
-   - Do NOT invent business details
-   - Do NOT add extra sections
-   - Do NOT change heading names or levels
-
-4. **Validation**: Your output will be validated by an enforcement tool.
-   - Missing sections → retry with stricter prompt
-   - Wrong order → auto-fixed
-   - Missing YAML → auto-generated
-
-Focus on accurate CONTENT. Tool handles FORMAT compliance.
-"""
-    
-    return prompt
-```
-
-**Acceptance Criteria:**
-- ✅ Prompt includes enforcement guidance
-- ✅ LLM understands auto-fix behavior
-- ✅ Prompt emphasizes content over structure
-- ✅ Guidance doesn't exceed context budget
-
-**Status:** ⬜ Not Started
-
----
-
-#### Task 3.3: Add Configuration for Enforcement Options
+#### Task 1.3: Add Enforcement Config to `config.json`
 
 **File:** `config.json`
 
-**What to do:**
-Add configuration schema for enforcement tool options to project config.
-
-**Specific Changes:**
 ```json
 {
   "documentation": {
     "output_path": "docs/",
-    "pathMappings": {
-      "src/**/*.cs": "docs/{module}.md"
-    },
+    "pathMappings": { "src/**/*.cs": "docs/{module}.md" },
     "enforcement": {
       "enabled": true,
       "validationStrictness": "baseline",
@@ -666,807 +150,1013 @@ Add configuration schema for enforcement tool options to project config.
       "enforceSectionOrder": true,
       "autoFixEnabled": true,
       "allowRetry": true,
-      "maxRetries": 3
-    },
-    "mergePolicy": {
-      "enabled": false,
-      "strategy": "append",
-      "sectionOwnership": {},
-      "rewriteThreshold": 0.8
+      "maxRetries": 3,
+      "writeMode": "git"
     }
   }
 }
 ```
 
-**Acceptance Criteria:**
-- ✅ Config is valid JSON
-- ✅ All enforcement options present
-- ✅ Defaults are sensible
-- ✅ Config loads without errors
+**Config Naming Convention Note:**
+- Existing keys are mixed for backward compatibility: output_path (snake_case), pathMappings (camelCase legacy)
+- New enforcement keys use camelCase: `writeMode`, `requireYamlFrontmatter`, `enforceSectionOrder`, `autoFixEnabled`, `allowRetry`, `maxRetries`
 
-**Status:** ⬜ Not Started
+**Config Loading Clarification:**
+`load_config()` returns the root dict. Enforcement settings are read via `config["documentation"]["enforcement"]`. Task 2.1 passes this loaded config directly to write functions, which access enforcement settings using the same path.
 
----
-
-### BATCH 4: End-to-End Testing & Documentation (6-8 hours)
-
-**Objective:** Verify entire workflow works with real code and templates, create developer guide
-
-**Priority:** 🟠 HIGH (validation & documentation)
+**Acceptance:** Config loads without error; all enforcement keys present.
 
 ---
 
-#### Task 4.1: Create End-to-End Integration Tests
+### BATCH 2: Dispatcher & Tool Registration (4-5 hours)
 
-**File:** `tests/test_enforcement_e2e.py`
+**Objective:** Wire real write tools into dispatcher; add schemas
 
-**What to do:**
-Create comprehensive E2E tests using real templates and generated documentation.
+#### Task 2.1: Replace Placeholder Tools in `server.py` Dispatcher
 
-**Specific Changes:**
+**File:** `src/server.py` - in `call_tool()` function
+
+Your current dispatcher has placeholders like `return [TextContent(type="text", text="Generating...")]`.
+
+**Replace with real function calls:**
+
 ```python
-# Create new test file: tests/test_enforcement_e2e.py
-
-import pytest
-import tempfile
-import json
-from pathlib import Path
-from src.tools.enforcement_tool import validate_and_write_async
-from src.tools.enforcement_tool_types import FileMetadata, ValidationResult
-from src.resources.akr_resources import AKRResourceManager
-
-
-class TestEnforcementE2E:
-    """End-to-end tests for template enforcement tool."""
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    """Dispatch tool calls to implementations."""
     
-    @pytest.fixture
-    def temp_workspace(self):
-        """Create temporary workspace for testing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            Path(tmpdir, "docs").mkdir()
-            yield tmpdir
+    # Use the global config loaded by ensure_initialized()
+    # (Avoid reassigning global config in function scope)
+    global config
+    cfg = config  # Local reference to avoid scope issues
     
-    @pytest.fixture
-    def resource_manager(self):
-        """Initialize resource manager."""
-        return AKRResourceManager()
+    if name == "get_charter":
+        # Keep existing implementation
+        ...
     
-    @pytest.mark.asyncio
-    async def test_lean_baseline_service_enforcement(self, temp_workspace, resource_manager):
-        """Test enforcement with lean baseline service template."""
-        
-        # Load template
-        template = resource_manager.get_template("lean_baseline_service_template.md")
-        assert template, "Template not found"
-        
-        # Sample generated markdown (simulating LLM output WITHOUT YAML)
-        generated_markdown = """
-# Service: UserService
+    elif name == "write_documentation":
+        # ENFORCEMENT GATE 🔴
+        try:
+            # Log start of write operation
+            if enforcement_logger:
+                enforcement_logger.log_start(name, arguments)
+            
+            result = write_documentation(
+                repo_path=".",
+                content=arguments.get("content", ""),
+                source_file=arguments.get("source_file", ""),
+                doc_path=arguments.get("doc_path", ""),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                component_type=arguments.get("component_type", "unknown"),
+                overwrite=arguments.get("overwrite", False),
+                config=cfg,  # PASS LOADED CONFIG (local reference)
+                telemetry_logger=enforcement_logger  # Pass logger to function
+            )
+            
+            # Log result
+            if enforcement_logger:
+                enforcement_logger.log_result(name, result)
+            
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except Exception as e:
+            logger.error(f"write_documentation error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": str(e)
+            }))]
+    
+    elif name == "update_documentation_sections":
+        # ENFORCEMENT GATE 🔴
+        try:
+            # Log start of update operation
+            if enforcement_logger:
+                enforcement_logger.log_start(name, arguments)
+            
+            result = update_documentation_sections_and_commit(
+                repo_path=".",
+                doc_path=arguments.get("doc_path", ""),
+                section_updates=arguments.get("section_updates", {}),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                source_file=arguments.get("source_file", ""),
+                component_type=arguments.get("component_type", "unknown"),
+                config=cfg,  # PASS LOADED CONFIG (local reference)
+                telemetry_logger=enforcement_logger  # Pass logger to function
+            )
+            
+            # Log result
+            if enforcement_logger:
+                enforcement_logger.log_result(name, result)
+            
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except Exception as e:
+            logger.error(f"update_documentation_sections error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": str(e)
+            }))]
+    
+    else:
+        raise ValueError(f"Unknown tool: {name}")
+```
 
-**Namespace**: MyApp.Services
-**File Location**: `src/Services/UserService.cs`
-**Complexity**: Medium
+**Acceptance:** Tools call real functions; no more placeholders.
 
-## Quick Reference (TL;DR)
+#### Task 2.2: Add Tool Schemas to `list_tools()`
 
-🤖 Manages user account operations: create, retrieve, update, delete.
+**File:** `src/server.py` - in `list_tools()` return list
 
-**When to use**: User management operations
-**Watch out for**: No role-based access control
+Add these schemas so Copilot discovers the tools:
 
-## What & Why
+```python
+Tool(
+    name="write_documentation",
+    description="Write documentation with enforcement. Content validated against template before write. Staged and committed.",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "content": {"type": "string", "description": "Markdown content (REQUIRED)"},
+            "source_file": {"type": "string", "description": "Repo-relative source code file path, e.g. src/handler.cs (REQUIRED)"},
+            "doc_path": {"type": "string", "description": "Repo-relative output doc path, e.g. docs/api.md (REQUIRED)"},
+            "template": {"type": "string", "default": "lean_baseline_service_template.md"},
+            "component_type": {"type": "string", "default": "unknown"},
+            "overwrite": {"type": "boolean", "default": False}
+        },
+        "required": ["content", "source_file", "doc_path"]
+    }
+),
+Tool(
+    name="update_documentation_sections",
+    description="Update specific doc sections with enforcement gate. Surgical updates: pass section names + new content.",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "doc_path": {"type": "string", "description": "Repo-relative doc file to update, e.g. docs/api.md (REQUIRED)"},
+            "section_updates": {"type": "object", "description": "Map of section_name -> new_content (REQUIRED)"},
+            "template": {"type": "string", "default": "lean_baseline_service_template.md"},
+            "source_file": {"type": "string", "description": "Repo-relative source code file path"},
+            "component_type": {"type": "string", "default": "unknown"}
+        },
+        "required": ["doc_path", "section_updates"]
+    }
+)
+```
 
-🤖 Provides user CRUD operations for the system.
+**Acceptance:** Schemas are valid JSON Schema; match function parameters.
 
-## How It Works
+---
 
-🤖 Coordinates with UserRepository to perform data operations.
+### BATCH 3: Fix Write Operations & Enforcement Gates (6-8 hours)
 
-## Business Rules
+**Objective:** Insert enforcement gates; fix YAML/header conflict; eliminate bypass
 
-| Rule | Description |
-|------|-------------|
-| BR-US-001 | 🤖 Email must be unique |
+#### Task 3.0: Fix YAML Front Matter / AI Header Conflict (1 hour) ⚠️ DO FIRST
 
-## Architecture
+**File:** `src/write_operations.py`
 
-🤖 **Dependencies**: UserRepository, EmailValidator
+Your `add_ai_header()` currently prepends HTML comment BEFORE YAML. This violates "YAML must be first" when enforcement tool generates YAML.
 
-## Data Operations
+**Add this helper function:**
 
-🤖 **Reads**: Users table
-**Writes**: Users table
+```python
+def _insert_ai_header_after_yaml(header: str, content: str) -> str:
+    """
+    Insert AI header AFTER YAML front matter (if present).
+    Ensures YAML stays at top of file.
+    """
+    lines = content.splitlines(keepends=True)
+    if not lines or not lines[0].strip().startswith("---"):
+        # No YAML, prepend header
+        return header + "\n\n" + content
+    
+    # Find closing YAML delimiter
+    yaml_end_idx = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            yaml_end_idx = i
+            break
+    
+    if yaml_end_idx is None:
+        # Malformed YAML, prepend anyway
+        return header + "\n\n" + content
+    
+    # Insert AFTER closing ---
+    before = "".join(lines[:yaml_end_idx + 1])
+    after = "".join(lines[yaml_end_idx + 1:])
+    return before + "\n" + header + "\n" + after
+```
 
-## Questions & Gaps
+**Add new `build_ai_header()` function that returns ONLY the header (not full content):**
 
-❓ [HUMAN: What are the authorization requirements?]
-"""
-        
-        # Create config
-        config = {
-            "workspace_root": temp_workspace,
-            "documentation": {
-                "output_path": "docs/",
-                "pathMappings": {
-                    "**/*Service.cs": "docs/services/{name}.md"
-                }
-            }
+```python
+def build_ai_header(source_file: str, component_type: str = "unknown", template: str = "") -> str:
+    """Return header text only (insertion deferred to write path)."""
+    return f"""<!-- 🤖 Auto-generated by AKR MCP Server
+  Source: {source_file}
+  Component: {component_type}
+  Template: {template}
+  Enhance with ❓ [HUMAN: ...] before merging
+-->"""
+```
+
+**Acceptance:** YAML preserved as first content; header inserted after closing `---`.
+
+#### Task 3.1: Insert Enforcement Gate into `write_documentation()` (3 hours)
+
+**File:** `src/write_operations.py`
+
+Replace existing `write_documentation()` function:
+
+```python
+def write_documentation(
+    repo_path: str,
+    content: str,
+    source_file: str,
+    doc_path: str,
+    template: str = "lean_baseline_service_template.md",
+    component_type: str = "unknown",
+    overwrite: bool = False,
+    config: dict = None,  # ADDED: Actual server config (not reconstructed)
+    telemetry_logger=None  # Add telemetry parameter
+) -> dict:
+    """
+    Write documentation with ENFORCEMENT HARD GATE.
+    
+    Content MUST pass enforcement validation before any file write.
+    No bypass paths.
+    """
+    
+    from tools.enforcement_tool import enforce_and_fix
+    from tools.enforcement_tool_types import FileMetadata
+    
+    # CRITICAL: Check if enforcement is enabled (hard gate)
+    if config and not config.get("documentation", {}).get("enforcement", {}).get("enabled", True):
+        return {
+            "success": False,
+            "error": "Documentation enforcement is disabled in config; writes refused for safety",
+            "filePath": doc_path
         }
-        
-        # Create file metadata
+    
+    writer = DocumentationWriter(repo_path)
+    
+    # SECURITY: Prevent path traversal attacks
+    # Prefer Path.is_relative_to() (Python 3.9+) for robustness; fallback for compatibility
+    # Note: This project targets Python 3.9+, but fallback retained for broader compatibility
+    full_path = (Path(repo_path) / doc_path).resolve()
+    repo_resolved = Path(repo_path).resolve()
+    try:
+        # Python 3.9+: use safe is_relative_to() method
+        is_safe = full_path.is_relative_to(repo_resolved)
+    except (AttributeError, ValueError):
+        # Fallback for Python <3.9: check prefix with os.sep (platform-independent)
+        import os
+        repo_str = str(repo_resolved)
+        full_str = str(full_path)
+        is_safe = full_str == repo_str or full_str.startswith(repo_str + os.sep)
+    
+    if not is_safe:
+        return {
+            "success": False,
+            "error": f"Path traversal blocked: {doc_path} is outside repo",
+            "filePath": doc_path
+        }
+    
+    # Check if file exists
+    existing = writer.read_file(doc_path)
+    if existing and not overwrite:
+        return {
+            "success": False,
+            "error": f"File exists: {doc_path}. Set overwrite=True to replace.",
+            "filePath": doc_path
+        }
+    
+    # ========== ENFORCEMENT GATE 🔴 ==========
+    try:
         metadata = FileMetadata(
-            file_path="src/Services/UserService.cs",
-            component_name="UserService",
-            feature_tag="FN001_US001",
-            domain="Users",
-            module_name="UserService"
+            file_path=source_file,
+            component_name=Path(source_file).stem,
+            domain="Unknown",
+            module_name=Path(source_file).stem,
+            feature_tag="",
+            complexity="Medium"
         )
         
-        # Validate and write
-        result = await validate_and_write_async(
-            generated_markdown=generated_markdown,
-            template_name="lean_baseline_service_template.md",
+        enforced = enforce_and_fix(
+            generated_markdown=content,
+            template_name=template,
             file_metadata=metadata,
             config=config,
+            update_mode="replace" if overwrite else "create",
+            overwrite=overwrite,
+            dry_run=False
+        )
+        
+        # CRITICAL: If not valid, STOP - do not write
+        if not enforced.valid:
+            return {
+                "success": False,
+                "error": "Template enforcement failed",
+                "violations": [
+                    {"type": v.type, "severity": v.severity.name, "message": v.message}
+                    for v in enforced.violations
+                ],
+                "filePath": doc_path,
+                "summary": enforced.summary
+            }
+        
+        # Enforcement passed - safe to write
+        enforced_content = enforced.content
+        
+    except Exception as e:
+        logger.error(f"Enforcement error: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Enforcement error: {e}",
+            "filePath": doc_path
+        }
+    # ========== END GATE ==========
+    
+    # Insert AI header AFTER YAML (safe)
+    try:
+        header = build_ai_header(source_file, component_type, template)
+        final_content = _insert_ai_header_after_yaml(header, enforced_content)
+    except Exception as e:
+        logger.warning(f"Could not insert header: {e}")
+        final_content = enforced_content
+    
+    # Write via DocumentationWriter (stages + commits)
+    if not writer.write_file(doc_path, final_content):
+        return {"success": False, "error": "Failed to write file", "filePath": doc_path}
+    
+    writer.stage_file(doc_path)
+    
+    msg = f"docs: add {Path(source_file).stem} documentation"
+    if not writer.commit(msg, [doc_path]):
+        return {"success": False, "error": "Failed to commit", "filePath": doc_path}
+    
+    return {
+        "success": True,
+        "filePath": doc_path,
+        "branch": writer.get_current_branch(),
+        "summary": f"Documentation written and committed. {enforced.summary}"
+    }
+```
+
+**Acceptance:** Enforcement runs before write; invalid content returns error without writing; YAML/header correct.
+
+#### Task 3.2: Eliminate `Path.write_text()` Bypass (3 hours)
+
+**File:** `src/section_updater.py` (refactor) + `src/write_operations.py` (new function)
+
+**In `section_updater.py`, change `update_documentation_sections()` to be TRUE PURE LOGIC (no I/O):**
+
+**NOTE:** Accept content as parameter, don't read from filesystem. This makes it truly testable.
+
+```python
+def update_documentation_sections(
+    existing_content: str,  # CHANGED: Accept content, not file path
+    section_updates: dict[str, str],
+    add_changelog: bool = True
+) -> dict:
+    """
+    Compute updated documentation (pure logic, NO I/O).
+    Returns updated_content for caller to write.
+    Caller is responsible for reading file before calling this.
+    """
+    
+    updater = SurgicalUpdater(existing_content)
+    results = []
+    
+    for section_id, new_content in section_updates.items():
+        r = updater.update_section(section_id, new_content)  # Returns UpdateResult dataclass
+        results.append({
+            "section_id": r.section_id,
+            "action": r.action,
+            "success": r.success,
+            "message": r.message  # Use attribute access, not .get()
+        })
+    
+    updated_content = updater.generate_updated_content(add_changelog)
+    
+    return {
+        "success": True,
+        "updates": results,
+        "updated_content": updated_content,  # Caller writes this
+        "message": "Computed (no write performed)"
+    }
+```
+
+**In `write_operations.py`, add NEW function that handles write+commit:**
+
+```python
+def update_documentation_sections_and_commit(
+    repo_path: str,
+    doc_path: str,
+    section_updates: dict[str, str],
+    template: str = "lean_baseline_service_template.md",
+    source_file: str = "",
+    component_type: str = "unknown",
+    add_changelog: bool = True,
+    overwrite: bool = True,
+    config: dict = None,  # ADDED: Actual server config
+    telemetry_logger=None  # Add telemetry parameter
+) -> dict:
+    """
+    Update doc sections WITH enforcement gate and git commit.
+    
+    HARD GATE: Updated content must pass enforcement before write.
+    
+    Flow: Read → Compute → ENFORCE → Write → Commit
+    """
+    
+    from tools.enforcement_tool import enforce_and_fix
+    from tools.enforcement_tool_types import FileMetadata
+    from tools.section_updater import update_documentation_sections as compute_updates
+    
+    # CRITICAL: Check if enforcement is enabled (hard gate)
+    if config and not config.get("documentation", {}).get("enforcement", {}).get("enabled", True):
+        return {
+            "success": False,
+            "error": "Documentation enforcement is disabled in config; writes refused for safety",
+            "filePath": doc_path
+        }
+    
+    writer = DocumentationWriter(repo_path)
+    
+    # SECURITY: Prevent path traversal attacks
+    full_path = (Path(repo_path) / doc_path).resolve()
+    repo_resolved = Path(repo_path).resolve()
+    
+    # Use Path.is_relative_to() if available (Python 3.9+); otherwise fallback to prefix check
+    try:
+        is_safe = full_path.is_relative_to(repo_resolved)
+    except (AttributeError, ValueError):
+        # Fallback for Python <3.9: check prefix with os.sep (platform-independent)
+        import os
+        repo_str = str(repo_resolved)
+        full_str = str(full_path)
+        is_safe = full_str == repo_str or full_str.startswith(repo_str + os.sep)
+    
+    if not is_safe:
+        return {
+            "success": False,
+            "error": f"Path traversal blocked: {doc_path} is outside repo",
+            "filePath": doc_path
+        }
+    
+    # Step 1: Read existing
+    existing = writer.read_file(doc_path)
+    if not existing:
+        return {"success": False, "error": f"File not found: {doc_path}", "filePath": doc_path}
+    
+    # Step 2: Compute changes (pure logic, passing content not path)
+    try:
+        result = compute_updates(
+            existing_content=existing,  # CHANGED: Pass content, not file path
+            section_updates=section_updates,
+            add_changelog=add_changelog
+        )
+        updated_content = result["updated_content"]
+        update_results = result["updates"]
+    except Exception as e:
+        logger.error(f"Compute error: {e}", exc_info=True)
+        return {"success": False, "error": str(e), "filePath": doc_path}
+    
+    # Step 3: ENFORCEMENT GATE 🔴
+    try:
+        metadata = FileMetadata(
+            file_path=source_file or doc_path,
+            component_name=Path(doc_path).stem,
+            domain="Unknown",
+            module_name=Path(doc_path).stem,
+            feature_tag="",
+            complexity="Medium"
+        )
+        
+        enforced = enforce_and_fix(
+            generated_markdown=updated_content,
+            template_name=template,
+            file_metadata=metadata,
+            config=config,
+            update_mode="replace",
             overwrite=True,
             dry_run=False
         )
         
-        # Assertions
-        assert isinstance(result, ValidationResult)
-        assert result.valid is True, f"Validation failed: {result.violations}"
-        assert result.file_path is not None
-        assert result.confidence >= 0.9
-        
-        # Verify file exists
-        written_file = Path(result.file_path)
-        assert written_file.exists(), f"File not written: {result.file_path}"
-        
-        # Read actual written content
-        content = written_file.read_text()
-        
-        # Verify YAML front matter was added
-        assert content.startswith("---"), "YAML front matter missing"
-        assert "feature:" in content, "YAML missing 'feature' field"
-        assert "domain:" in content, "YAML missing 'domain' field"
-        assert "component:" in content, "YAML missing 'component' field"
-        
-        # NEW: Verify section structure in written file
-        sections = self._extract_h2_sections(content)
-        expected_sections = [
-            "Quick Reference",
-            "What & Why",
-            "How It Works",
-            "Business Rules",
-            "Architecture",
-            "Data Operations",
-            "Questions & Gaps"
-        ]
-        
-        section_names = [s["name"] for s in sections]
-        for expected in expected_sections:
-            assert any(expected in name for name in section_names), \
-                f"Expected section '{expected}' not found. Found: {section_names}"
-        
-        # NEW: Verify section ordering
-        expected_order = expected_sections
-        actual_order = [s["name"] for s in sections]
-        # Check that expected sections appear in correct relative order
-        last_index = -1
-        for expected_section in expected_order:
-            matching = [i for i, name in enumerate(actual_order) if expected_section in name]
-            if matching:
-                current_index = matching[0]
-                assert current_index > last_index, \
-                    f"Section '{expected_section}' out of order (at {current_index}, should be after {last_index})"
-                last_index = current_index
-        
-        # NEW: Verify heading hierarchy (no jumps)
-        self._verify_heading_hierarchy(content)
-    
-    def _extract_h2_sections(self, markdown: str):
-        """Extract H2 section names and line numbers."""
-        sections = []
-        for i, line in enumerate(markdown.split("\n")):
-            if line.startswith("## ") and not line.startswith("### "):
-                name = line.replace("##", "").strip()
-                sections.append({"name": name, "line": i})
-        return sections
-    
-    def _verify_heading_hierarchy(self, markdown: str):
-        """Verify no heading level jumps (# → ## OK, # → ### BAD)."""
-        last_level = 0
-        for i, line in enumerate(markdown.split("\n")):
-            if line.startswith("#"):
-                level = len(line) - len(line.lstrip("#"))
-                if last_level > 0 and level > last_level + 1:
-                    raise AssertionError(
-                        f"Line {i}: Heading jump from level {last_level} to {level}\n"
-                        f"Line: {line}\n"
-                        f"Fix: Add intermediate heading levels"
-                    )
-                last_level = level
-    
-    @pytest.mark.asyncio
-    async def test_enforcement_auto_fix_missing_yaml(self, temp_workspace):
-        """Test that enforcement auto-generates YAML front matter."""
-        
-        markdown_without_yaml = """
-# Service: TestService
-
-## Quick Reference
-Test content
-
-## What & Why
-Test content
-
-## How It Works
-Test content
-
-## Business Rules
-Test table
-
-## Architecture
-Test content
-
-## Data Operations
-Test content
-
-## Questions & Gaps
-Test content
-"""
-        
-        config = {
-            "workspace_root": temp_workspace,
-            "documentation": {
-                "output_path": "docs/",
-                "pathMappings": {"**/*.cs": "docs/{name}.md"}
+        if not enforced.valid:
+            return {
+                "success": False,
+                "error": "Updated content failed enforcement",
+                "violations": [{"type": v.type, "severity": v.severity.name} for v in enforced.violations],
+                "updates": update_results,
+                "filePath": doc_path
             }
+        
+        enforced_content = enforced.content
+        
+    except Exception as e:
+        logger.error(f"Enforcement error: {e}", exc_info=True)
+        return {"success": False, "error": str(e), "filePath": doc_path}
+    # ========== END GATE ==========
+    
+    # Step 4: Write + commit via DocumentationWriter
+    try:
+        header = build_ai_header(source_file, component_type, template)
+        final_content = _insert_ai_header_after_yaml(header, enforced_content)
+        
+        if not writer.write_file(doc_path, final_content):
+            return {"success": False, "error": "Failed to write", "filePath": doc_path}
+        
+        writer.stage_file(doc_path)
+        msg = f"docs: update {Path(doc_path).stem} sections"
+        if not writer.commit(msg, [doc_path]):
+            return {"success": False, "error": "Failed to commit", "filePath": doc_path}
+        
+        return {
+            "success": True,
+            "filePath": doc_path,
+            "branch": writer.get_current_branch(),
+            "updates": update_results,
+            "summary": "Sections updated, enforced, and committed"
         }
         
-        metadata = FileMetadata(
-            file_path="TestService.cs",
-            component_name="TestService"
-        )
-        
-        result = await validate_and_write_async(
-            generated_markdown=markdown_without_yaml,
-            template_name="lean_baseline_service_template.md",
-            file_metadata=metadata,
-            config=config,
-            overwrite=True
-        )
-        
-        # Should succeed because YAML is auto-generated
-        assert result.valid is True
-        
-        # Check violations for YAML fix
-        yaml_violations = [v for v in result.violations if "yaml" in v.type.lower()]
-        if yaml_violations:
-            assert all(v.severity.name == "FIXABLE" for v in yaml_violations)
-    
-    @pytest.mark.asyncio
-    async def test_enforcement_detects_missing_required_section(self, temp_workspace):
-        """Test that enforcement detects missing required sections."""
-        
-        markdown_missing_sections = """
-# Service: TestService
-
-## Quick Reference
-Test content
-
-## What & Why
-Test content
-
-# Missing Business Rules and other sections
-"""
-        
-        config = {
-            "workspace_root": temp_workspace,
-            "documentation": {
-                "output_path": "docs/",
-                "pathMappings": {"**/*.cs": "docs/{name}.md"}
-            }
-        }
-        
-        metadata = FileMetadata(
-            file_path="TestService.cs",
-            component_name="TestService"
-        )
-        
-        result = await validate_and_write_async(
-            generated_markdown=markdown_missing_sections,
-            template_name="lean_baseline_service_template.md",
-            file_metadata=metadata,
-            config=config,
-            overwrite=True
-        )
-        
-        # Should fail because required sections missing (BLOCKER violations)
-        assert result.valid is False
-        
-        # Should have BLOCKER violations for missing sections
-        blocker_violations = [v for v in result.violations if v.severity.name == "BLOCKER"]
-        assert len(blocker_violations) > 0
-
-
-# Run tests: pytest tests/test_enforcement_e2e.py -v -s
+    except Exception as e:
+        logger.error(f"Write error: {e}", exc_info=True)
+        return {"success": False, "error": str(e), "filePath": doc_path}
 ```
 
-**Acceptance Criteria:**
-- ✅ All E2E tests pass
-- ✅ Tests cover happy path (valid doc)
-- ✅ Tests cover auto-fix scenarios (missing YAML)
-- ✅ Tests cover error scenarios (missing sections)
-- ✅ Real templates and files used
-- ✅ File I/O verified
-
-**Status:** ⬜ Not Started
+**Acceptance:** No direct `Path.write_text()` outside of `DocumentationWriter`; enforcement gate required before any write; updates are committed.
 
 ---
 
-#### Task 4.2: Integration Test with Real Project Files
+### BATCH 4: Testing & Documentation (6-8 hours)
 
-**File:** `tests/test_enforcement_real_files.py`
+**Objective:** Verify enforcement works end-to-end; ensure no regressions
 
-**What to do:**
-Test enforcement with actual training-tracker backend files.
+#### Task 4.1: Create E2E Tests
 
-**Specific Changes:**
+**File:** `tests/test_enforcement_e2e.py` (new)
+
+Test both pathways. **Note:** Tests validate enforcement indirectly through the write path; we don't call `enforce_and_fix()` directly since enforcement is integrated into write operations.
+
 ```python
-# Create new test file: tests/test_enforcement_real_files.py
-
 import pytest
 from pathlib import Path
-from src.tools.enforcement_tool import validate_and_write_async
-from src.tools.enforcement_tool_types import FileMetadata
+import subprocess
+from tools.write_operations import write_documentation
 
+@pytest.fixture
+def git_repo(tmp_path):
+    """Initialize a git repo in tmp_path."""
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=tmp_path, check=True)
+    # Create initial commit so "branch" exists
+    (tmp_path / "README.md").write_text("# Test Repo")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=tmp_path, check=True)
+    return tmp_path
 
-class TestEnforcementRealFiles:
-    """Test enforcement with real project files."""
+def test_write_documentation_enforces_before_write(git_repo):
+    """Test that write_documentation refuses invalid content (no enforcement pass)."""
     
-    @pytest.mark.asyncio
-    async def test_enrollment_service_documentation(self):
-        """Test with EnrollmentService from training-tracker project."""
-        
-        # Sample LLM-generated doc for EnrollmentService
-        generated_markdown = """
-# Service: EnrollmentService
+    invalid_markdown = "# Service\n\nNo required sections!"
+    
+    result = write_documentation(
+        repo_path=str(git_repo),
+        content=invalid_markdown,
+        source_file="test.cs",
+        doc_path="docs/test.md",  # Repo-relative path
+        template="lean_baseline_service_template.md",
+        overwrite=True
+    )
+    
+    # Should fail due to enforcement
+    assert result["success"] is False
+    assert "enforcement" in result.get("error", "").lower() or "violations" in result
+    
+    # File should NOT be created
+    assert not (git_repo / "docs" / "test.md").exists()
 
-**Namespace/Project**: TrainingTracker.Api.Domain.Services
-**File Location**: `TrainingTracker.Api/Domain/Services/IEnrollmentService.cs`
-**Complexity**: Medium
-**Documentation Level**: 🔶 Baseline (70% complete)
+def test_write_documentation_with_valid_content(git_repo):
+    """Test that write_documentation accepts valid enforced content."""
+    
+    valid_markdown = """---
+component: TestService
+feature: TEST001
+domain: Testing
+---
 
-## Quick Reference (TL;DR)
+# Service: TestService
 
-🤖 Manages user course enrollments across their lifecycle: create, retrieve, update status, and delete.
-
-**When to use**: Any operation involving enrolling users in courses
-
-**Watch out for**: ❓ [HUMAN: Business rule for status values]
+## Quick Reference
+Testing service.
 
 ## What & Why
-
-🤖 Technical: Orchestrates enrollment operations between controllers and repositories.
-
-❓ **Business Context**: [HUMAN: What is the enrollment model?]
+Testing.
 
 ## How It Works
-
-🤖 Validates user and course exist, checks for duplicates, creates enrollment record.
+Testing.
 
 ## Business Rules
-
-| Rule ID | Description |
-|---------|-------------|
-| BR-ENR-001 | 🤖 Users cannot enroll in same course twice |
+| Rule | Desc |
+|------|------|
+| R1 | Test |
 
 ## Architecture
-
-🤖 **Dependencies**: UserRepository, CourseRepository
+Testing.
 
 ## Data Operations
-
-🤖 **Reads**: Users, Courses, Enrollments
-**Writes**: Enrollments
+Testing.
 
 ## Questions & Gaps
-
-❓ [HUMAN: Are there enrollment count limits?]
-"""
-        
-        config = {
-            "workspace_root": ".",
-            "documentation": {
-                "output_path": "docs/",
-                "pathMappings": {
-                    "TrainingTracker.Api/**/*.cs": "docs/services/{name}.md"
-                }
-            }
-        }
-        
-        metadata = FileMetadata(
-            file_path="TrainingTracker.Api/Domain/Services/IEnrollmentService.cs",
-            component_name="EnrollmentService",
-            feature_tag="FN12345_US067",
-            domain="Training",
-            module_name="Enrollment"
-        )
-        
-        result = await validate_and_write_async(
-            generated_markdown=generated_markdown,
-            template_name="lean_baseline_service_template.md",
-            file_metadata=metadata,
-            config=config,
-            dry_run=True  # Don't actually write in test
-        )
-        
-        # Verify validation result
-        print(f"\nValidation Result:")
-        print(f"  Valid: {result.valid}")
-        print(f"  Confidence: {result.confidence}")
-        print(f"  Violations: {len(result.violations)}")
-        print(f"  Summary: {result.summary}")
-        
-        for v in result.violations:
-            print(f"    - {v.severity.name}: {v.type} @ {v.line}: {v.message}")
-
-
-# Run tests: pytest tests/test_enforcement_real_files.py -v -s
+Testing."""
+    
+    result = write_documentation(
+        repo_path=str(git_repo),
+        content=valid_markdown,
+        source_file="test.cs",
+        doc_path="docs/test.md",  # repo-relative
+        overwrite=True
+    )
+    
+    # Should succeed
+    assert result["success"] is True
+    assert (git_repo / "docs" / "test.md").exists()
+    
+    # File content should have header AFTER YAML
+    written = (git_repo / "docs" / "test.md").read_text()
+    assert written.startswith("---")
+    yaml_end = written.find("---\n", 5)
+    assert yaml_end > 0
+    # Header should appear AFTER YAML
+    header_pos = written.find("<!--")
+    assert header_pos > yaml_end
 ```
 
-**Acceptance Criteria:**
-- ✅ Test runs with real file paths
-- ✅ Validation produces expected results
-- ✅ YAML is correctly generated
-- ✅ Violations logged properly
-- ✅ No actual file I/O in dry-run mode
+**Acceptance:** Git repo initialized; enforcement gate tested; write refuses invalid; YAML/header correct; tests pass.
 
-**Status:** ⬜ Not Started
+#### Task 4.2: Add Bypass Scan Task
+
+**File:** Add to test suite or pre-commit hook
+
+```bash
+#!/bin/bash
+# Scan for dangerous write patterns outside write_operations.py
+
+echo "🔍 Scanning for doc write bypasses..."
+
+# Find .write_text() calls outside write_operations.py
+if grep -r --include="*.py" "\.write_text(" src/ tests/ | grep -v "write_operations.py"; then
+  echo "❌ FAIL: Found .write_text() outside write_operations.py"
+  exit 1
+fi
+
+# Find open(..., 'w') or open(..., "w") outside write_operations.py
+if grep -r --include="*.py" "open([^)]*['\"]w['\"]" src/ tests/ | grep -v "write_operations.py"; then
+  echo "❌ FAIL: Found open(..., 'w') outside write_operations.py"
+  exit 1
+fi
+
+echo "✅ PASS: No direct write bypasses detected."
+```
+
+**Acceptance:** Scan completes; finds no undocumented write paths for `.md` files.
+
+#### Task 4.3: Run Full Test Suite
+
+```bash
+pytest tests/ -v --cov=src
+```
+
+**Acceptance:** All existing tests pass; new E2E tests pass; no regressions; coverage remains >80%.
+
+#### Task 4.4: Create Developer Guide
+
+**File:** `docs/DEVELOPER_GUIDE_ENFORCEMENT.md`
+
+Include sections:
+- How enforcement works (diagram)
+- API usage examples
+- Configuration options
+- Troubleshooting (bypass detection)
 
 ---
 
-#### Task 4.3: Create Developer Integration Guide
+## ✅ Final Checklist
 
-**File:** `docs/DEVELOPER_GUIDE_ENFORCEMENT_INTEGRATION.md`
+### Before Integration Starts
+- [ ] All code reviewed for bypass paths
+- [ ] Import structure confirmed
+- [ ] Test data prepared
 
-**What to do:**
-Document how developers integrate enforcement tool into their code generation workflows.
+### Batch 1 Complete
+- [x] Imports added
+- [x] Telemetry initialized
+- [x] Config schema updated
 
-**Specific Changes:**
-Create new markdown file with sections:
+### Batch 2 Complete
+- [x] Dispatcher wired to real functions
+- [x] Tool schemas registered
+- [ ] All tests compile
 
-```markdown
-# Developer Guide: Enforcement Tool Integration
+### Batch 3 Complete (Critical)
+- [x] YAML/header fix applied
+- [x] `write_documentation()` enforces
+- [x] `update_documentation_sections()` is pure logic
+- [x] `update_documentation_sections_and_commit()` works
+- [ ] No `Path.write_text()` outside `DocumentationWriter`
 
-## Overview
+### Batch 4 Complete
+- [ ] E2E tests pass
+- [ ] All existing tests pass
+- [x] Dev guide written
+- [ ] Bypass scan completes with zero violations
 
-This guide explains how to integrate the Template Enforcement Tool into your documentation generation workflow.
+### Production Ready
+- [ ] All enforcement gates confirmed
+- [ ] No bypass paths remain
+- [ ] Git workflow preserved
+- [ ] Telemetry logging works
 
-## Quick Start
+---
 
-### 1. Call Enforcement Tool After LLM Generation
+## 🔴 Critical Success Criteria
+
+**Enforcement is unavoidable if and only if:**
+
+1. ✅ `write_documentation()` calls enforcement; refuses to write if `valid=false`
+2. ✅ `update_documentation_sections_and_commit()` calls enforcement; refuses to write if `valid=false`
+3. ✅ No other code path writes docs (grep: no `Path.write_text()` for `.md` files)
+4. ✅ AI header inserted AFTER YAML, not before
+5. ✅ All writes stage and commit via `DocumentationWriter`
+6. ✅ **If enforcement is `enabled=false` in config, write tools REFUSE to write** (no bypass fallback)
+   - Return error: `"error": "Documentation enforcement is disabled in config; writes refused for safety"`
+   - This prevents silent legacy behavior circumventing the hard gate
+
+**If any of these fail, enforcement is NOT the hard gate.**
+
+---
+
+## 📋 Enforcement Tool Contract (What `enforce_and_fix()` Returns)
+
+**The enforcement tool MUST return this exact contract for the integration to work:**
 
 ```python
-from tools.enforcement_tool import validate_and_write_async
-from tools.enforcement_tool_types import FileMetadata
+@dataclass
+class EnforcementResult:
+    """Result of template validation and auto-fix."""
+    valid: bool                           # True if content passes all validations
+    content: str                          # The fixed markdown (may differ from input)
+    violations: list[Violation]           # Non-fixable issues found
+    summary: str                          # Human-readable summary of what changed
+    auto_fixed: list[str]                 # List of auto-fixed issues
+```
 
-result = await validate_and_write_async(
-    generated_markdown=llm_output,
-    template_name="lean_baseline_service_template.md",
-    file_metadata=FileMetadata(
-        file_path="src/Services/MyService.cs",
-        component_name="MyService",
-        domain="MyDomain"
-    ),
-    config=config,
-    overwrite=True
+The plan assumes:
+- `result.valid` is True if safe to write
+- `result.content` is the validated/fixed markdown
+- `result.violations` is a list of `Violation` objects with `.type`, `.severity`, `.message`
+- `result.summary` describes what enforcement changed
+
+**If your enforcement tool returns a different structure, update the dispatcher code in Batch 2.**
+
+---
+
+## 🗺️ Path Clarifications
+
+### Repo-Relative vs Absolute Paths
+
+**In this plan:**
+- **`doc_path` is repo-relative:** `"docs/service.md"` not `"/absolute/path/docs/service.md"`
+- **`source_file` is repo-relative:** `"src/handlers.cs"` not absolute
+- **`repo_path` is absolute:** `"."` or `"/full/path/to/repo"`
+
+The dispatcher resolves `doc_path` as `Path(repo_path) / doc_path`.
+
+**Example:**
+```python
+write_documentation(
+    repo_path="/home/user/myrepo",  # Absolute
+    doc_path="docs/api.md",         # Relative to repo
+    source_file="src/api.cs"        # Relative to repo
 )
-
-if result.valid:
-    print(f"✅ Documentation written to {result.file_path}")
-else:
-    print(f"❌ Validation failed: {result.violations}")
+# Writes to: /home/user/myrepo/docs/api.md
 ```
 
-### 2. Understanding Validation Results
+### Import Path: `from tools...` not `from src.tools...`
 
-- `valid`: Boolean indicating if doc passes all validation rules
-- `file_path`: Where the doc was written (if valid)
-- `violations`: List of issues found (auto-fixed or blocking)
-- `confidence`: Score 0.0-1.0 indicating validation confidence
-- `summary`: Human-readable summary of result
+**ALL imports use the pattern your server already uses:**
 
-### 3. Handling Violations
-
-**FIXABLE violations**: Auto-corrected by tool (YAML generation, section reordering)
-**BLOCKER violations**: Require retry with stricter LLM prompt
-**WARN violations**: Non-blocking issues (Phase 2+)
-
-## Configuration
-
-See `config.json` enforcement section for options:
-
-```json
-{
-  "enforcement": {
-    "enabled": true,
-    "autoFixEnabled": true,
-    "validationStrictness": "baseline",
-    "allowRetry": true,
-    "maxRetries": 3
-  }
-}
+```python
+from tools.enforcement_tool import enforce_and_fix      # ✅ NOT from src.tools (canonical module path)
+from tools.write_operations import write_documentation    # ✅ NOT from src.tools
+from resources import AKRResourceManager                  # ✅ Matches server.py
 ```
 
-## Testing
-
-Run end-to-end tests:
-
-```bash
-pytest tests/test_enforcement_e2e.py -v -s
-pytest tests/test_enforcement_real_files.py -v -s
-```
-
-## Troubleshooting
-
-[Include common issues and solutions from previous analysis]
-
-## See Also
-
-- [IMPLEMENTATION_PLAN_TEMPLATE_ENFORCEMENT_TOOL.md](IMPLEMENTATION_PLAN_TEMPLATE_ENFORCEMENT_TOOL.md)
-- [COPILOT_AGENT_IMPLEMENTATION_BATCHES.md](COPILOT_AGENT_IMPLEMENTATION_BATCHES.md)
-```
-
-**Acceptance Criteria:**
-- ✅ Guide covers quick start
-- ✅ Examples are copy-pasteable
-- ✅ Configuration options explained
-- ✅ Testing instructions included
-- ✅ Troubleshooting section present
-
-**Status:** ⬜ Not Started
+This avoids `ModuleNotFoundError` when the server runs as an MCP subprocess.
 
 ---
 
-#### Task 4.4: Verify Integration with Existing Tests
+## ⚠️ Important Implementation Notes
 
-**File:** `tests/` (all test files)
+### AI Header Refactoring (Option A: Backward Compatible)
 
-**What to do:**
-Run full test suite to ensure enforcement tool doesn't break existing functionality.
+**Current State:** `DocumentationWriter.add_ai_header()` is a method that modifies content.
 
-**Specific Changes:**
-```bash
-# Run all existing tests
-pytest tests/ -v --tb=short
+**Refactoring Strategy (Task 3.0) - CHOSEN: Option A (Recommended)**
 
-# Run with coverage
-pytest tests/ --cov=src --cov-report=html
+**Why Option A:** Preserves backward compatibility; prevents breaking existing callers.
 
-# Run specific enforcement tests
-pytest tests/test_enforcement*.py -v -s
+**Implementation steps:**
+1. Create NEW standalone function `build_ai_header(source_file, component_type, template) -> str`
+   - Returns header text only (no content modification)
+   - Located in `write_operations.py`
+
+2. Create `_insert_ai_header_after_yaml(header: str, content: str) -> str` helper
+   - Inserts header AFTER YAML closing delimiter
+   - Located in `write_operations.py`
+
+3. **Do NOT modify** `DocumentationWriter.add_ai_header()` method
+   - It may have existing callers outside write_operations.py
+   - Leaves compatibility door open for future refactor
+
+4. In dispatcher + write functions:
+   - Use: `header = build_ai_header(...)`
+   - Then: `final_content = _insert_ai_header_after_yaml(header, enforced_content)`
+
+**Result:** YAML-first requirement met; existing code unbroken; clear separation of concerns.
+
+### Config Parameter Wiring
+
+**Critical:** Pass the actual loaded server config through the dispatcher:
+
+```python
+# In call_tool() (Task 2.1):
+global config
+cfg = config  # Use global config already loaded by ensure_initialized()
+result = write_documentation(..., config=cfg, ...)
 ```
 
-**Acceptance Criteria:**
-- ✅ All existing tests pass
-- ✅ New tests pass
-- ✅ Code coverage remains >80%
-- ✅ No regressions introduced
+**Why:** Your `ensure_initialized()` must call `config = load_config()` and set it globally. This config is then passed through to enforcement, which uses settings like `validationStrictness`, `maxRetries`, etc. Do NOT reconstruct a minimal config in the dispatcher.
 
-**Status:** ⬜ Not Started
+### Telemetry Initialization Timing & Usage
+
+**Initialization:**
+```python
+# In server initialization or main():
+ensure_initialized()  # This now calls init_enforcement_telemetry()
+```
+This ensures telemetry is ready before the first tool call.
+
+**Telemetry Event Contract (minimal schema):**
+
+Log these 3 event types to `logs/enforcement.jsonl`:
+
+1. **`enforcement_start`** (logged at enforcement invocation start):
+   - `event_type`: "enforcement_start"
+   - `tool`: name of write/update function
+   - `template`: template_name being used
+   - `doc_path`: path being written
+   - `timestamp`: ISO 8601 datetime
+
+2. **`enforcement_result`** (logged after enforcement completes):
+   - `event_type`: "enforcement_result"
+   - `tool`: name of write/update function
+   - `valid`: boolean (True if passed)
+   - `violations_count`: number of violations found
+   - `auto_fixed_count`: number of issues auto-fixed
+   - `duration_ms`: milliseconds to validate+fix
+   - `timestamp`: ISO 8601 datetime
+
+3. **`enforcement_error`** (logged if enforcement fails with exception):
+   - `event_type`: "enforcement_error"
+   - `tool`: name of write/update function
+   - `error_type`: exception class name
+   - `message`: error message
+   - `timestamp`: ISO 8601 datetime
+
+**Usage Inside write/update functions:**
+Inside `write_documentation()` and `update_documentation_sections_and_commit()`:
+- Log `enforcement_start` before calling `enforce_and_fix()`
+- Log `enforcement_result` after enforcement completes (whether valid or not)
+- Log `enforcement_error` in exception handler
+- This helps trace which docs were enforced and what issues were found
+- Pattern: `if telemetry_logger: telemetry_logger.log_event(event_dict)`
+
+### Path Semantics Summary
+
+- **`repo_path`** (absolute): Passed by dispatcher, typically `"."`
+- **`doc_path`** (repo-relative): `"docs/api.md"` NOT `"/full/path/to/docs/api.md"`
+- **`source_file`** (repo-relative): `"src/api.cs"` NOT absolute
+- **Resolution:** Internally: `full_path = Path(repo_path) / doc_path`
+
+### Overwrite / Update Mode Mapping
+
+**Explicit mapping (already in plan, restated for clarity):**
+- `overwrite=False` → `update_mode="create"` (fail if file exists)
+- `overwrite=True` → `update_mode="replace"` (overwrite if exists)
 
 ---
 
-#### Task 4.5: Create Integration Checklist
+## 📖 Supporting Batch 2 Extensions (Optional)
 
-**File:** `docs/INTEGRATION_CHECKLIST.md`
+If you want Copilot to have full visibility into the update workflow, **optionally add these tools to `list_tools()` and dispatcher in Batch 2:**
 
-**What to do:**
-Create final verification checklist for integration completion.
-
-**Specific Changes:**
-```markdown
-# Template Enforcement Tool Integration Checklist
-
-## Batch 1: Server Integration Preparation
-- [ ] Imports added to server.py
-- [ ] No circular import issues
-- [ ] Telemetry logger initialized
-- [ ] Config schema loaded correctly
-
-## Batch 2: MCP Tool Registration  
-- [ ] validate_and_write_documentation tool registered
-- [ ] Tool schema valid
-- [ ] Error handling works
-- [ ] Telemetry logging works
-- [ ] Tool registration tests pass
-
-## Batch 3: Documentation Generation Flow
-- [ ] generate_documentation_with_enforcement function works
-- [ ] LLM prompts updated with enforcement guidance
-- [ ] config.json updated with enforcement options
-- [ ] Backward compatibility maintained (enforce=False)
-
-## Batch 4: End-to-End Testing
-- [ ] E2E tests pass (auto-fix, missing sections)
-- [ ] Real file tests pass (enrollment service)
-- [ ] All existing tests still pass
-- [ ] No regressions
-- [ ] Coverage >80%
-- [ ] Developer guide complete
-- [ ] Integration checklist complete
-
-## Final Verification
-- [ ] Test with training-tracker backend
-- [ ] Manual test with VSCode MCP server
-- [ ] Verify telemetry logging works
-- [ ] Update README with new workflow
-- [ ] Create sample prompt documentation
-
-## Sign-Off
-- [ ] Code review completed
-- [ ] All acceptance criteria met
-- [ ] Ready for production
-
-**Approved by**: [Name]
-**Date**: [Date]
+```python
+Tool(
+    name="get_document_structure",
+    description="Analyze existing doc structure: sections, hierarchy, YAML metadata.",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "doc_path": {"type": "string", "description": "Repo-relative path"}
+        },
+        "required": ["doc_path"]
+    }
+),
+Tool(
+    name="analyze_documentation_impact",
+    description="Analyze impact of proposed changes: cross-references, dependencies.",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "doc_path": {"type": "string"},
+            "changes": {"type": "object"}
+        },
+        "required": ["doc_path", "changes"]
+    }
+)
 ```
 
-**Acceptance Criteria:**
-- ✅ Checklist is comprehensive
-- ✅ All items trackable
-- ✅ Clear sign-off criteria
-
-**Status:** ⬜ Not Started
+These already exist in `section_updater.py` and enable more coherent Copilot workflows (understand structure before proposing changes). **Mark as optional** because they're not strictly required for enforcement to work.
 
 ---
 
-## 📊 Progress Tracking
+## � M365 Copilot Round 4 Feedback: Clarifications Applied
 
-### Batch Summary
+This section summarizes fixes applied to address Round 4 assessment (9 items).
 
-| Batch | Name | Duration | Status |
-|-------|------|----------|--------|
-| 1 | Server Integration Preparation | 4-6h | ⬜ Not Started |
-| 2 | MCP Tool Registration | 3-4h | ⬜ Not Started |
-| 3 | Documentation Generation Flow Update | 5-6h | ⬜ Not Started |
-| 4 | E2E Testing & Documentation | 6-8h | ⬜ Not Started |
-| **TOTAL** | | **18-24 hours** | ⬜ Not Started |
+### Blocking Issues Fixed
 
-### Batch Dependency Graph
+**1. Enforcement module import path unified:**
+- Canonical import: `from tools.enforcement_tool import enforce_and_fix`
+- Used consistently in Batch 1, Batch 2, Batch 3, tests, and Path Clarifications
+- No aliases or alternate paths
 
-```
-┌──────────────────────────────────────────┐
-│ Batch 1: Server Integration Preparation  │
-│ (Imports, Telemetry, Config)             │
-└──────────────────┬───────────────────────┘
-                   │
-                   ▼
-┌──────────────────────────────────────────┐
-│ Batch 2: MCP Tool Registration           │
-│ (Tool Definition, Schema, Tests)         │
-└──────────────────┬───────────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        ▼                     ▼
-┌──────────────────────┐  ┌──────────────────────┐
-│ Batch 3: Flow Update │  │ Batch 4: E2E Testing │
-│ (Enforcement in Flow)│  │ (Validation & Docs)  │
-└──────────────────┬───┘  └──────────────────────┘
-                   │
-                   ▼
-        ✅ Integration Complete
-```
+**2. Dispatcher config scope corrected:**
+- Changed from: `config = load_config() if config is None else config` (causes UnboundLocalError)
+- Changed to: `global config; cfg = config` (local reference to global)
+- Tool calls use `cfg` instead of reassigning `config`
+- Prevents runtime errors in Python scope
 
----
+### High-Value Improvements
 
-## 🎯 Success Criteria
+**3. AI header strategy clarified (Option A chosen):**
+- New standalone `build_ai_header()` returns header text only
+- New `_insert_ai_header_after_yaml()` inserts after YAML closing delimiter
+- **Do NOT modify** existing `DocumentationWriter.add_ai_header()` method (backward compatibility)
+- Dispatcher uses new functions
 
-### Overall Integration Success
+**4. Path traversal guard added:**
+- Both `write_documentation()` and `update_documentation_sections_and_commit()` validate `doc_path`
+- Guard: resolve full path and ensure it's within `repo_path`
+- Returns error if path tries to escape repo boundaries
+- Prevents: `doc_path="../secret.md"` or `doc_path="/absolute/path"`
 
-✅ **Functional**: Documentation generation with automatic template enforcement works end-to-end  
-✅ **Integrated**: Enforcement tool is wired into MCP server workflow  
-✅ **Tested**: All test suites pass with >80% coverage  
-✅ **Documented**: Developer guide and integration guide complete  
-✅ **Verified**: Real-world test with training-tracker backend files passes  
-✅ **Ready**: Production-ready code with telemetry and error handling  
+**5. Tool schemas clarified with repo-relative paths:**
+- `doc_path` description now: "Repo-relative output doc path, e.g. docs/api.md"
+- `source_file` description now: "Repo-relative source code file path, e.g. src/handler.cs"
+- Eliminates client-side ambiguity about path format
 
-### Specific Measurable Outcomes
+**6. Bypass scan script simplified:**
+- Removed fragile multi-pattern grep logic
+- Now deterministically checks:
+  - `.write_text()` outside write_operations.py → FAIL
+  - `open(..., 'w')` outside write_operations.py → FAIL
+- No false negatives/positives from "markdown" string detection
 
-- Generated docs now **100% include YAML front matter** (auto-generated)
-- Generated docs now **100% have required sections in correct order** (auto-fixed)
-- Generated docs now **100% have valid heading hierarchy** (auto-fixed)
-- First-pass validation success rate: **>90%** (target: >95% with retries)
-- User experience: **~20-25 minutes per doc** (includes manual enhancement of ❓ sections)
+**7. Config key naming standardized:**
+- JSON config uses camelCase: `writeMode`, `requireYamlFrontmatter`, `enforceSectionOrder`
+- Consistent throughout plan
 
----
+### Clarifications Addressed
 
-## 🚀 Next Steps After Integration
+**8. Telemetry logger usage documented:**
+- Initialization: call `init_enforcement_telemetry()` in `ensure_initialized()`
+- Usage in write/update functions: log enforcement start/result with template name + doc_path + violation count
+- Pattern: `if telemetry_logger: telemetry_logger.log_enforcement(...)`
 
-### Phase 2 Enhancements (Future)
-
-- ✨ Section merge engine for updating existing docs
-- ✨ Advanced markers and diagram validation
-- ✨ Customizable section templates
-- ✨ Multi-language support
-- ✨ Advanced merge conflict resolution
-
-### Production Rollout
-
-1. Deploy to staging environment
-2. Test with live templates and real projects
-3. Gather feedback from users
-4. Deploy to production
-5. Monitor telemetry for issues
+**9. Enforcement enabled flag behavior:**
+- If `documentation.enforcement.enabled=false` in config: write tools REFUSE to write
+- Error message: "Documentation enforcement is disabled in config; writes refused for safety"
+- Prevents silent bypass fallback; maintains hard-gate guarantee
 
 ---
 
-## � Critical Improvements Applied (M365 Copilot Feedback)
+## �📚 Supporting Materials
 
-This plan incorporates 6 critical fixes identified in peer review:
-
-### 1. Enforcement as Hard Gate
-**Problem**: If tool validates but other code paths can still write, compliance is lost.  
-**Fix**: Tool is the ONLY writer. No bypass paths. See Task 2.1 integration.
-
-### 2. Minimal Prompt (Not Full Template Text)
-**Problem**: Embedding full template causes models to "summarize" structure.  
-**Fix**: Task 3.2 now uses minimal contract (sections list + markers only). Enforcement tool is schema authority.
-
-### 3. Tool Dispatcher Integration
-**Problem**: Creating second `@server.call_tool()` conflicts with existing dispatcher.  
-**Fix**: Task 2.1 now integrates into existing dispatcher as a case branch.
-
-### 4. Config Schema Alignment
-**Problem**: Config keys don't match enforcement tool's actual contract.  
-**Fix**: Task 3.3 now validates config matches tool expectations with startup check.
-
-### 5. Update Mode Support
-**Problem**: Tool schema missing `update_mode` for create/replace/merge intent.  
-**Fix**: Task 2.2 schema now includes explicit `update_mode` parameter.
-
-### 6. Output Validation Tests
-**Problem**: Tests verified return codes, not actual written file structure.  
-**Fix**: Task 4.1 tests now extract sections, verify order, check heading hierarchy in written files.
+- [CRITICAL_IMPROVEMENTS_M365_COPILOT_FEEDBACK.md](CRITICAL_IMPROVEMENTS_M365_COPILOT_FEEDBACK.md) — Details of feedback items
+- [M365_FEEDBACK_MAPPING.md](M365_FEEDBACK_MAPPING.md) — Maps each feedback to specific tasks
+- [QUICK_REFERENCE_CHANGES.md](QUICK_REFERENCE_CHANGES.md) — Task-by-task summary
+- [Phase 1 Implementation Plan](IMPLEMENTATION_PLAN_TEMPLATE_ENFORCEMENT_TOOL.md) — Component build plan (completed)
 
 ---
-
-## 📝 Debug Checklist (When Docs Still Don't Follow Template)
-
-If you generate docs and they still don't follow template structure, use this checklist:
-
-**1. Was enforcement tool invoked?**
-- [ ] Check server logs for validation start/end events
-- [ ] Look for `VALIDATION_RUN` entries in `logs/enforcement.jsonl`
-- [ ] If no logs: enforcement is not wired into generation flow
-
-**2. Did tool return `valid=false`?**
-- [ ] Check result.violations for BLOCKER violations
-- [ ] If BLOCKER present: tool detected issues (good!)
-- [ ] If valid=true but file format still wrong: tool may not have run on final output
-
-**3. Is file written outside the tool?**
-- [ ] Search codebase for `.write()` or `open("w")` calls that aren't in FileWriter
-- [ ] Check if agent is writing LLM output directly (bypassing tool)
-- [ ] This is the most common issue!
-
-**4. Is template name correct?**
-- [ ] Verify template file exists: `ls akr_content/templates/lean_baseline_service_template.md`
-- [ ] Check tool can load it: print template in logs
-
-**5. Do pathMappings match your paths?**
-- [ ] Example: Does config say `"TrainingTracker.Api/**/*.cs"` match your actual file path?
-- [ ] If path doesn't match rule, tool may refuse to write
-- [ ] Check config validation log at server startup
-
-**6. Is config.json valid and loaded?**
-- [ ] Verify `config.json` is valid JSON (use online validator)
-- [ ] Check server startup logs for config load success
-- [ ] Look for validation errors like "enforcement disabled"
-
----
-
-**Last Updated:** February 3, 2026  
-**Status:** Ready for Copilot Agent Execution (With Critical Improvements Applied)

@@ -49,5 +49,19 @@
         "comment": "Set enabled: true to completely skip initialization",
         "environment_variable": "AKR_SKIP_INITIALIZATION=true",
         "startup_time": "< 500 milliseconds"
+    },
+    "documentation": {
+        "output_path": "docs/",
+        "pathMappings": { "src/**/*.cs": "docs/{module}.md" },
+        "enforcement": {
+            "enabled": true,
+            "validationStrictness": "baseline",
+            "requireYamlFrontmatter": true,
+            "enforceSectionOrder": true,
+            "autoFixEnabled": true,
+            "allowRetry": true,
+            "maxRetries": 3,
+            "writeMode": "git"
+        }
     }
 }

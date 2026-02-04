@@ -242,3 +242,75 @@ class EnforcementTool:
             EnforcementLogger for accessing logs/events
         """
         return self.logger
+
+
+@dataclass
+class EnforcementResult:
+    """Result of template validation and auto-fix."""
+    valid: bool
+    content: str
+    violations: List[Any]
+    summary: str
+    auto_fixed: List[str]
+
+
+def enforce_and_fix(
+    markdown: str,
+    template_name: str,
+    file_metadata: FileMetadata,
+    config: Dict[str, Any],
+    update_mode: str = "replace",
+    dry_run: bool = False
+) -> EnforcementResult:
+    """Validate markdown against template and auto-fix where possible."""
+    enforcement_cfg = (config or {}).get("documentation", {}).get("enforcement", {})
+    require_yaml = enforcement_cfg.get("requireYamlFrontmatter", True)
+    enforce_section_order = enforcement_cfg.get("enforceSectionOrder", True)
+    auto_fix_enabled = enforcement_cfg.get("autoFixEnabled", True)
+
+    schema_builder = TemplateSchemaBuilder()
+    parser = BasicDocumentParser()
+    yaml_generator = YAMLFrontmatterGenerator()
+    validation_engine = ValidationEngine()
+
+    template_content = schema_builder.load_template_content(template_name) or ""
+    schema = schema_builder.build_schema(template_name, template_content)
+
+    auto_fixed: List[str] = []
+    content = markdown
+    parsed_doc = parser.parse_document(content)
+
+    if require_yaml and auto_fix_enabled and not parsed_doc.yaml_data:
+        yaml_block = yaml_generator.generate(file_metadata, template_name)
+        content = f"{yaml_block}\n{content.lstrip()}"
+        auto_fixed.append("yaml_frontmatter")
+        parsed_doc = parser.parse_document(content)
+
+    validation_result: ValidationResult = validation_engine.validate_phase1(parsed_doc, schema)
+
+    violations = validation_result.violations
+    if not enforce_section_order:
+        violations = [v for v in violations if v.type != "section_order"]
+
+    if not require_yaml:
+        violations = [
+            v for v in violations
+            if v.type not in {"missing_yaml_frontmatter", "missing_yaml_fields"}
+        ]
+
+    severity_summary = validation_engine.calculate_severity_summary(violations)
+    valid = severity_summary.get("blockers", 0) == 0
+
+    summary = (
+        f"Validation {'passed' if valid else 'failed'}: {len(violations)} violations"
+    )
+    if auto_fixed:
+        summary += f"; auto-fixed: {', '.join(auto_fixed)}"
+
+    return EnforcementResult(
+        valid=valid,
+        content=content,
+        violations=violations,
+        summary=summary,
+        auto_fixed=auto_fixed
+    )
