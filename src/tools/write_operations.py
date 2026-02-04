@@ -10,7 +10,7 @@ import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Protocol
 
 from .config_utils import ErrorType, error_response
 from .enforcement_tool import enforce_and_fix
@@ -18,6 +18,13 @@ from .enforcement_tool_types import FileMetadata
 from .section_updater import update_documentation_sections
 
 logger = logging.getLogger("akr-mcp-server.tools.write_operations")
+
+
+class TelemetryLogger(Protocol):
+    """Protocol for telemetry logging."""
+    def log_event(self, event: dict) -> None:
+        """Log an event with metadata."""
+        ...
 
 
 def _insert_ai_header_after_yaml(header: str, content: str) -> str:
@@ -261,7 +268,7 @@ def write_documentation(
     commit_message: Optional[str] = None,
     overwrite: bool = False,
     config: dict | None = None,
-    telemetry_logger: object | None = None
+    telemetry_logger: Optional[TelemetryLogger] = None
 ) -> dict:
     """
     Write new documentation to the repository.
@@ -469,7 +476,7 @@ def update_documentation_sections_and_commit(
     add_changelog: bool = True,
     overwrite: bool = True,
     config: dict | None = None,
-    telemetry_logger: object | None = None
+    telemetry_logger: Optional[TelemetryLogger] = None
 ) -> dict:
     """
     Update documentation sections, enforce template, and commit changes.

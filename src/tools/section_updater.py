@@ -476,77 +476,95 @@ def update_documentation_sections(
     """
     Perform surgical updates to documentation sections (pure logic).
     
+    This is a pure transformation function: it computes updated content
+    without any file I/O. The caller (write_operations.update_documentation_sections_and_commit)
+    is responsible for writing the result and managing git operations.
+    
     Args:
-        existing_content: Existing markdown content
+        existing_content: Existing markdown content (caller reads this)
         section_updates: Dict of section_id -> new_content
         add_changelog: Add changelog entry for updates
         
     Returns:
-        Update results
+        {
+            "success": bool,
+            "updates": list of update results per section,
+            "updated_content": str (always present),
+            "message": str
+        }
     """
-    updater = SurgicalUpdater(existing_content)
-    
-    # Perform updates
-    results = []
-    for section_id, new_content in section_updates.items():
-        result = updater.update_section(section_id, new_content)
-        results.append({
-            "section_id": result.section_id,
-            "section_title": result.section_title,
-            "action": result.action,
-            "success": result.success,
-            "message": result.message
-        })
-    
-    # Generate updated content
-    updated_content = updater.generate_updated_content(add_changelog)
-    
-    if dry_run:
+    try:
+        updater = SurgicalUpdater(existing_content)
+        
+        # Perform updates
+        results = []
+        for section_id, new_content in section_updates.items():
+            result = updater.update_section(section_id, new_content)
+            results.append({
+                "section_id": result.section_id,
+                "section_title": result.section_title,
+                "action": result.action,
+                "success": result.success,
+                "message": result.message
+            })
+        
+        # Generate updated content (pure logic, no I/O)
+        updated_content = updater.generate_updated_content(add_changelog)
+        
         return {
             "success": True,
-            "dry_run": True,
-            "file_path": str(file_path),
             "updates": results,
-            "preview_length": len(updated_content),
-            "preview_lines": updated_content.count('\n') + 1,
-            "message": "Dry run - no changes written"
+            "updated_content": updated_content,
+            "sections_updated": sum(1 for r in results if r["action"] == "updated"),
+            "sections_preserved": sum(1 for r in results if r["action"] == "preserved"),
+            "sections_not_found": sum(1 for r in results if r["action"] == "not_found"),
+            "message": "Sections computed successfully"
         }
-    
-    # Write updated content
-    try:
-        path.write_text(updated_content, encoding='utf-8')
     except Exception as e:
+        logger.exception(f"Error updating sections: {e}")
         return {
             "success": False,
-            "error": f"Failed to write file: {e}",
-            "updates": results
+            "error": str(e),
+            "updates": [],
+            "updated_content": existing_content,
+            "message": f"Failed to compute updates: {e}"
         }
-    
-    return {
-        "success": True,
-        "file_path": str(file_path),
-        "updates": results,
-        "sections_updated": sum(1 for r in results if r["action"] == "updated"),
-        "sections_preserved": sum(1 for r in results if r["action"] == "preserved"),
-        "sections_not_found": sum(1 for r in results if r["action"] == "not_found"),
-        "message": "Documentation updated successfully"
-    }
 
 
 def get_document_structure(file_path: str) -> dict:
     """
-    Get the structure of a documentation file.
+    Get the structure of a documentation file (pure logic over content).
     
+    Args:
+        file_path: Path to the markdown file
+        
+    Returns:
+        Dict with structure metadata
+    """
+    try:
+        content = Path(file_path).read_text(encoding='utf-8')
+    except FileNotFoundError:
+        return {
+            "success": False,
+            "error": f"File not found: {file_path}",
+            "file_path": str(file_path)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "file_path": str(file_path)
+        }
     
     parser = MarkdownSectionParser(content)
+    sections = parser.parse()
     
-        "updated_content": updated_content,
     return {
         "success": True,
         "file_path": str(file_path),
         "total_sections": len(sections),
-        "ai_generated_sections": len(parser.get_ai_generated_sections()),
-        "sections_needing_input": len(parser.get_sections_needing_input()),
+        "ai_generated_sections": sum(1 for s in sections if s.is_ai_generated),
+        "sections_needing_input": sum(1 for s in sections if s.needs_human_input),
         "sections": [
             {
                 "id": s.id,
