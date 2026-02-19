@@ -1,0 +1,517 @@
+{% block metadata %}---
+feature: {{ service_name }}
+domain: {{ domain or 'Backend' }}
+layer: Service
+component: {{ service_name }}
+status: deployed
+version: {{ version or '1.0' }}
+componentType: Service
+priority: P1
+lastUpdated: {{ last_updated }}
+---
+{% endblock %}
+
+{% block title %}# Service: {{ service_name }}{% endblock %}
+
+{% block service_info %}**Namespace/Project**: {{ namespace or 'Not specified' }}  
+**File Location**: Multiple source files  
+**Complexity**: Medium  
+**Documentation Level**: 🔶 Baseline (70% complete)
+
+---
+{% endblock %}
+
+{% block quick_reference %}## Quick Reference (TL;DR)
+
+**What it does:**  
+{{ service_summary or '🤖 [AI: 1-2 sentences on what service accomplishes]' }}
+
+**When to use it:**  
+❓ [HUMAN: What scenarios trigger use of this service? Web UI? API? Background jobs?]
+
+**Watch out for:**  
+❓ [HUMAN: Critical gotcha or common mistake when using this service]
+
+---
+{% endblock %}
+
+{% block what_and_why %}## What & Why
+
+### Purpose
+
+**Technical:** 
+{{ service_summary or '🤖 [AI: Technical description of what service does]' }}
+
+**Business:** 
+❓ [HUMAN: Business purpose - what problem does this solve?]
+
+### Capabilities
+
+{% if capabilities %}
+The service provides the following core capabilities:
+{% for cap in capabilities %}
+- {{ cap }}
+{% endfor %}
+{% else %}
+🤖 [AI: Bullet list of what service can do]
+{% endif %}
+
+### Use Cases
+
+{% if use_cases and use_cases | length > 0 %}
+{# PHASE 9: Render actual extracted use cases #}
+{% for use_case in use_cases %}
+**{{ use_case.title }}**
+- **Who**: {{ use_case.actor }}
+- **What**: {{ use_case.description }}
+- **Preconditions**: {{ use_case.preconditions | join(', ') }}
+- **Steps**:
+  {% for step in use_case.steps %}
+  {{ loop.index }}. {{ step }}
+  {% endfor %}
+- **Result**: {{ use_case.postconditions | join(', ') }}
+
+{% endfor %}
+{% else %}
+❓ [HUMAN: Document common scenarios and use cases]
+{% endif %}
+
+### Not Responsible For
+
+❓ [HUMAN: What this service explicitly does NOT do]
+
+**Example:**
+- Does NOT enforce prerequisites (handled by EnrollmentService)
+- Does NOT manage authentication (handled by AuthService)
+- Does NOT manage course content (content platform responsibility)
+
+---
+{% endblock %}
+
+{% block how_it_works %}## How It Works
+
+{% if primary_method %}
+### Primary Operation: {{ primary_method.name }}
+
+**Purpose:**  
+🤖 [AI: What this method accomplishes]  
+❓ [HUMAN: Business context - why do we need this operation?]
+
+**Input:**  
+{% if primary_method.parameters %}
+```csharp
+{% for param in primary_method.parameters %}
+{{ param.type }} {{ param.name }}{% if param.default %} = {{ param.default }}{% endif %}  // {% if param.description %}{{ param.description }}{% else %}Parameter{% endif %}
+{% endfor %}
+```
+{% else %}
+No parameters
+{% endif %}
+
+**Output:**  
+{% if primary_method.return_type %}
+`{{ primary_method.return_type }}`
+{% else %}
+No return value
+{% endif %}
+
+**Step-by-Step Flow:**
+
+{% if operation_flows and operation_flows | length > 0 %}
+{# PHASE 8: Render actual extracted operation flow #}
+{% set flow = operation_flows | first %}
+```
+{{ flow.ascii_diagram }}
+```
+
+**Success Path:**  
+{{ flow.success_path }}
+
+**Failure Paths:**
+{% for step in flow.steps %}
+{% if step.error_path %}
+- **{{ step.description }} fails**: {{ step.error_path }}
+{% endif %}
+{% endfor %}
+{% else %}
+{# Placeholder flow diagram for manual completion #}
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Step 1: Validate Inputs                                      │
+│  What  → Check parameters and business rules                 │
+│  Why   → Ensure request is valid before processing           │
+│  Error → Invalid parameters → 400 BadRequest                 │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 2: Query Requirements                                   │
+│  What  → Fetch dependent data from repositories              │
+│  Why   → Verify prerequisites are met                        │
+│  Error → Data not found → 404 NotFound                       │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 3: Execute Business Logic                               │
+│  What  → Apply domain rules and transformations              │
+│  Why   → Enforce business constraints                        │
+│  Error → Rule violation → 409 Conflict                       │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ Step 4: Persist Results                                      │
+│  What  → Save changes to database                            │
+│  Why   → Make changes durable                                │
+│  Error → Database failure → 500 InternalServerError          │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+                    [SUCCESS - Operation Complete]
+```
+
+**Success Path:**  
+Operation completes successfully and data is persisted.
+
+**Failure Paths:**
+- **Validation fails**: Returns error response with validation details
+- **Prerequisites not met**: Returns 404 or conflict response
+- **Business rule violation**: Returns 409 Conflict or specific error code
+- **Database error**: Returns 500 server error
+{% endif %}
+
+{% else %}
+🤖 [AI: Provide a step-by-step explanation of the service's main workflows]
+
+### Primary Workflow
+1. User submits a request
+2. System validates the request against business rules
+3. Service queries database for related data
+4. If successful, applies business logic and performs data mutation
+5. Returns result to caller
+{% endif %}
+
+---
+{% endblock %}
+
+{% block business_rules %}## Business Rules
+
+{% if enhanced_business_rules and enhanced_business_rules | length > 0 %}
+{# PHASE 10.1: Render business rules in table format #}
+| Description | Type | Example | Violation Consequence |
+|-------------|------|---------|----------------------|
+{% for rule in enhanced_business_rules %}
+| {{ rule.description }} | {{ rule.rule_type }} | {% if rule.example %}{{ rule.example }}{% else %}N/A{% endif %} | {% if rule.violation_consequence %}{{ rule.violation_consequence }}{% else %}N/A{% endif %} |
+{% endfor %}
+
+{% elif business_rules %}
+| Rule ID | Description | Why It Exists | Enforced By |
+|---------|-------------|---------------|------------|
+{% for rule in business_rules %}
+| {{ rule.title or 'BR-' ~ loop.index }} | {{ rule.description }} | {% if rule.related_code %}[See Code]({{ rule.related_code }}){% else %}[HUMAN: Enter rationale]{% endif %} | Service logic |
+{% endfor %}
+{% else %}
+🤖 [AI: Document business logic, constraints, and invariants that this service maintains]
+- Example: "Course enrollments are limited to 30 students per section"
+- Example: "A course must have at least one instructor assigned before it can be published"
+- Example: "Once published, a course description cannot be changed"
+{% endif %}
+
+**Common Questions:**  
+{% if faq_items and faq_items | length > 0 %}
+{# PHASE 9: Render actual extracted FAQ items #}
+{% for category, items in faq_items | groupby('category') %}
+
+### {{ category }}
+{% for faq in items %}
+**❓ {{ faq.question }}**  
+{{ faq.answer }}
+
+{% endfor %}
+{% endfor %}
+{% else %}
+❓ [HUMAN: Add FAQ section with edge cases and clarifications]
+{% endif %}
+
+---
+{% endblock %}
+
+{% block architecture %}## Architecture
+
+### Where This Fits
+
+```
+┌──────────────────────────────────────────────────────────┐
+│   API Layer                                               │
+│   [Controller]                                            │
+│   → Handles HTTP requests/responses                       │
+│   → Routes to service methods                             │
+└──────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────┐
+│   ► {{ service_name }} ◄        (THIS SERVICE)            │
+│   (Business Logic & Domain Operations)                    │
+│   → Enforces business rules                               │
+│   → Manages domain operations                             │
+│   → Coordinates with repositories                         │
+│   → Maps domain → DTOs                                    │
+└──────────────────────────────────────────────────────────┘
+                          ↓
+┌──────────────────────────────────────────────────────────┐
+│   Data Layer                                              │
+│   [Repository Interfaces]                                │
+│   → CRUD operations on entities                           │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Dependencies (What This Service Needs)
+
+{% if dependencies %}
+| Dependency | Type | Purpose | Failure Impact |
+|-----------|------|---------|-----------------|
+{% for dep in dependencies %}
+| `{{ dep.name }}` | {{ dep.type }} | {{ dep.purpose }} | {% if dep.failure_impact %}{{ dep.failure_impact | truncate(80) }}{% else %}⚠️ Critical{% endif %} |
+{% endfor %}
+{% else %}
+| Dependency | Type | Purpose | Critical? |
+|-----------|------|---------|-----------|
+| `[Dependency]` | `[Type]` | 🤖 [AI: What is it used for] | No |
+{% endif %}
+
+### Consumers (Who Uses This Service)
+
+| Consumer | Use Case | Impact of Failure |
+|----------|----------|-------------------|
+| `[Controller]` | HTTP endpoints for CRUD operations | Users cannot perform operations; 500 error response |
+| `[Other Service]` | References this service for domain logic | Dependent service unavailable |
+
+---
+{% endblock %}
+
+{% block endpoints %}## API Contract (AI Context)
+
+> 📋 **Interactive Documentation:** See source files for latest endpoint definitions  
+> **Sync Status:** Last verified on {{ last_updated }}
+
+### Endpoints
+
+{% if endpoints %}
+| Method | Route | Purpose | Auth Required |
+|--------|-------|---------|-----------------|
+{% for endpoint in endpoints %}
+| `{{ endpoint.method }}` | `{{ endpoint.path }}` | {{ endpoint.summary or endpoint.method ~ ' ' ~ endpoint.path }} | ✅ Yes |
+{% endfor %}
+{% else %}
+| Method | Route | Purpose | Auth |
+|--------|-------|---------|------|
+| 🤖 `GET` | 🤖 `/api/[endpoint]` | 🤖 Purpose | ✅ Yes |
+{% endif %}
+
+### Request Example
+
+{% if request_response_examples and request_response_examples | length > 0 %}
+{% set first_example = request_response_examples.values() | list | first %}
+```json
+{{ first_example.json | tojson(indent=2) }}
+```
+
+{% if first_example.properties %}
+**Properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+{% for prop in first_example.properties %}
+| `{{ prop.name }}` | `{{ prop.type }}` | {% if prop.required %}✅ Yes{% else %}❌ No{% endif %} | 🤖 Purpose |
+{% endfor %}
+{% endif %}
+{% else %}
+```json
+{
+  "🤖": "[AI: Extract from DTO definition]",
+  "❓": "[HUMAN: Update with actual example]"
+}
+```
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `property` | `type` | ✅ Yes | 🤖 [AI: Purpose from DTO] |
+{% endif %}
+
+### Success Response Example (200 OK)
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "message": "Operation completed successfully"
+}
+```
+
+### Error Response Example (409 Conflict)
+
+```json
+{
+  "traceId": "0HN1GLDM8VJ8P:00000001",
+  "message": "❓ [HUMAN: Document common error case]"
+}
+```
+
+---
+{% endblock %}
+
+{% block validation_rules %}## Validation Rules (AUTO-GENERATED)
+
+{% if validation_rules %}
+| Property | Rule | Error Message |
+|----------|------|---------------|
+{% for rule in validation_rules %}
+| `{{ rule.property }}` | `{{ rule.rule_type }}` | {{ rule.error_message }} |
+{% endfor %}
+{% else %}
+🤖 [AI: Document input validation rules - what fields are validated, how, and what error messages are shown]
+
+| Property | Rule | Error Message |
+|----------|------|---------------|
+| `[field]` | `NotEmpty` | "[field] is required" |
+{% endif %}
+
+---
+{% endblock %}
+
+{% block data_operations %}## Data Operations
+
+**Purpose:** Document all database interactions to support impact analysis, debugging, and performance optimization.
+
+### Reads From
+
+{% if data_reads %}
+| Database Object | Method | Purpose | Performance Notes |
+|-----------------|--------|---------|-------------------|
+{% for read in data_reads %}
+| `{{ read.table_name }}` | `{{ read.method_name }}()` | Fetch data for operations | 🤖 [AI: Query pattern & optimization hints] |
+{% endfor %}
+{% else %}
+| Database Object | Purpose | Business Context | Performance Notes |
+|-----------------|---------|------------------|-------------------|
+| `[schema.TableName]` | 🤖 [AI: What read, which columns] | [HUMAN: Why needed?] | 🤖 [AI: Query pattern] |
+{% endif %}
+
+### Writes To
+
+{% if data_writes %}
+| Database Object | Method | Operation | Atomic? |
+|-----------------|--------|-----------|---------|
+{% for write in data_writes %}
+| `{{ write.table_name }}` | `{{ write.method_name }}()` | {{ write.operation_type }} | ✅ Yes |
+{% endfor %}
+{% else %}
+| Database Object | Purpose | Business Context | Performance Notes |
+|-----------------|---------|------------------|-------------------|
+| `[schema.TableName]` | 🤖 [AI: What write, which columns] | [HUMAN: Why needed?] | 🤖 [AI: Transaction scope] |
+{% endif %}
+
+---
+
+{% endblock %}
+
+{% block failure_modes %}## Failure Modes & Exception Handling (PHASE 10.2)
+
+**Purpose:** Document exception handling patterns, error flows, and business impact of failures.
+
+### Common Failure Scenarios
+
+{% if failure_modes and failure_modes | length > 0 %}
+| Exception Type | Trigger | Operation | Impact | Mitigation |
+|---|---|---|---|---|
+{% for fm in failure_modes %}
+| `{{ fm.exception_type }}` | {{ fm.trigger }} | {{ fm.operation }} | {{ fm.impact }} | {{ fm.mitigation }} |
+{% endfor %}
+
+{% else %}
+| Exception Type | Trigger | Operation | Impact | Mitigation |
+|---|---|---|---|---|
+| 🤖 `InvalidOperationException` | 🤖 [What causes it] | 🤖 [Which operation fails] | 🤖 [Business consequence] | 🤖 [How service handles it] |
+| 🤖 `DbUpdateException` | 🤖 [DB constraint violated] | 🤖 [Which write operation fails] | 🤖 [Data not persisted] | 🤖 [Retry? Rollback? User message?] |
+| 🤖 `TimeoutException` | 🤖 [Slow query/API call] | 🤖 [Operation hangs] | 🤖 [User request times out] | 🤖 [Retry logic? Circuit breaker?] |
+{% endif %}
+
+### Expected vs Unexpected Failures
+
+**Expected Failures** (Service recovers, user informed):
+- Validation errors (400 BadRequest) → User corrects input and retries
+- Resource not found (404 NotFound) → User checks resource ID and retries
+- Duplicate key (409 Conflict) → User knows this is a business rule violation; takes corrective action
+- Rate limit exceeded (429 TooManyRequests) → Client backs off and retries per spec
+
+**Unexpected Failures** (Service degrades, incident alerting triggered):
+- Database unavailable (500 InternalServerError) → Service down; on-call notified
+- External API timeout (504 GatewayTimeout) → External system issue; fallback or queue for retry
+- Memory exception (OutOfMemoryException) → Service crash; restart may be needed
+- Configuration error (null reference in initialization) → Deployment issue; rollback needed
+
+---
+
+{% endblock %}
+
+{% block questions_and_gaps %}## Questions & Gaps
+
+❓ **[HUMAN: Add open questions]**  
+What needs clarification or further investigation?
+
+### Known Gaps
+- 🤖 **[What's not implemented yet?]**
+- 🤖 **[What's unclear about the design?]**
+
+### Assumptions
+- 🤖 **[What are we assuming about external systems?]**
+
+---
+{% endblock %}
+
+{% block testing %}## Testing Strategy
+
+🤖 **[AI: How should this service be tested? Unit tests? Integration tests? Key scenarios?]**
+
+### Key Test Scenarios
+
+- ✅ Happy path: Valid input → Success response
+- ❌ Validation failure: Invalid input → 400 BadRequest
+- ❌ Conflict: Duplicate resource → 409 Conflict
+- ❌ Not found: Resource missing → 404 NotFound
+- ❌ Database error: Persistence fails → 500 InternalServerError
+
+---
+{% endblock %}
+
+{% block known_issues %}## Known Issues & Limitations
+
+🤖 **[AI: Document any known issues, temporary workarounds, or architectural limitations]**
+
+---
+{% endblock %}
+
+{% block future_improvements %}## Future Improvements
+
+🤖 **[AI: What improvements or refactorings would enhance this service?]**
+
+---
+{% endblock %}
+
+{% block related_services %}## Related Services
+
+🤖 **[AI: What other services does this service interact with? How?]**
+
+| Service | Interaction Type | Purpose |
+|---------|-----------------|---------|
+| | | |
+
+---
+{% endblock %}
+
+{% block source_files_footer %}**Source Files Analyzed**: 
+{% if source_files %}
+{% for file in source_files %}
+- `{{ file }}`
+{% endfor %}
+{% else %}
+- [Source files listed here]
+{% endif %}
+
+*This documentation was auto-generated from extracted code. All 🤖 sections and ❓ placeholders require human review and completion.*
+{% endblock %}

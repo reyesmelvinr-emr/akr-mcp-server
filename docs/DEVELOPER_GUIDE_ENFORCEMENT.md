@@ -69,6 +69,7 @@ Key fields:
 - `allowRetry` (bool)
 - `maxRetries` (int)
 - `writeMode` (git)
+- `allowWorkflowBypass` (bool, default false)
 
 **Safety rule:** If `enabled=false`, all write operations refuse to write.
 

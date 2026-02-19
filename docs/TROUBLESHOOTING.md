@@ -9,7 +9,7 @@
 - [Health Check Not Working](#health-check-not-working)
 - [MCP Server Not Connecting](#mcp-server-not-connecting)
 - [Templates Not Found](#templates-not-found)
-- [Slash Commands Not Recognized](#slash-commands-not-recognized)
+- [AKR Tasks Not Found](#akr-tasks-not-found)
 - [Wrong Workspace Detected](#wrong-workspace-detected)
 
 ---
@@ -17,21 +17,14 @@
 ## Health Check Not Working
 
 ### Symptom
-When you type `/docs.health-check`, you get a long explanation instead of a short status message.
+When you ask Copilot Chat to run a health check, you get a long explanation instead of a short status message.
 
-### Solution 1: Don't Use @workspace Prefix
+### Solution 1: Use a Short Health Check Prompt
 
-**❌ Wrong:**
+**✅ Example:**
 ```
-@workspace /docs.health-check
+Run AKR MCP health check for this workspace.
 ```
-
-**✅ Correct:**
-```
-/docs.health-check
-```
-
-**Note:** The AKR MCP server slash commands work better **without** the `@workspace` prefix.
 
 ---
 
@@ -63,7 +56,7 @@ When you type `/docs.health-check`, you get a long explanation instead of a shor
 ## MCP Server Not Connecting
 
 ### Symptom
-Copilot Chat doesn't recognize any `/docs.*` commands.
+Copilot Chat cannot access AKR MCP tools or tasks are not available in Command Palette.
 
 ### Solution 1: Check .vscode/mcp.json Exists
 
@@ -136,35 +129,82 @@ Copy-Item "c:\Users\E1481541\OneDrive - Emerson\Documents\CDS - Team Hawkeye\AKR
 
 ---
 
-## Slash Commands Not Recognized
+## AKR Tasks Not Found
 
 ### Symptom
-Typing `/docs.generate` does nothing or is treated as regular text.
+You cannot find AKR tasks in **Tasks: Run Task** or task execution fails immediately.
 
-### Solution 1: Use in Copilot Chat Only
+### Solution 1: Check Global Task Setup
 
-Slash commands **only work in Copilot Chat**, not in:
-- ❌ Code files
-- ❌ Terminal
-- ❌ Regular comments
+**NEW:** AKR tasks can be configured globally to be available in all workspaces.
 
-**To open Copilot Chat:**
-- Press `Ctrl+Shift+I`, or
-- Click the Copilot Chat icon in the sidebar
+Check if global tasks are configured:
 
----
-
-### Solution 2: Don't Use @workspace
-
-**❌ Wrong:**
-```
-@workspace /docs.generate file.cs
+```powershell
+python "C:\path\to\akr-mcp-server\scripts\verify_global_tasks.py"
 ```
 
-**✅ Correct:**
+If checks fail, run the global task setup:
+
+```powershell
+cd "C:\path\to\akr-mcp-server"
+python scripts\setup_global_tasks.py
 ```
-/docs.generate file.cs
+
+Then restart VS Code.
+
+### Solution 2: Check Environment Variable
+
+Global tasks require the `AKR_MCP_SERVER_PATH` environment variable.
+
+**Windows:**
+```powershell
+# Check if variable is set
+$env:AKR_MCP_SERVER_PATH
+
+# Expected: Path to your akr-mcp-server installation
+# If empty, run: python scripts\setup_global_tasks.py
 ```
+
+**Mac/Linux:**
+```bash
+# Check if variable is set
+echo $AKR_MCP_SERVER_PATH
+
+# Expected: Path to your akr-mcp-server installation
+# If empty, add to ~/.bashrc or ~/.zshrc:
+# export AKR_MCP_SERVER_PATH="/path/to/akr-mcp-server"
+```
+
+### Solution 3: Check VS Code User Settings
+
+Verify AKR tasks are in your VS Code user settings:
+
+1. Open VS Code
+2. `Ctrl+,` (Settings)
+3. Click "Open Settings (JSON)" icon (top right)
+4. Search for `"tasks.tasks"`
+5. Look for tasks with labels starting with "AKR:"
+
+If missing, run: `python scripts\setup_global_tasks.py`
+
+### Solution 4: Reload VS Code
+
+After configuring global tasks or setting environment variables:
+
+1. Press `Ctrl+Shift+P`
+2. Type: **"Developer: Reload Window"**
+3. Press Enter
+
+### Solution 5: Legacy Approach - Run from MCP Server Workspace
+
+If global tasks are not configured, you can still run tasks from the akr-mcp-server workspace:
+
+1. Open a second VS Code window: `File` → `New Window`
+2. Open the `akr-mcp-server` folder
+3. Run tasks from there
+
+**Note:** This is the legacy approach. Global task configuration is recommended for better workflow.
 
 ---
 

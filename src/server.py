@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import json
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -28,8 +29,15 @@ from tools.enforcement_tool import enforce_and_fix
 from tools.enforcement_tool_types import FileMetadata
 from tools.write_operations import (
     write_documentation,
-    update_documentation_sections_and_commit
+    write_documentation_async,
+    update_documentation_sections_and_commit,
+    update_documentation_sections_and_commit_async
 )
+from tools.progress_tracker import ProgressTracker
+from tools.operation_metrics import OperationMetrics
+from tools.workflow_tracker import WorkflowTracker
+from tools.duplicate_detector import DuplicateDetector
+from tools.template_schema_builder import TEMPLATE_BASELINE_SECTIONS
 
 # ---- Lazy managers (avoid heavy work during import/startup) ----
 resource_manager = None  # type: ignore
@@ -44,6 +52,22 @@ def get_resource_manager():
         # requires: from resources import create_resource_manager
         resource_manager = create_resource_manager()
     return resource_manager
+
+
+# ==================== PHASE 3: SESSION CACHE ====================
+session_cache = None  # type: ignore
+
+def get_session_cache():
+    """
+    Create SessionCache on first use and return it.
+    Caches validation results across tool calls for 20-30% speedup.
+    """
+    global session_cache
+    if session_cache is None:
+        from tools.session_cache import SessionCache
+        session_cache = SessionCache(ttl_seconds=1800, max_entries=1000)
+    return session_cache
+# ================================================================
 
 
 
@@ -72,6 +96,8 @@ resource_manager: Optional[AKRResourceManager] = None
 workspace_manager: Optional[object] = None
 config: Optional[dict] = None
 enforcement_logger = None
+workflow_tracker: Optional[WorkflowTracker] = None
+duplicate_detector: Optional[DuplicateDetector] = None
 
 
 # ==================== NEW CODE: CONFIG LOADER FUNCTION ====================
@@ -120,7 +146,7 @@ def ensure_initialized():
     This function is called before any tool/resource is accessed,
     but skipped during server startup in fast mode.
     """
-    global resource_manager, workspace_manager, config
+    global resource_manager, workspace_manager, config, workflow_tracker, duplicate_detector
     
     if resource_manager is not None:
         # Already initialized
@@ -139,6 +165,14 @@ def ensure_initialized():
             raise ValueError(f"Enforcement config validation failed: {errors}")
 
         init_enforcement_telemetry()
+        
+        # Create workflow tracker
+        workflow_tracker = WorkflowTracker(ttl_seconds=1800)  # 30 minutes TTL
+        logger.info("✅ Workflow tracker initialized")
+        
+        # Create duplicate detector
+        duplicate_detector = DuplicateDetector()
+        logger.info("✅ Duplicate detector initialized")
         
         # Create resource manager (minimal, no scanning)
         resource_manager = create_resource_manager()
@@ -192,7 +226,12 @@ async def list_tools() -> list[Tool]:
     tools = [
         Tool(
             name="analyze_codebase",
-            description="Analyze a codebase structure and identify components for documentation",
+            description=(
+                "Code analysis not yet fully implemented. "
+                "**Use generate_documentation instead** to create template-compliant documentation stubs. "
+                "The generate_documentation tool creates structured stubs with ❓ placeholders "
+                "that you can enhance with code insights."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -211,7 +250,14 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="generate_documentation",
-            description="Generate AKR-compliant documentation from codebase analysis",
+            description=(
+                "**PRIMARY ENTRY POINT for new documentation.** "
+                "Creates AKR-compliant documentation stubs with ❓ placeholders for human input. "
+                "This tool MUST be used before write_documentation for new files. "
+                "\n\n"
+                "**Workflow:** generate_documentation → human review → write_documentation\n"
+                "**DO NOT** generate full documentation content yourself—this tool creates structured stubs."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -230,6 +276,57 @@ async def list_tools() -> list[Tool]:
                     }
                 },
                 "required": ["component_name", "component_type"]
+            }
+        ),
+        Tool(
+            name="generate_and_write_documentation",
+            description=(
+                "**UNIFIED WORKFLOW:** Generate and write AKR documentation in a single operation. "
+                "Combines scaffolding (full template structure) with intelligent placeholder replacement and writes the file. "
+                "\n\n"
+                "**What it does:**\n"
+                "1. Auto-detects project type (backend/ui/database) or uses component_type\n"
+                "2. Selects appropriate template (lean_baseline_service_template.md, ui_component_template.md, etc.)\n"
+                "3. Generates full template structure with all sections\n"
+                "4. Replaces placeholders ([SERVICE_NAME], [DOMAIN], dates, etc.)\n"
+                "5. Adds source file metadata as comments\n"
+                "6. Validates and writes file using enforcement gates\n"
+                "\n"
+                "**Output:** Complete template with structure + placeholders ready for human enhancement.\n"
+                "**Use when:** You want to create documentation in one step instead of scaffold → generate → write."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "component_name": {
+                        "type": "string",
+                        "description": "Name of the component to document (e.g., 'EnrollmentService', 'Button', 'Courses')"
+                    },
+                    "source_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of source files to document (e.g., ['Domain/Services/IEnrollmentService.cs', 'Controllers/EnrollmentsController.cs'])"
+                    },
+                    "component_type": {
+                        "type": "string",
+                        "enum": ["service", "ui_component", "table", "api"],
+                        "description": "Type of component (optional; auto-detected from project structure if not provided)"
+                    },
+                    "template": {
+                        "type": "string",
+                        "description": "Template file to use (optional; auto-selected based on component_type/project_type)"
+                    },
+                    "doc_path": {
+                        "type": "string",
+                        "description": "Output documentation path (optional; auto-determined based on project type, e.g., 'docs/services/EnrollmentService_doc.md')"
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Whether to overwrite existing file"
+                    }
+                },
+                "required": ["component_name"]
             }
         ),
         Tool(
@@ -263,7 +360,16 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="write_documentation",
-            description="Write documentation with enforcement. Content validated against template before write. Staged and committed.",
+            description=(
+                "Writes validated documentation to disk with git commit. "
+                "**IMPORTANT:** For NEW documentation, use generate_documentation first. "
+                "This tool is for:\n"
+                "- Writing AI-generated stubs from generate_documentation\n"
+                "- Updating existing documentation files\n"
+                "- Writing documentation you've manually created (use force_workflow_bypass=true)\n"
+                "\n"
+                "Performs template enforcement validation before writing."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -272,7 +378,12 @@ async def list_tools() -> list[Tool]:
                     "doc_path": {"type": "string", "description": "Repo-relative output doc path, e.g. docs/api.md"},
                     "template": {"type": "string", "description": "Template filename, e.g. lean_baseline_service_template.md"},
                     "component_type": {"type": "string", "description": "Component type, e.g. service, controller"},
-                    "overwrite": {"type": "boolean", "default": False}
+                    "overwrite": {"type": "boolean", "default": False},
+                    "force_workflow_bypass": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Allow direct write for new files without generate_documentation (emergency use)"
+                    }
                 },
                 "required": ["content", "source_file", "doc_path"]
             }
@@ -303,6 +414,203 @@ async def list_tools() -> list[Tool]:
     return tools
 
 
+# ============ PROGRESS TRACKING HELPERS ============
+
+# Global progress token storage for current operation
+_progress_token: Optional[str] = None
+
+async def send_progress_notification(progress: int, message: str) -> None:
+    """
+    Send a progress notification to the client via real MCP notifications/progress API.
+    
+    This is called by ProgressTracker to update the client on operation progress.
+    If no progress token is set, falls back to debug logging.
+    
+    Args:
+        progress: Progress percentage (0-100)
+        message: Status message to display with stage indicator
+    """
+    global _progress_token
+    
+    logger.debug(f"Progress: {progress}% - {message}")
+    
+    if not _progress_token:
+        return  # Progress tracking not active for this operation
+    
+    try:
+        await server.send_notification(
+            "notifications/progress",
+            {
+                "progressToken": _progress_token,
+                "progress": progress,
+                "total": 100,
+                "message": message
+            }
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send progress notification: {e}")
+
+
+def _get_stub_title(component_name: str, component_type: str, template: str) -> str:
+    if template == "ui_component_template.md" or component_type == "ui_component":
+        return f"# Component: {component_name}"
+    if template == "table_doc_template.md" or component_type == "table":
+        return f"# Table: {component_name}"
+    if template == "embedded_database_template.md" or component_type == "database":
+        return f"# Database: {component_name}"
+    return f"# Service: {component_name}"
+
+
+def _section_placeholder(section_name: str) -> str:
+    if section_name == "Business Rules":
+        return (
+            "| Rule ID | Description | Why It Exists | Since When |\n"
+            "|---|---|---|---|\n"
+            "| ❓ BR-XXX-001 | [HUMAN: Add rule] | [HUMAN: Rationale] | [HUMAN: Date] |"
+        )
+    if section_name == "Questions & Gaps":
+        return "- ❓ [HUMAN: Add open question]\n- ❓ [HUMAN: Add assumption]"
+    if section_name == "Quick Reference (TL;DR)":
+        return "❓ [HUMAN: Add brief 1-2 sentence summary]"
+    if section_name == "API Contract (AI Context)":
+        return "❓ [HUMAN: List endpoints, request/response, and auth requirements]"
+    if "Validation Rules" in section_name:
+        return "❓ [HUMAN: Summarize validation rules or note none]"
+    return f"❓ [HUMAN: Add {section_name} details]"
+
+
+def _detect_project_type(workspace_root: Path) -> str:
+    """
+    Auto-detect project type by checking .akr-config.json or file patterns
+    
+    Returns: "backend", "ui", "database", or "unknown"
+    """
+    # Strategy 1: Read .akr-config.json
+    config_path = workspace_root / ".akr-config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+                
+                # Check for explicit domain field (root level)
+                if "domain" in config_data:
+                    domain = config_data["domain"].lower()
+                    if domain in ["backend", "ui", "database"]:
+                        return domain
+                
+                # Check for projectType field (root level)
+                if "projectType" in config_data:
+                    proj_type = config_data["projectType"].lower()
+                    if proj_type in ["backend", "ui", "database"]:
+                        return proj_type
+                
+                # Check for nested project.type field
+                if "project" in config_data and isinstance(config_data["project"], dict):
+                    if "type" in config_data["project"]:
+                        proj_type = config_data["project"]["type"].lower()
+                        if proj_type in ["backend", "ui", "database"]:
+                            return proj_type
+        except (json.JSONDecodeError, Exception) as e:
+            logger.warning(f"Could not read .akr-config.json: {e}")
+    
+    # Strategy 2: File pattern detection
+    # Check for backend indicators
+    if list(workspace_root.rglob("*.csproj")) or list(workspace_root.rglob("*.sln")):
+        return "backend"
+    
+    # Check for UI indicators
+    package_json = workspace_root / "package.json"
+    if package_json.exists():
+        if (workspace_root / "src" / "components").exists() or \
+           (workspace_root / "src" / "pages").exists():
+            return "ui"
+        return "backend"  # Node.js backend
+    
+    # Check for database indicators
+    if list(workspace_root.rglob("*.sqlproj")):
+        return "database"
+    
+    return "unknown"
+
+
+def _replace_placeholders(content: str, module_name: str, project_type: str, source_files: list[str]) -> str:
+    """Replace template placeholders with actual values"""
+    # Replace common placeholders
+    content = content.replace("[SERVICE_NAME]", module_name)
+    content = content.replace("[COMPONENT_NAME]", module_name)
+    content = content.replace("[TABLE_NAME]", module_name)
+    content = content.replace("[FEATURE_NAME]", module_name)
+    
+    # Replace placeholders with spaces
+    content = content.replace("[Component Name]", module_name)
+    content = content.replace("[Service Name]", module_name)
+    content = content.replace("[Table Name]", module_name)
+    
+    # Replace camelCase/PascalCase placeholders
+    content = content.replace("[ComponentName]", module_name)
+    content = content.replace("[ServiceName]", module_name)
+    content = content.replace("[TableName]", module_name)
+    
+    # Replace date placeholders
+    today = datetime.now().strftime("%Y-%m-%d")
+    content = content.replace("[YYYY-MM-DD]", today)
+    content = content.replace("YYYY-MM-DD", today)
+    
+    # Replace domain placeholder with project type
+    domain_map = {
+        "backend": "Backend",
+        "ui": "UI",
+        "database": "Database"
+    }
+    content = content.replace("[DOMAIN]", domain_map.get(project_type, "Unknown"))
+    
+    # Add source files comment if provided
+    if source_files:
+        files_list = "\n".join(f"- {f}" for f in source_files)
+        source_comment = f"\n<!-- Source files used for documentation:\n{files_list}\n-->\n"
+        # Insert after front matter if it exists
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                content = f"---{parts[1]}---{source_comment}{parts[2]}"
+        else:
+            # No front matter, add comment at the top
+            content = source_comment + content
+    
+    return content
+
+
+def _build_stub_content(
+    component_name: str,
+    component_type: str,
+    template: str,
+    baseline_sections: list[str],
+) -> str:
+    lines = [
+        "---",
+        f"component: {component_name}",
+        f"componentType: {component_type}",
+        "status: draft",
+        "version: 0.1.0",
+        f"lastUpdated: {datetime.now().strftime('%Y-%m-%d')}",
+        "domain: TBD",
+        "feature: TBD",
+        "layer: TBD",
+        "priority: medium",
+        "---",
+        "",
+        _get_stub_title(component_name, component_type, template),
+        "",
+    ]
+
+    for section_name in baseline_sections:
+        lines.append(f"## {section_name}")
+        lines.append(_section_placeholder(section_name))
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute an AKR documentation tool."""
@@ -317,25 +625,335 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         codebase_path = arguments.get("codebase_path")
         file_types = arguments.get("file_types", [".ts", ".tsx", ".py", ".java"])
         
-        # Placeholder implementation
-        result = f"Analyzing codebase at {codebase_path} for file types {file_types}..."
-        return [TextContent(type="text", text=result)]
+        # Currently not implemented - return guidance
+        result = {
+            "success": False,
+            "error": "analyze_codebase is not yet implemented",
+            "guidance": (
+                "This tool is planned for future implementation. "
+                "For now, please identify components manually and use generate_documentation or write_documentation "
+                "to create AKR-compliant documentation."
+            ),
+            "alternative": "Use generate_documentation with component_name to create template-compliant stubs"
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
     
     elif name == "generate_documentation":
+        # Generate a template-compliant documentation stub with ❓ placeholders
         component_name = arguments.get("component_name")
-        component_type = arguments.get("component_type")
-        template = arguments.get("template")
+        component_type = arguments.get("component_type", "service")
+        template = arguments.get("template", "lean_baseline_service_template.md")
+        source_file = arguments.get("source_file", "")
+        doc_path = arguments.get("doc_path", f"docs/{component_name}.md")
         
-        # Placeholder implementation
-        result = f"Generating {component_type} documentation for '{component_name}'..."
-        return [TextContent(type="text", text=result)]
+        # Validate template exists BEFORE attempting to use it
+        try:
+            rm = get_resource_manager()
+            template_content = rm.get_resource_content("template", template)
+            if not template_content:
+                available_templates = [t.filename for t in rm.list_templates()]
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Template '{template}' not found in akr_content/templates/",
+                    "availableTemplates": available_templates,
+                    "hint": "Use one of the available templates or check that the template file exists"
+                }, indent=2))]
+        except Exception as e:
+            logger.error(f"Template validation error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": f"Failed to validate template: {str(e)}",
+                "hint": "Check server logs for details"
+            }, indent=2))]
+        
+        baseline_sections = TEMPLATE_BASELINE_SECTIONS.get(template)
+        if not baseline_sections:
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": f"Template '{template}' is not mapped to baseline sections for stub generation.",
+                "guidance": "Use a known template or add it to TEMPLATE_BASELINE_SECTIONS.",
+                "availableTemplates": sorted(TEMPLATE_BASELINE_SECTIONS.keys())
+            }, indent=2))]
+
+        # Generate template-compliant content with human input placeholders
+        stub_content = _build_stub_content(
+            component_name=component_name,
+            component_type=component_type,
+            template=template,
+            baseline_sections=baseline_sections,
+        )
+        
+        # Use write_documentation_async to ensure enforcement
+        try:
+            repo_path = str(Path(__file__).parent.parent)
+            
+            # Create operation metrics
+            metrics = OperationMetrics(template_name=template)
+
+            # Create progress tracker
+            progress_token = arguments.get("_meta", {}).get("progressToken")
+            tracker = ProgressTracker(
+                progress_token=progress_token,
+                send_progress=send_progress_notification if progress_token else None,
+                estimate_remaining=metrics.estimate_remaining_ms
+            )
+            
+            result = await write_documentation_async(
+                repo_path=repo_path,
+                content=stub_content,
+                source_file=source_file or f"src/{component_name}.cs",
+                doc_path=doc_path,
+                template=template,
+                component_type=component_type,
+                overwrite=arguments.get("overwrite", False),
+                config=cfg,
+                telemetry_logger=enforcement_logger,
+                progress_tracker=tracker,
+                operation_metrics=metrics,
+                workflow_tracker=workflow_tracker,
+                duplicate_detector=duplicate_detector,
+                resource_manager=get_resource_manager(),
+                session_cache=get_session_cache(),
+            )
+            
+            # Add guidance message
+            if result.get("success"):
+                # Mark stub as generated in workflow tracker
+                if workflow_tracker:
+                    await workflow_tracker.mark_stub_generated(doc_path, template)
+                
+                result["message"] = (
+                    f"✅ Generated template-compliant documentation stub for {component_name}. "
+                    f"All sections marked with ❓ require human input. Please review and enhance with business context before finalizing."
+                )
+                result["nextSteps"] = [
+                    "Review the generated file and replace all ❓ placeholders with actual content",
+                    "Update YAML front matter with correct domain, feature, and layer values",
+                    "Add specific business rules and architectural details",
+                    "Use update_documentation_sections to make targeted updates after review"
+                ]
+                result["workflow"] = {
+                    "stub_generated": True,
+                    "next_tool": "write_documentation",
+                    "workflow_id": doc_path
+                }
+            
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        
+        except asyncio.CancelledError:
+            logger.warning("generate_documentation cancelled by client")
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Operation cancelled",
+                "cancelled": True
+            }))]
+        
+        except Exception as e:
+            logger.error(f"generate_documentation error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": f"Failed to generate documentation: {e}",
+                "guidance": "Use write_documentation instead with your own content, or check the error above."
+            }))]
+    
+    elif name == "generate_and_write_documentation":
+        # Unified scaffolding + generation + writing in a single operation
+        try:
+            component_name = arguments.get("component_name")
+            source_files = arguments.get("source_files", [])
+            template = arguments.get("template")
+            doc_path = arguments.get("doc_path")
+            component_type = arguments.get("component_type")
+            
+            if not component_name:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "component_name is required"
+                }, indent=2))]
+            
+            # Get workspace root
+            workspace_root = Path(os.environ.get("VSCODE_WORKSPACE_FOLDER", Path.cwd()))
+            
+            # Auto-detect project type if not specified
+            if not component_type:
+                project_type = _detect_project_type(workspace_root)
+                if project_type == "unknown":
+                    return [TextContent(type="text", text=json.dumps({
+                        "success": False,
+                        "error": "Could not detect project type",
+                        "guidance": (
+                            "Please either:\n"
+                            "1. Add 'domain' field to .akr-config.json (backend/ui/database), or\n"
+                            "2. Specify component_type parameter explicitly"
+                        )
+                    }, indent=2))]
+                
+                # Map project type to component type
+                type_map = {
+                    "backend": "service",
+                    "ui": "ui_component",
+                    "database": "table"
+                }
+                component_type = type_map.get(project_type, "service")
+            else:
+                # Derive project type from component type
+                if component_type in ["service", "api"]:
+                    project_type = "backend"
+                elif component_type in ["ui_component", "component"]:
+                    project_type = "ui"
+                elif component_type == "table":
+                    project_type = "database"
+                else:
+                    project_type = "backend"  # default
+            
+            # Auto-select template if not specified
+            if not template:
+                template_map = {
+                    "backend": "lean_baseline_service_template.md",
+                    "ui": "ui_component_template.md",
+                    "database": "table_doc_template.md"
+                }
+                template = template_map.get(project_type, "lean_baseline_service_template.md")
+            
+            # Validate template exists
+            try:
+                rm = get_resource_manager()
+                template_content = rm.get_resource_content("template", template)
+                if not template_content:
+                    available_templates = [t.filename for t in rm.list_templates()]
+                    return [TextContent(type="text", text=json.dumps({
+                        "success": False,
+                        "error": f"Template '{template}' not found in akr_content/templates/",
+                        "availableTemplates": available_templates,
+                        "hint": "Use one of the available templates or check that the template file exists"
+                    }, indent=2))]
+            except Exception as e:
+                logger.error(f"Template validation error: {e}", exc_info=True)
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Failed to validate template: {str(e)}",
+                    "hint": "Check server logs for details"
+                }, indent=2))]
+            
+            # Replace placeholders in template
+            scaffolded_content = _replace_placeholders(
+                template_content,
+                component_name,
+                project_type,
+                source_files
+            )
+            
+            # Auto-determine doc_path if not specified
+            if not doc_path:
+                output_path_map = {
+                    "backend": "docs/services/",
+                    "ui": "docs/components/",
+                    "database": "docs/tables/"
+                }
+                naming_suffix_map = {
+                    "backend": "_doc.md",
+                    "ui": "_doc.md",
+                    "database": ".md"
+                }
+                output_path = output_path_map.get(project_type, "docs/services/")
+                naming_suffix = naming_suffix_map.get(project_type, "_doc.md")
+                doc_path = f"{output_path}{component_name}{naming_suffix}"
+            
+            # Prepare for writing
+            repo_path = str(Path(__file__).parent.parent)
+            
+            # Create operation metrics
+            metrics = OperationMetrics(template_name=template)
+
+            # Create progress tracker
+            progress_token = arguments.get("_meta", {}).get("progressToken")
+            tracker = ProgressTracker(
+                progress_token=progress_token,
+                send_progress=send_progress_notification if progress_token else None,
+                estimate_remaining=metrics.estimate_remaining_ms
+            )
+            
+            # Use first source file as primary source_file for metadata
+            primary_source_file = source_files[0] if source_files else f"src/{component_name}.cs"
+            
+            # Write documentation with enforcement
+            result = await write_documentation_async(
+                repo_path=repo_path,
+                content=scaffolded_content,
+                source_file=primary_source_file,
+                doc_path=doc_path,
+                template=template,
+                component_type=component_type,
+                overwrite=arguments.get("overwrite", False),
+                config=cfg,
+                telemetry_logger=enforcement_logger,
+                progress_tracker=tracker,
+                operation_metrics=metrics,
+                workflow_tracker=workflow_tracker,
+                duplicate_detector=duplicate_detector,
+                resource_manager=get_resource_manager(),
+                session_cache=get_session_cache(),
+            )
+            
+            # Enhance result message
+            if result.get("success"):
+                if workflow_tracker:
+                    await workflow_tracker.mark_stub_generated(doc_path, template)
+                
+                result["message"] = (
+                    f"✅ Generated and wrote AKR documentation for {component_name}. "
+                    f"Template structure complete with placeholders. Review and enhance sections marked with ❓."
+                )
+                result["nextSteps"] = [
+                    "Review the generated file - template structure is complete",
+                    "Replace ❓ placeholders in sections requiring human context (Business Rules, What & Why, etc.)",
+                    "Update YAML front matter with correct domain, feature, and layer values if needed",
+                    "Run 'AKR: Validate Documentation (file)' to check compliance",
+                    "Commit to git when ready"
+                ]
+                result["workflow"] = {
+                    "unified_generation": True,
+                    "scaffolded": True,
+                    "written": True,
+                    "validation_passed": result.get("fixesApplied", 0) == 0,
+                    "file_path": doc_path
+                }
+            
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        
+        except asyncio.CancelledError:
+            logger.warning("generate_and_write_documentation cancelled by client")
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Operation cancelled",
+                "cancelled": True
+            }))]
+        
+        except Exception as e:
+            logger.error(f"generate_and_write_documentation error: {e}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": f"Failed to generate and write documentation: {e}",
+                "guidance": "Check the error above or try using generate_documentation + write_documentation separately."
+            }))]
     
     elif name == "validate_documentation":
         file_path = arguments.get("file_path")
         
-        # Placeholder implementation
-        result = f"Validating documentation at {file_path}..."
-        return [TextContent(type="text", text=result)]
+        # Currently not implemented as standalone - return guidance
+        result = {
+            "success": False,
+            "error": "validate_documentation is not yet implemented as a standalone tool",
+            "guidance": (
+                "Validation is automatically performed by write_documentation and update_documentation_sections. "
+                "These tools enforce template compliance and return detailed validation results."
+            ),
+            "alternative": {
+                "description": "Use write_documentation or update_documentation_sections - they include automatic validation",
+                "example": "Call write_documentation with your content - it will validate against the template and return violations if any"
+            }
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
     
     elif name == "get_charter":
         domain = arguments.get("domain")
@@ -351,7 +969,24 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     elif name == "write_documentation":
         try:
             repo_path = str(Path(__file__).parent.parent)
-            result = write_documentation(
+            
+            # Extract progress token (if client supports it; MCP 2025-11-25+)
+            progress_token = arguments.get("_meta", {}).get("progressToken")
+            
+            # Create operation metrics
+            metrics = OperationMetrics(
+                template_name=arguments.get("template", "lean_baseline_service_template.md")
+            )
+
+            # Create progress tracker
+            tracker = ProgressTracker(
+                progress_token=progress_token,
+                send_progress=send_progress_notification if progress_token else None,
+                estimate_remaining=metrics.estimate_remaining_ms
+            )
+            
+            # Call async version
+            result = await write_documentation_async(
                 repo_path=repo_path,
                 content=arguments.get("content"),
                 source_file=arguments.get("source_file"),
@@ -359,11 +994,26 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 template=arguments.get("template", "lean_baseline_service_template.md"),
                 component_type=arguments.get("component_type", "unknown"),
                 overwrite=arguments.get("overwrite", False),
+                force_workflow_bypass=arguments.get("force_workflow_bypass", False),
                 config=cfg,
-                telemetry_logger=enforcement_logger
+                telemetry_logger=enforcement_logger,
+                progress_tracker=tracker,
+                operation_metrics=metrics,
+                resource_manager=get_resource_manager(),
+                session_cache=get_session_cache(),
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        
+        except asyncio.CancelledError:
+            logger.warning("write_documentation cancelled by client")
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Operation cancelled",
+                "cancelled": True
+            }))]
+        
         except TypeError:
+            # Fallback for compatibility (no progress tracking)
             repo_path = str(Path(__file__).parent.parent)
             result = write_documentation(
                 repo_path=repo_path,
@@ -372,9 +1022,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 doc_path=arguments.get("doc_path"),
                 template=arguments.get("template", "lean_baseline_service_template.md"),
                 component_type=arguments.get("component_type", "unknown"),
-                overwrite=arguments.get("overwrite", False)
+                overwrite=arguments.get("overwrite", False),
+                force_workflow_bypass=arguments.get("force_workflow_bypass", False)
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        
         except Exception as e:
             logger.error(f"write_documentation error: {e}", exc_info=True)
             return [TextContent(type="text", text=json.dumps({
@@ -384,6 +1036,50 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     elif name == "update_documentation_sections":
         try:
+            repo_path = str(Path(__file__).parent.parent)
+            
+            # Extract progress token (if client supports it)
+            progress_token = arguments.get("_meta", {}).get("progressToken")
+            
+            # Create operation metrics
+            metrics = OperationMetrics(
+                template_name=arguments.get("template", "lean_baseline_service_template.md")
+            )
+
+            # Create progress tracker
+            tracker = ProgressTracker(
+                progress_token=progress_token,
+                send_progress=send_progress_notification if progress_token else None,
+                estimate_remaining=metrics.estimate_remaining_ms
+            )
+            
+            # Call async version
+            result = await update_documentation_sections_and_commit_async(
+                repo_path=repo_path,
+                doc_path=arguments.get("doc_path"),
+                section_updates=arguments.get("section_updates"),
+                template=arguments.get("template", "lean_baseline_service_template.md"),
+                source_file=arguments.get("source_file", ""),
+                component_type=arguments.get("component_type", "unknown"),
+                add_changelog=arguments.get("add_changelog", True),
+                overwrite=arguments.get("overwrite", True),
+                config=cfg,
+                telemetry_logger=enforcement_logger,
+                progress_tracker=tracker,
+                operation_metrics=metrics
+            )
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        
+        except asyncio.CancelledError:
+            logger.warning("update_documentation_sections cancelled by client")
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Operation cancelled",
+                "cancelled": True
+            }))]
+        
+        except TypeError:
+            # Fallback for compatibility
             repo_path = str(Path(__file__).parent.parent)
             result = update_documentation_sections_and_commit(
                 repo_path=repo_path,

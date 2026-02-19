@@ -120,13 +120,16 @@ lastUpdated: [YYYY-MM-DD]
 
 [Table of business rules enforced by this service]
 
-| Rule ID | Description | Why It Exists | Since When |
-|---------|-------------|---------------|------------|
-| 🤖 **BR-[SVC]-001** | 🤖 [AI: Rule description from code] | ❓ [HUMAN: Business rationale] | ❓ [HUMAN: When added] |
-| 🤖 **BR-[SVC]-002** | 🤖 [AI: Rule description from code] | ❓ [HUMAN: Business rationale] | ❓ [HUMAN: When added] |
-| 🤖 **BR-[SVC]-003** | 🤖 [AI: Rule description from code] | ❓ [HUMAN: Business rationale] | ❓ [HUMAN: When added] |
+| Rule ID | Description | Why It Exists | Since When | Violation Exception |
+|---------|-------------|---------------|------------|---|
+| 🤖 **BR-[SVC]-001** | 🤖 [AI: Rule description from code] | ❓ [HUMAN: Business rationale] | ❓ [HUMAN: When added] | 🤖 [AI: Exception type thrown - PHASE 10.2] |
+| 🤖 **BR-[SVC]-002** | 🤖 [AI: Rule description from code] | ❓ [HUMAN: Business rationale] | ❓ [HUMAN: When added] | 🤖 [AI: Exception type thrown - PHASE 10.2] |
+| 🤖 **BR-[SVC]-003** | 🤖 [AI: Rule description from code] | ❓ [HUMAN: Business rationale] | ❓ [HUMAN: When added] | 🤖 [AI: Exception type thrown - PHASE 10.2] |
 
 **Rule ID Format:** BR-[ServiceAbbreviation]-### (e.g., BR-ENR-001 for EnrollmentService)
+
+**Exception Mapping (PHASE 10.2):**  
+See "Failure Modes & Exception Handling" section for details on what exceptions are thrown when these rules are violated.
 
 **Common Questions:**
 - ❓ [HUMAN: Any rules that seem arbitrary? Document the history.]
@@ -158,10 +161,16 @@ lastUpdated: [YYYY-MM-DD]
 
 ### Dependencies (What This Service Needs)
 
-| Dependency | Purpose | Failure Mode |
-|------------|---------|--------------|
-| 🤖 `IDependencyName` | 🤖 [AI: What it's used for] | ❓ [HUMAN: Critical? Blocking? Non-blocking?] |
-| 🤖 `IDependencyName` | 🤖 [AI: What it's used for] | ❓ [HUMAN: What happens if unavailable?] |
+| Dependency | Purpose | Failure Mode | Critical? |
+|------------|---------|--------------|-----------|
+| 🤖 `IDependencyName` | 🤖 [AI: What it's used for] | 🤖 [AI: What exception/failure occurs - PHASE 10.2] | ❓ [HUMAN: Blocking? Can service degrade?] |
+| 🤖 `IDependencyName` | 🤖 [AI: What it's used for] | 🤖 [AI: Exception + business impact] | ❓ [HUMAN: Fallback available?] |
+
+**Example (PHASE 10.2 Enhanced):**
+| Dependency | Purpose | Failure Mode | Critical? |
+|------------|---------|--------------|-----------|
+| `ICourseRepository` | CRUD operations + title uniqueness checks | `DbUpdateException`: Constraint violation when duplicate title | ⚠️ **Blocking** - course operations cannot proceed without data access |
+| `ILogger` | Request/error logging | `NullReferenceException` if no logger injected | Non-critical - logging failures don't block operations |
 
 ### Consumers (Who Uses This Service)
 
@@ -193,21 +202,33 @@ lastUpdated: [YYYY-MM-DD]
 
 ### Request Example
 
-🤖 [AI: Generate from request DTO]
+🤖 [AI: Generate realistic examples from DTOs, reflecting actual business domain - PHASE 10.2]
 
 ```json
 {
-  "propertyName": "value",
-  "propertyId": 0,
+  "propertyName": "🤖 [AI: Realistic value based on property domain semantics]",
+  "propertyId": "🤖 [AI: Smart value, respecting type and constraints]",
   "isActive": true
+}
+```
+
+**Example (Real CourseService Request):**
+```json
+{
+  "title": "Safety Orientation",
+  "isRequired": true,
+  "isActive": true,
+  "validityMonths": 12,
+  "category": "Safety",
+  "description": "Mandatory safety training covering workplace hazards and emergency procedures"
 }
 ```
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| 🤖 `propertyName` | 🤖 `string` | 🤖 Yes | ❓ [HUMAN: Business context] |
-| 🤖 `propertyId` | 🤖 `int` | 🤖 Yes | ❓ [HUMAN: Business context] |
-| 🤖 `isActive` | 🤖 `bool` | 🤖 No | ❓ [HUMAN: Default value?] |
+| 🤖 `propertyName` | 🤖 `string` | 🤖 Yes | 🤖 [AI: Business purpose of field] |
+| 🤖 `propertyId` | 🤖 `int` | 🤖 Yes | 🤖 [AI: Business purpose of field] |
+| 🤖 `isActive` | 🤖 `bool` | 🤖 No | 🤖 [AI: Default behavior and purpose] |
 
 ### Success Response Example (200)
 
@@ -261,8 +282,15 @@ lastUpdated: [YYYY-MM-DD]
 
 | Database Object | Purpose | Business Context | Performance Notes |
 |-----------------|---------|------------------|-------------------|
-| 🤖 `schema.TableName` | 🤖 [AI: What data retrieved, which columns] | ❓ [HUMAN: Why needed? Business rule context] | 🤖 [AI: Query pattern if visible] ❓ [HUMAN: Performance concerns, N+1 risks] |
-| 🤖 `schema.ViewName` | 🤖 [AI: What aggregated data used] | ❓ [HUMAN: Why use view vs raw tables?] | ❓ [HUMAN: View performance, materialized?] |
+| 🤖 `schema.TableName` | 🤖 [AI: What data retrieved, which columns] | ❓ [HUMAN: Why needed? Business rule context] | 🤖 [AI: Query pattern, indexes, optimization hints] |
+| 🤖 `schema.ViewName` | 🤖 [AI: What aggregated data used] | ❓ [HUMAN: Why use view vs raw tables?] | 🤖 [AI: View query plan, materialized?] |
+
+**AI GENERATION HINT (PHASE 10.2):** Analyze repository code for:
+- `SELECT` statements and `DbSet<T>` queries
+- `.Where()`, `.OrderBy()`, `.Include()` patterns  
+- Output SQL: "Query: `SELECT * FROM Table WHERE Id = @id`"
+- Index needs: "⚠️ Consider index on CourseId field"
+- N+1 risks: "Each course fetch triggers separate category query"
 
 **Example:**
 | Database Object | Purpose | Business Context | Performance Notes |
@@ -313,6 +341,37 @@ For table schema details, see [Table Documentation](../../database-repo/docs/tab
 |-----------------|----------------|------------------|--------|
 | 🤖 `training.Enrollments` (INSERT trigger) | 🤖 Sends email notification via Service Broker queue | ❓ Immediate notification requirement for user experience | ⚠️ Email failure doesn't rollback transaction - acceptable trade-off |
 | 🤖 External: Email service API call | 🤖 Sends confirmation email after enrollment created | ❓ User expects immediate confirmation per UX requirements | ⚠️ Timeout after 5 seconds, enrollment succeeds even if email fails |
+
+---
+
+## Failure Modes & Exception Handling (PHASE 10.2)
+
+**Purpose:** Document exception handling patterns, error flows, and business impact of failures. Help on-call engineers quickly understand "what could go wrong and what happens next."
+
+### Common Failure Scenarios
+
+🤖 [AI: Extracted from exception handling in source code - PHASE 10.2]
+
+| Exception Type | Trigger | Operation | Impact | Mitigation |
+|---|---|---|---|---|
+| 🤖 `InvalidOperationException` | 🤖 [What causes it] | 🤖 [Which operation fails] | 🤖 [Business consequence] | 🤖 [How service handles it] |
+| 🤖 `ArgumentNullException` | 🤖 [What causes it] | 🤖 [Which operation fails] | 🤖 [Business consequence] | 🤖 [How service handles it] |
+| 🤖 `DbUpdateException` | 🤖 [DB constraint violated] | 🤖 [Which write operation fails] | 🤖 [Data not persisted] | 🤖 [Retry? Rollback? User message?] |
+| 🤖 `TimeoutException` | 🤖 [Slow query/API call] | 🤖 [Operation hangs] | 🤖 [User request times out] | 🤖 [Retry logic? Circuit breaker?] |
+
+### Expected vs Unexpected Failures
+
+**Expected Failures** (Service recovers, user informed):
+- Validation errors (400 BadRequest) → User corrects input and retries
+- Resource not found (404 NotFound) → User checks resource ID and retries
+- Duplicate key (409 Conflict) → User knows this is a business rule violation; takes corrective action
+- Rate limit exceeded (429 TooManyRequests) → Client backs off and retries per spec
+
+**Unexpected Failures** (Service degrades, incident alerting triggered):
+- Database unavailable (500 InternalServerError) → Service down; on-call notified
+- External API timeout (504 GatewayTimeout) → External system issue; fallback or queue for retry
+- Memory exception (OutOfMemoryException) → Service crash; restart may be needed
+- Configuration error (null reference in initialization) → Deployment issue; rollback needed
 
 ---
 

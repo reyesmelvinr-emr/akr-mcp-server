@@ -1,0 +1,123 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AKR: Generate and Write Documentation (Unified)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/generate_and_write_documentation.py",
+        "--module-name",
+        "${input:akrModuleName}",
+        "--source-files",
+        "${input:akrSourceFilesRequired}",
+        "--workspace-root",
+        "${workspaceFolder}"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true
+      }
+    },
+    {
+      "label": "AKR: Validate Documentation (file)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_documentation.py",
+        "${input:akrDocFile}"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AKR: Validate Documentation (changed files)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_documentation.py",
+        "--changed-files"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AKR: Validate Documentation (all in docs/)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_documentation.py",
+        "--all",
+        "docs/"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AKR: Validate Traceability",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_traceability.py",
+        "--docs-dir",
+        "docs/"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "AKR: Scan Write Bypasses",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/validate_write_bypasses.sh"
+      ],
+      "group": "test",
+      "problemMatcher": [],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${env:AKR_MCP_SERVER_PATH}/scripts/validate_write_bypasses.ps1"
+        ]
+      },
+      "osx": {
+        "command": "bash",
+        "args": [
+          "${env:AKR_MCP_SERVER_PATH}/scripts/validate_write_bypasses.sh"
+        ]
+      },
+      "linux": {
+        "command": "bash",
+        "args": [
+          "${env:AKR_MCP_SERVER_PATH}/scripts/validate_write_bypasses.sh"
+        ]
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "akrModuleName",
+      "type": "promptString",
+      "description": "Module name (e.g., EnrollmentService, Button, Courses)",
+      "default": ""
+    },
+    {
+      "id": "akrSourceFilesRequired",
+      "type": "promptString",
+      "description": "Source files to document (comma-separated, REQUIRED). Example: Domain/Services/IEnrollmentService.cs,Controllers/EnrollmentsController.cs",
+      "default": ""
+    },
+    {
+      "id": "akrDocFile",
+      "type": "promptString",
+      "description": "Path to documentation file (e.g., docs/services/users_service_doc.md)",
+      "default": "docs/"
+    }
+  ]
+}

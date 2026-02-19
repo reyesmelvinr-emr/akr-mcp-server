@@ -1,0 +1,117 @@
+name: Tests & Enforcement Validation
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Windows-first (primary platform for AKR)
+  test-windows:
+    name: Test & Bypass Scan (Windows)
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+        shell: pwsh
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        shell: pwsh
+      
+      - name: Validate write bypasses (PowerShell) — Doc-Scoped Enforcement
+        run: pwsh -File scripts/validate_write_bypasses.ps1
+        shell: pwsh
+        continue-on-error: false
+      
+      - name: Run test suite with coverage
+        run: pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+        shell: pwsh
+      
+      - name: Check coverage threshold
+        run: |
+          $coverage = pytest tests/ --cov=src --cov-report=term | Select-String "TOTAL.*(\d+)%"
+          if ($coverage -match "TOTAL.*(\d+)%") {
+            $percent = [int]$matches[1]
+            if ($percent -lt 80) {
+              Write-Host "❌ Coverage below 80%: $percent%" -ForegroundColor Red
+              exit 1
+            }
+            Write-Host "✅ Coverage threshold met: $percent%" -ForegroundColor Green
+          }
+        shell: pwsh
+
+  # Ubuntu (secondary, for multi-platform CI support)
+  test-ubuntu:
+    name: Test (Ubuntu)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Validate write bypasses (Bash) — Doc-Scoped Enforcement
+        run: bash scripts/validate_write_bypasses.sh
+        continue-on-error: false
+      
+      - name: Run test suite with coverage
+        run: pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+      
+      - name: Check coverage threshold
+        run: |
+          coverage_line=$(pytest tests/ --cov=src --cov-report=term | grep "TOTAL")
+          percent=$(echo $coverage_line | grep -oP 'TOTAL.*?(\d+)%' | grep -oP '\d+(?=%)')
+          if [ "$percent" -lt 80 ]; then
+            echo "❌ Coverage below 80%: $percent%"
+            exit 1
+          fi
+          echo "✅ Coverage threshold met: $percent%"
+
+  # Summary job (only runs if all other jobs pass)
+  ci-success:
+    name: CI Pipeline Success
+    runs-on: ubuntu-latest
+    needs: [test-windows, test-ubuntu]
+    if: success()
+    
+    steps:
+      - name: Report success
+        run: |
+          echo "✅ All CI checks passed!"
+          echo "  ✅ Windows tests passed"
+          echo "  ✅ Ubuntu tests passed"
+          echo "  ✅ Doc-scoped bypass scan passed"
+          echo "  ✅ Coverage threshold met"
+          echo ""
+          echo "🎉 Enforcement pipeline ready for production"

@@ -1,0 +1,344 @@
+{# Database Table Documentation Template for Jinja2 Rendering #}
+
+# {{ table_name }} Table
+
+{% block metadata %}
+**Schema**: {{ schema_name | default('dbo') }}  
+**Status**: {{ status | default('Active') }}  
+**Version**: {{ version | default('1.0') }}  
+**Last Updated**: {{ last_updated }}
+
+{% endblock %}
+
+---
+
+## Overview
+
+{% block overview %}
+{% if purpose %}
+{{ purpose }}
+{% else %}
+🤖 **[AI: Provide a clear description of this table's purpose and business context]**
+{% endif %}
+{% endblock %}
+
+**Full Name**: `{{ schema_name | default('dbo') }}.{{ table_name }}`  
+**Row Count**: 🤖 [To be populated]  
+**Table Size**: 🤖 [To be populated]
+
+---
+
+## Columns
+
+{% block columns %}
+{% if columns %}
+| Column Name | Type | Nullable | Default | Primary Key | Description |
+|------------|------|----------|---------|------------|-------------|
+{% for col in columns %}
+| `{{ col.name }}` | `{{ col.type }}` | {{ col.nullable | yes_no('Yes', 'No') }} | {{ col.default | default_if_empty('—') }} | {{ col.is_primary_key | yes_no('PK', '—') }} | {{ col.description | truncate_smart(50) }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document all table columns - names, data types, nullability, defaults, constraints]**
+{% endif %}
+{% endblock %}
+
+### Column Details
+
+{% block column_details %}
+{% if columns %}
+{% for col in columns %}
+#### `{{ col.name }}`
+
+**Type**: `{{ col.type }}` | **Nullable**: {{ col.nullable | yes_no('Yes', 'No') }}
+
+{% if col.default %}
+**Default Value**: `{{ col.default }}`
+{% endif %}
+
+{% if col.constraints %}
+**Constraints**: {{ col.constraints | join_list() }}
+{% endif %}
+
+🤖 **[AI: Add detailed description of what this column stores and its business meaning]**
+
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+---
+
+## Keys & Relationships
+
+### Primary Key
+
+{% block primary_key %}
+{% if columns | selectattr('is_primary_key', 'equalto', True) | list %}
+{% set pk_columns = columns | selectattr('is_primary_key', 'equalto', True) | list %}
+```
+PRIMARY KEY ({{ pk_columns | map(attribute='name') | join_list() }})
+```
+{% else %}
+🤖 **[AI: Define the primary key for this table]**
+{% endif %}
+{% endblock %}
+
+### Foreign Keys
+
+{% block foreign_keys %}
+{% if foreign_keys %}
+| Column | References | Relationship | Cascade Delete? |
+|--------|-----------|--------------|-----------------|
+{% for fk in foreign_keys %}
+| `{{ fk.column }}` | `{{ fk.referenced_table }}.{{ fk.referenced_column }}` | {{ fk.relationship | default('1:N') }} | {{ fk.cascade_delete | yes_no('Yes', 'No') }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document all foreign key relationships to other tables]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Constraints
+
+### Check Constraints
+
+{% block check_constraints %}
+{% if check_constraints %}
+{% for constraint in check_constraints %}
+#### `{{ constraint.name }}`
+
+```sql
+{{ constraint.sql_expression }}
+```
+
+{% if constraint.description %}
+{{ constraint.description }}
+{% else %}
+🤖 **[AI: Explain what this constraint ensures]**
+{% endif %}
+
+{% endfor %}
+{% else %}
+🤖 **[AI: Document CHECK constraints that validate column values]**
+{% endif %}
+{% endblock %}
+
+### Unique Constraints
+
+{% block unique_constraints %}
+{% if unique_constraints %}
+{% for constraint in unique_constraints %}
+#### `{{ constraint.name }}`
+
+**Columns**: {{ constraint.affected_columns | join_list() }}
+
+{% if constraint.description %}
+{{ constraint.description }}
+{% else %}
+🤖 **[AI: Explain why uniqueness is required for these columns]**
+{% endif %}
+
+{% endfor %}
+{% else %}
+🤖 **[AI: Document UNIQUE constraints - which column combinations must be unique and why]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Indexes
+
+{% block indexes %}
+{% if indexes %}
+{% for idx in indexes %}
+### `{{ idx.name | default('Index ' + loop.index | string) }}`
+
+🤖 **[AI: Document index purpose and performance impact]**
+
+{% endfor %}
+{% else %}
+🤖 **[AI: List indexes on this table - which columns and why they're indexed]**
+
+| Index Name | Columns | Type | Purpose |
+|-----------|---------|------|---------|
+| | | | |
+
+{% endif %}
+{% endblock %}
+
+---
+
+## Business Rules
+
+{% block business_rules %}
+{% if business_rules %}
+{% for rule in business_rules %}
+### {{ rule.title }}
+
+{{ rule.description }}
+
+**Enforcement**: {{ rule.enforcement_point }}  
+**Impact Level**: {{ rule.impact_level }}
+
+{% endfor %}
+{% else %}
+🤖 **[AI: Document business rules and invariants maintained by this table]**
+
+Examples:
+- "Active status records must have a start date before end date"
+- "Total allocation for a course cannot exceed budget"
+
+{% endif %}
+{% endblock %}
+
+---
+
+## Related Tables
+
+{% block related_tables %}
+### Tables This Table References
+
+{% if foreign_keys %}
+{% for fk in foreign_keys %}
+- [`{{ fk.referenced_table }}`](./{{ fk.referenced_table }}_doc.md)
+{% endfor %}
+{% else %}
+None
+{% endif %}
+
+### Tables That Reference This Table
+
+{% if referenced_by %}
+{% for ref_table in referenced_by %}
+- [`{{ ref_table }}`](./{{ ref_table }}_doc.md)
+{% else %}
+🤖 **[AI: List tables that have foreign key references to this table]**
+{% endif %}
+
+{% endblock %}
+
+---
+
+## Common Queries
+
+{% block common_queries %}
+### Retrieve All Active Records
+
+{% if columns | selectattr('name', 'equalto', 'Status') | list %}
+```sql
+SELECT * FROM {{ schema_name | default('dbo') }}.{{ table_name }}
+WHERE Status = 'Active'
+ORDER BY [PrimaryKeyColumn]
+```
+{% else %}
+```sql
+SELECT * FROM {{ schema_name | default('dbo') }}.{{ table_name }}
+ORDER BY [PrimaryKeyColumn]
+```
+{% endif %}
+
+### [Other Common Query 1]
+
+🤖 **[AI: Document other frequently-run queries against this table]**
+
+```sql
+-- Add query here
+```
+
+{% endblock %}
+
+---
+
+## Performance Considerations
+
+{% block performance %}
+🤖 **[AI: Document performance characteristics and optimization strategies]**
+
+- Row count and growth rate
+- Most frequently queried columns (ensure indexed)
+- Expensive joins or aggregations
+- Archival/cleanup policies
+
+{% endblock %}
+
+---
+
+## Data Lifecycle
+
+{% block data_lifecycle %}
+🤖 **[AI: How long is data retained? When is it archived/deleted? Any seasonal patterns?]**
+
+- Insertion: When/how are records created?
+- Updates: What fields change most frequently?
+- Deletion: When/how are records removed?
+
+{% endblock %}
+
+---
+
+## Change History
+
+{% block change_history %}
+🤖 **[AI: Document schema changes - new columns, renamed columns, deprecated columns]**
+
+| Date | Change | Impact |
+|------|--------|--------|
+| | | |
+
+{% endblock %}
+
+---
+
+## Access Control
+
+{% block access_control %}
+🤖 **[AI: Who can access this table? Any row-level security? Sensitive data handling?]**
+
+- Read access:
+- Insert access:
+- Update access:
+- Delete access:
+- Sensitive columns:
+
+{% endblock %}
+
+---
+
+## Backup & Recovery
+
+{% block backup_recovery %}
+🤖 **[AI: Backup schedule, recovery procedures, and disaster scenarios]**
+
+- Backup frequency:
+- Retention period:
+- Recovery time objective:
+- Critical recovery scenarios:
+
+{% endblock %}
+
+---
+
+## Troubleshooting
+
+{% block troubleshooting %}
+### Common Issues
+
+🤖 **[AI: What issues do developers commonly encounter? How to investigate?]**
+
+| Symptom | Root Cause | Solution |
+|---------|-----------|----------|
+| | | |
+
+### Data Quality Checks
+
+🤖 **[AI: How to verify data integrity in this table?]**
+
+```sql
+-- Add validation queries here
+```
+
+{% endblock %}
+
+---
+
+*This documentation was auto-generated from extracted table schema. All 🤖 sections require human review and completion.*

@@ -243,7 +243,7 @@ code .
 In Copilot Chat, type:
 
 ```
-/docs.health-check
+Run AKR MCP health check for this workspace.
 ```
 
 **Expected Response:**
@@ -259,7 +259,86 @@ Workspace: akr-mcp-server
 
 ---
 
-## 📝 Step 8: Save Your Installation Path
+## 🌍 Step 8: Configure Global AKR Tasks (Optional but Recommended)
+
+**NEW:** Configure AKR tasks to be available in ALL VS Code workspaces! 🚀
+
+This optional step allows you to run AKR tasks (like "Generate and Write Documentation") from any workspace without switching to the akr-mcp-server folder.
+
+### Why Configure Global Tasks?
+
+- ✅ **Run tasks from any workspace** (UI repo, API repo, database repo)
+- ✅ **No workspace switching** - tasks operate on current workspace automatically
+- ✅ **One-time setup** - configure once, use everywhere
+- ✅ **Simplified workflow** - generate and validate docs without leaving your project
+
+### How to Configure
+
+Run the global task setup script:
+
+```powershell
+# Make sure you're in the akr-mcp-server directory
+# and virtual environment is activated
+
+python scripts\setup_global_tasks.py
+```
+
+**The script will:**
+1. Prompt for your akr-mcp-server installation path (or use auto-detected path)
+2. Set the `AKR_MCP_SERVER_PATH` environment variable
+3. Configure VS Code user settings to include AKR tasks
+4. Backup your existing settings before making changes
+
+**Follow the prompts:**
+- Accept the default path (recommended) or specify a custom location
+- Wait for environment variable setup
+- Review the success message
+
+**Expected Output:**
+```
+======================================================================
+✓ Setup Complete!
+======================================================================
+
+AKR tasks are now available in all VS Code workspaces.
+
+Next steps:
+  1. Restart VS Code to load environment variable
+  2. Open any workspace (UI, API, database repos)
+  3. Open Command Palette (Ctrl+Shift+P)
+  4. Type 'Tasks: Run Task' and select any AKR task
+
+Available tasks:
+  • AKR: Generate and Write Documentation (Unified)
+  • AKR: Validate Documentation (file)
+  • AKR: Validate Documentation (changed files)
+  • AKR: Validate Documentation (all in docs/)
+  • AKR: Validate Traceability
+  • AKR: Scan Write Bypasses
+```
+
+### Verify Global Task Setup
+
+After setup, verify it worked:
+
+```powershell
+python scripts\verify_global_tasks.py
+```
+
+**Expected:** All checks should pass ✓
+
+### If You Skip This Step
+
+No problem! You can still:
+- Run tasks from the akr-mcp-server workspace
+- Use Copilot Chat to generate documentation
+- Configure global tasks later by running the script again
+
+**Note:** You can always add global tasks later by re-running `python scripts\setup_global_tasks.py`
+
+---
+
+## 📝 Step 9: Save Your Installation Path
 
 **Important:** Remember where you installed the AKR MCP server!
 
@@ -340,7 +419,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ### Problem: Templates Not Found
 
-**Symptom:** `/docs.health-check` shows "Templates: 0"
+**Symptom:** Health check reports "Templates: 0"
 
 **Solution:**
 ```powershell
@@ -427,7 +506,7 @@ pip show mcp
 - [ ] Templates verified
 - [ ] `.vscode/mcp.json` created
 - [ ] MCP server shows "Running" in Output
-- [ ] `/docs.health-check` works in Copilot Chat
+- [ ] Health check works in Copilot Chat
 
 ---
 

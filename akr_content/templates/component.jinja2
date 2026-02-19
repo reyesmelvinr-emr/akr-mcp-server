@@ -1,0 +1,250 @@
+{# React/UI Component Documentation Template for Jinja2 Rendering #}
+
+# {{ component_name }}
+
+{% block metadata %}
+**Type**: {{ component_type | title_case }}  
+**Complexity**: {{ complexity }}  
+**Status**: {{ status | default('Active') }}  
+**Last Updated**: {{ last_updated }}
+
+{% if file_path %}
+**File**: `{{ file_path }}`
+{% endif %}
+
+{% endblock %}
+
+---
+
+## Overview
+
+{% block overview %}
+{% if purpose %}
+{{ purpose }}
+{% else %}
+🤖 **[AI: Write a clear description of what this component does and when/where it's used]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Props (Component API)
+
+{% block props %}
+{% if props %}
+| Prop Name | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+{% for prop in props %}
+| `{{ prop.name }}` | `{{ prop.type }}` | {{ prop.required | yes_no('Yes', 'No') }} | {{ prop.default | default_if_empty('—') }} | {{ prop.description | truncate_smart(50) }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document all component props - name, type, whether required, default value, purpose]**
+{% endif %}
+{% endblock %}
+
+---
+
+## State
+
+{% block state %}
+{% if state_vars %}
+| State Variable | Type | Initial Value | Purpose |
+|---------------|------|---------------|---------|
+{% for state in state_vars %}
+| `{{ state.name }}` | `{{ state.type }}` | {{ state.initial_value | default_if_empty('—') }} | {{ state.purpose | truncate_smart(50) }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document internal component state - variables managed with useState, their purpose, and initial values]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Events & Callbacks
+
+{% block events %}
+{% if events %}
+| Event | Triggered When | Parameters | Business Impact |
+|-------|----------------|-----------|-----------------|
+{% for event in events %}
+| `{{ event.name }}` | {{ event.triggered_when }} | {% if event.parameters %}{{ event.parameters | length }} param(s){% else %}None{% endif %} | {{ event.business_impact | default_if_empty('—') }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document events this component emits or callbacks it accepts - when triggered and their impact]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Child Components
+
+{% block children_components %}
+{% if children_components %}
+This component uses:
+{% for child in children_components %}
+- `{{ child }}`
+{% endfor %}
+{% else %}
+{% endif %}
+{% endblock %}
+
+---
+
+## Variants & Styling
+
+{% block variants %}
+{% if variants %}
+### Visual Variants
+
+| Variant | Description | CSS Classes |
+|---------|-------------|------------|
+{% for variant in variants %}
+| `{{ variant.name }}` | {{ variant.description }} | {{ variant.css_classes | join_list() }} |
+{% endfor %}
+
+{% else %}
+### Available Variants
+
+🤖 **[AI: Document visual variants available - size, color, state variations (e.g., primary/secondary buttons)]**
+
+| Variant | Description | CSS Classes |
+|---------|-------------|------------|
+| | | |
+
+### Styling
+
+🤖 **[AI: How is this component styled? CSS-in-JS, CSS Modules, Tailwind? Are there customization options?]**
+
+{% endif %}
+{% endblock %}
+
+---
+
+## Usage Examples
+
+{% block usage_examples %}
+{% if examples %}
+{% for example in examples %}
+{{ example }}
+
+{% endfor %}
+{% else %}
+### Basic Usage
+
+```jsx
+import {{ component_name }} from '@components/{{ component_name }}';
+
+export function MyPage() {
+  return (
+    <{{ component_name }}
+      {# Add props here #}
+    />
+  );
+}
+```
+
+### Advanced Usage
+
+🤖 **[AI: Show more complex usage patterns, integrations with other components, or state management]**
+
+{% endif %}
+{% endblock %}
+
+---
+
+## Hooks Used
+
+{% block hooks %}
+🤖 **[AI: List any React hooks used beyond useState - useEffect, useContext, useCallback, etc.]**
+
+- Usage: Purpose
+- Example: Cleanup logic, dependencies
+
+{% endblock %}
+
+---
+
+## Accessibility
+
+{% block accessibility %}
+{% if accessibility_notes %}
+{{ accessibility_notes }}
+{% else %}
+🤖 **[AI: Ensure accessibility compliance - ARIA attributes, keyboard navigation, screen reader support]**
+
+- ARIA labels/descriptions
+- Keyboard navigation support
+- Focus management
+- Color contrast
+
+{% endif %}
+{% endblock %}
+
+---
+
+## Performance Considerations
+
+{% block performance %}
+{% if performance_notes %}
+{{ performance_notes }}
+{% else %}
+🤖 **[AI: Document performance optimizations - memoization, lazy loading, render optimization]**
+
+- React.memo for preventing unnecessary re-renders?
+- useCallback for memoized callbacks?
+- Lazy loading of heavy content?
+- Bundle size impact?
+
+{% endif %}
+{% endblock %}
+
+---
+
+## Related Components
+
+{% block related_components %}
+🤖 **[AI: List related components that work with this one or provide similar functionality]**
+
+- Component name: Relationship/purpose
+- Example: UserCard is used by UserList
+
+{% endblock %}
+
+---
+
+## Testing
+
+{% block testing %}
+### Unit Tests
+
+🤖 **[AI: Key unit test cases for this component]**
+
+- Props validation
+- State management
+- Event handling
+- Conditional rendering
+
+### Integration Tests
+
+🤖 **[AI: How does this component integrate with parent/child components?]**
+
+{% endblock %}
+
+---
+
+## Troubleshooting
+
+{% block troubleshooting %}
+### Common Issues
+
+🤖 **[AI: What issues do developers commonly encounter? How to fix them?]**
+
+| Issue | Solution |
+|-------|----------|
+| | |
+
+{% endblock %}
+
+---
+
+*This documentation was auto-generated from extracted component code. All 🤖 sections require human review and completion.*

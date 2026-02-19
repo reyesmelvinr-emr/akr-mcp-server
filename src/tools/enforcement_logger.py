@@ -187,6 +187,152 @@ class EnforcementLogger:
             }
         )
         self._append_event(event)
+    
+    # ===== Phase 3: Workflow Telemetry Methods =====
+    
+    def log_workflow_violation(
+        self,
+        doc_path: str,
+        violation_type: str,
+        context: dict
+    ) -> None:
+        """
+        Log workflow violations (e.g., direct writes, bypasses).
+        
+        Tracks instances where the intended workflow is bypassed.
+        
+        Args:
+            doc_path: Path to documentation file
+            violation_type: Type of violation (direct_write_new_file, bypass_used, etc.)
+            context: Additional context about the violation
+        """
+        event = LogEvent(
+            timestamp=self._get_timestamp(),
+            event_type="WORKFLOW_VIOLATION",
+            details={
+                "doc_path": doc_path,
+                "violation_type": violation_type,
+                "context": context
+            }
+        )
+        self._append_event(event)
+    
+    def log_workflow_bypass(
+        self,
+        doc_path: str,
+        bypass_reason: str,
+        bypass_context: dict
+    ) -> None:
+        """
+        Log when force_workflow_bypass is used.
+        
+        Helps identify legitimate bypass scenarios for future refinement.
+        
+        Args:
+            doc_path: Path to documentation file
+            bypass_reason: Reason for bypass (emergency, existing_content, etc.)
+            bypass_context: Additional context about bypass usage
+        """
+        event = LogEvent(
+            timestamp=self._get_timestamp(),
+            event_type="WORKFLOW_BYPASS",
+            details={
+                "doc_path": doc_path,
+                "bypass_reason": bypass_reason,
+                "bypass_context": bypass_context
+            }
+        )
+        self._append_event(event)
+    
+    def log_stub_generated(
+        self,
+        doc_path: str,
+        component_name: str,
+        component_type: str,
+        template_name: str
+    ) -> None:
+        """
+        Log successful stub generation.
+        
+        Tracks the start of documentation generation workflow.
+        
+        Args:
+            doc_path: Path to generated documentation
+            component_name: Component name
+            component_type: Type of component (service, ui_component, database, table)
+            template_name: Template used for generation
+        """
+        event = LogEvent(
+            timestamp=self._get_timestamp(),
+            event_type="STUB_GENERATED",
+            details={
+                "doc_path": doc_path,
+                "component_name": component_name,
+                "component_type": component_type,
+                "template_name": template_name
+            }
+        )
+        self._append_event(event)
+    
+    def log_duplicate_write_attempt(
+        self,
+        doc_path: str,
+        time_since_last_ms: int,
+        content_hash: str,
+        previous_hash: str,
+        is_identical: bool
+    ) -> None:
+        """
+        Log when same file is written multiple times quickly.
+        
+        Detects accidental duplicate writes or rapid iterations.
+        
+        Args:
+            doc_path: Path to documentation file
+            time_since_last_ms: Milliseconds since last write to this file
+            content_hash: SHA256 hash of current content
+            previous_hash: SHA256 hash of previous write
+            is_identical: Whether content is identical to previous write
+        """
+        event = LogEvent(
+            timestamp=self._get_timestamp(),
+            event_type="DUPLICATE_WRITE",
+            details={
+                "doc_path": doc_path,
+                "time_since_last_ms": time_since_last_ms,
+                "content_hash": content_hash,
+                "previous_hash": previous_hash,
+                "is_identical": is_identical
+            }
+        )
+        self._append_event(event)
+    
+    def log_manual_file_creation(
+        self,
+        file_path: str,
+        file_size_bytes: int,
+        creation_context: str
+    ) -> None:
+        """
+        Log files created outside the tool system (detected via git diff).
+        
+        Helps identify manual workarounds or Copilot bypasses.
+        
+        Args:
+            file_path: Path to manually created file
+            file_size_bytes: Size of created file
+            creation_context: Context about how file was created (detected, etc.)
+        """
+        event = LogEvent(
+            timestamp=self._get_timestamp(),
+            event_type="MANUAL_FILE_CREATION",
+            details={
+                "file_path": file_path,
+                "file_size_bytes": file_size_bytes,
+                "creation_context": creation_context
+            }
+        )
+        self._append_event(event)
 
     def log_event(self, event: Dict[str, Any]) -> None:
         """Log a raw event payload to the log stream."""

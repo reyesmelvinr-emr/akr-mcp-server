@@ -3,8 +3,15 @@ Write Operations Module
 
 Handles file writing operations for MCP documentation.
 Provides tools for creating new documentation files and committing changes.
+
+Supports:
+- Async/await for non-blocking operations
+- Real-time progress notifications (0-100%)
+- Operation metrics tracking (timing, file size, estimated tokens)
+- Cancellation support
 """
 
+import asyncio
 import logging
 import os
 import subprocess
@@ -13,9 +20,11 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 from .config_utils import ErrorType, error_response
-from .enforcement_tool import enforce_and_fix
+from .enforcement_tool import enforce_and_fix, enforce_and_fix_async
 from .enforcement_tool_types import FileMetadata
 from .section_updater import update_documentation_sections
+from .progress_tracker import ProgressTracker
+from .operation_metrics import OperationMetrics
 
 logger = logging.getLogger("akr-mcp-server.tools.write_operations")
 
@@ -256,6 +265,74 @@ class DocumentationWriter:
         """Get current branch name."""
         result = self._run_git("rev-parse", "--abbrev-ref", "HEAD")
         return result.stdout.strip() if result.returncode == 0 else "unknown"
+    
+    # ============== ASYNC VARIANTS (for non-blocking operations) ==============
+    
+    async def _run_git_async(self, *args) -> subprocess.CompletedProcess:
+        """Run a git command asynchronously (non-blocking)."""
+        cmd = ["git"] + list(args)
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self.repo_path
+            )
+            stdout, stderr = await process.communicate()
+            
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=process.returncode,
+                stdout=stdout.decode('utf-8', errors='replace'),
+                stderr=stderr.decode('utf-8', errors='replace')
+            )
+        except Exception as e:
+            logger.error(f"Git async error: {e}")
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=1,
+                stdout="",
+                stderr=str(e)
+            )
+    
+    async def stage_file_async(self, file_path: str) -> bool:
+        """Stage a file for commit (async)."""
+        result = await self._run_git_async("add", file_path)
+        return result.returncode == 0
+    
+    async def commit_async(self, message: str, files: Optional[list[str]] = None) -> bool:
+        """
+        Commit staged changes (async).
+        
+        Args:
+            message: Commit message
+            files: Optional list of specific files to commit
+            
+        Returns:
+            True if successful
+        """
+        # Ensure git config
+        self._ensure_git_config()
+        
+        # Stage files if specified
+        if files:
+            for file_path in files:
+                await self.stage_file_async(file_path)
+        else:
+            await self._run_git_async("add", ".")
+        
+        # Commit
+        result = await self._run_git_async("commit", "-m", message)
+        
+        if result.returncode == 0:
+            logger.info(f"Committed: {message}")
+            return True
+        elif "nothing to commit" in result.stdout.lower():
+            logger.info("Nothing to commit")
+            return True
+        else:
+            logger.error(f"Commit failed: {result.stderr}")
+            return False
 
 
 def write_documentation(
@@ -268,7 +345,8 @@ def write_documentation(
     commit_message: Optional[str] = None,
     overwrite: bool = False,
     config: dict | None = None,
-    telemetry_logger: Optional[TelemetryLogger] = None
+    telemetry_logger: Optional[TelemetryLogger] = None,
+    force_workflow_bypass: bool = False
 ) -> dict:
     """
     Write new documentation to the repository.
@@ -322,6 +400,28 @@ def write_documentation(
                 filePath=doc_path,
                 exists=True
             )
+    else:
+        if not force_workflow_bypass:
+            if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                telemetry_logger.log_event({
+                    "event_type": "WORKFLOW_VIOLATION",
+                    "doc_path": doc_path,
+                    "violation_type": "direct_write_new_file",
+                    "timestamp": datetime.now().isoformat() + "Z"
+                })
+            return error_response(
+                ErrorType.WORKFLOW_VIOLATION,
+                "New documentation must be created via generate_documentation first",
+                guidance={
+                    "correct_workflow": [
+                        "1. Call generate_documentation with component_name and template",
+                        "2. Review the generated stub with ❓ placeholders",
+                        "3. Use write_documentation to save final content"
+                    ],
+                    "alternative": "If you already have content, set force_workflow_bypass=true"
+                },
+                telemetry={"violation_type": "direct_write_new_file"}
+            )
 
     file_metadata = FileMetadata(
         file_path=source_file or doc_path,
@@ -343,7 +443,8 @@ def write_documentation(
             file_metadata=file_metadata,
             config=config,
             update_mode="replace" if overwrite else "create",
-            dry_run=False
+            dry_run=False,
+            resource_manager=None,
         )
     except Exception as e:
         if telemetry_logger and hasattr(telemetry_logger, "log_event"):
@@ -418,6 +519,424 @@ def write_documentation(
         "enforcementSummary": enforcement_result.summary,
         "autoFixed": enforcement_result.auto_fixed
     }
+
+
+async def write_documentation_async(
+    repo_path: str,
+    doc_path: str,
+    content: str,
+    source_file: str,
+    component_type: str = "unknown",
+    template: str = "standard_service_template.md",
+    commit_message: Optional[str] = None,
+    overwrite: bool = False,
+    config: dict | None = None,
+    telemetry_logger: Optional[TelemetryLogger] = None,
+    progress_tracker: Optional[ProgressTracker] = None,
+    operation_metrics: Optional[OperationMetrics] = None,
+    workflow_tracker: Optional[object] = None,
+    duplicate_detector: Optional[object] = None,
+    force_workflow_bypass: bool = False,
+    resource_manager: Optional[object] = None,
+    session_cache: Optional[object] = None,
+) -> dict:
+    """
+    Write new documentation to the repository (ASYNC with progress tracking).
+    
+    Args:
+        repo_path: Path to the repository
+        doc_path: Relative path for the documentation file
+        content: Documentation content to write
+        source_file: Source file being documented
+        component_type: Type of component (services, controllers, etc.)
+        template: Template used for generation
+        commit_message: Optional custom commit message
+        overwrite: Allow overwriting existing files
+        config: Configuration dictionary
+        telemetry_logger: Optional telemetry logger
+        progress_tracker: Optional progress tracker for real-time notifications
+        operation_metrics: Optional metrics tracker for performance data
+        
+    Returns:
+        Dictionary with result information (includes operationMetrics)
+    """
+    config = config or {}
+    metrics = operation_metrics or OperationMetrics(template_name=template)
+    metrics.start_stage("validation")
+    
+    try:
+        # === Duplicate Detection (Phase 1: Telemetry only) ===
+        if duplicate_detector:
+            duplicate_check = await duplicate_detector.check_duplicate(doc_path, content)
+            if duplicate_check.is_duplicate:
+                logger.info(f"Duplicate write detected for {doc_path}, returning cached result")
+                if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                    telemetry_logger.log_event({
+                        "event_type": "DUPLICATE_WRITE",
+                        "doc_path": doc_path,
+                        "time_since_last_ms": duplicate_check.time_since_last_ms,
+                        "timestamp": datetime.now().isoformat() + "Z"
+                    })
+                # Return cached result
+                return duplicate_check.cached_result
+            
+            # Log rapid change warning if detected
+            if duplicate_check.reason and "rapid" in duplicate_check.reason.lower():
+                logger.warning(f"Rapid content change for {doc_path}: {duplicate_check.reason}")
+                if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                    telemetry_logger.log_event({
+                        "event_type": "RAPID_CHANGE_WARNING",
+                        "doc_path": doc_path,
+                        "time_since_last_ms": duplicate_check.time_since_last_ms,
+                        "timestamp": datetime.now().isoformat() + "Z"
+                    })
+        
+        # === Stage 1: Validation (0-40%) ===
+        await progress_tracker.update_stage("validation", "Validating document structure") if progress_tracker else None
+        
+        enforcement_cfg = config.get("documentation", {}).get("enforcement", {})
+        if not enforcement_cfg or not enforcement_cfg.get("enabled", False):
+            return error_response(
+                ErrorType.CONFIG_DISABLED,
+                "Documentation enforcement is disabled in config; writes refused for safety"
+            )
+        allow_workflow_bypass = enforcement_cfg.get("allowWorkflowBypass", False)
+        
+        repo_root = Path(repo_path).resolve()
+        doc_rel = Path(doc_path)
+        if doc_rel.is_absolute():
+            return error_response(
+                ErrorType.PATH_TRAVERSAL,
+                f"doc_path must be repo-relative: {doc_path}"
+            )
+        
+        full_path = (repo_root / doc_rel).resolve()
+        try:
+            full_path.relative_to(repo_root)
+        except ValueError:
+            return error_response(
+                ErrorType.PATH_TRAVERSAL,
+                f"doc_path escapes repository root: {doc_path}"
+            )
+        
+        writer = DocumentationWriter(repo_path)
+        
+        # Check if file exists
+        file_exists = writer.file_exists(doc_path)
+        
+        if file_exists:
+            if not overwrite:
+                return error_response(
+                    ErrorType.WRITE_FAILED,
+                    f"Documentation already exists at {doc_path}. Use 'overwrite=true' to replace or use surgical update.",
+                    filePath=doc_path,
+                    exists=True
+                )
+        else:
+            # === Workflow Validation (Strict) ===
+            # For NEW files, enforce stub-first workflow unless bypass is explicitly set.
+            if force_workflow_bypass and not allow_workflow_bypass:
+                return error_response(
+                    ErrorType.WORKFLOW_VIOLATION,
+                    "Workflow bypass is disabled by config",
+                    guidance={
+                        "correct_workflow": [
+                            "1. Call generate_documentation with component_name and template",
+                            "2. Review the generated stub with ❓ placeholders",
+                            "3. Use write_documentation to save final content"
+                        ],
+                        "alternative": "Enable documentation.enforcement.allowWorkflowBypass to allow direct writes"
+                    }
+                )
+            if not force_workflow_bypass:
+                if not workflow_tracker:
+                    return error_response(
+                        ErrorType.WORKFLOW_VIOLATION,
+                        "Workflow tracker not initialized; cannot verify stub generation",
+                        guidance={
+                            "correct_workflow": [
+                                "1. Call generate_documentation with component_name and template",
+                                "2. Review the generated stub with ❓ placeholders",
+                                "3. Use write_documentation to save final content"
+                            ],
+                            "alternative": "If you already have content, set force_workflow_bypass=true"
+                        }
+                    )
+
+                stub_generated = await workflow_tracker.is_stub_generated(doc_path)
+                if not stub_generated:
+                    logger.warning(
+                        f"Workflow violation: direct write of new file {doc_path} without generate_documentation"
+                    )
+                    if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                        telemetry_logger.log_event({
+                            "event_type": "WORKFLOW_VIOLATION",
+                            "doc_path": doc_path,
+                            "violation_type": "direct_write_new_file",
+                            "timestamp": datetime.now().isoformat() + "Z"
+                        })
+                    return error_response(
+                        ErrorType.WORKFLOW_VIOLATION,
+                        "New documentation must be created via generate_documentation first",
+                        guidance={
+                            "correct_workflow": [
+                                "1. Call generate_documentation with component_name and template",
+                                "2. Review the generated stub with ❓ placeholders",
+                                "3. Use write_documentation to save final content"
+                            ],
+                            "alternative": "If you already have content, set force_workflow_bypass=true"
+                        },
+                        telemetry={"violation_type": "direct_write_new_file"}
+                    )
+
+            # Log if bypass was used
+            if force_workflow_bypass and telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                telemetry_logger.log_event({
+                    "event_type": "WORKFLOW_BYPASS",
+                    "doc_path": doc_path,
+                    "timestamp": datetime.now().isoformat() + "Z"
+                })
+        
+        file_metadata = FileMetadata(
+            file_path=source_file or doc_path,
+            component_name=Path(source_file or doc_path).stem
+        )
+        
+        # ==================== PHASE 3: CHECK SESSION CACHE ====================
+        if session_cache and hasattr(session_cache, 'get_enforcement_result'):
+            cached_result = session_cache.get_enforcement_result(content, template)
+            if cached_result is not None:
+                logger.info(f"Session cache hit for {template} - skipping enforcement")
+                if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                    telemetry_logger.log_event({
+                        "event_type": "cache_hit",
+                        "cache_type": "session",
+                        "template": template,
+                        "doc_path": doc_path,
+                        "timestamp": datetime.now().isoformat() + "Z"
+                    })
+                # Use cached result and skip enforcement
+                # Build file header and write
+                header = build_ai_header(source_file, component_type, template)
+                content_with_header = _insert_ai_header_after_yaml(header, content)
+                
+                if not writer.write_file(doc_path, content_with_header):
+                    return error_response(
+                        ErrorType.WRITE_FAILED,
+                        f"Failed to write file to {doc_path}",
+                        filePath=doc_path
+                    )
+                
+                await writer.stage_file_async(doc_path)
+                metrics.end_stage("write")
+                
+                if not commit_message:
+                    source_name = Path(source_file).stem
+                    commit_message = f"docs: add {component_type} documentation for {source_name}"
+                
+                committed = await writer.commit_async(commit_message, [doc_path])
+                metrics.end_stage("commit")
+                metrics.finalize()
+                
+                await progress_tracker.conclude() if progress_tracker else None
+                
+                result = {
+                    "success": True,
+                    "filePath": doc_path,
+                    "fullPath": str(Path(repo_path) / doc_path),
+                    "sourceFile": source_file,
+                    "componentType": component_type,
+                    "template": template,
+                    "committed": committed,
+                    "commitMessage": commit_message,
+                    "branch": writer.get_current_branch(),
+                    "enforcementSummary": "✓ Validation cached (no re-validation)",
+                    "autoFixed": [],
+                    "operationMetrics": metrics.to_dict(),
+                    "cacheHit": True,
+                }
+                
+                if duplicate_detector:
+                    await duplicate_detector.cache_result(doc_path, content, result)
+                
+                if workflow_tracker:
+                    await workflow_tracker.clear(doc_path)
+                
+                return result
+        # =========================================================================
+        
+        if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+            telemetry_logger.log_event({
+                "event_type": "enforcement_start",
+                "template": template,
+                "doc_path": doc_path,
+                "timestamp": datetime.now().isoformat() + "Z"
+            })
+        
+        # Run enforcement (PHASE 4: async to avoid blocking event loop)
+        try:
+            enforcement_result = await enforce_and_fix_async(
+                markdown=content,
+                template_name=template,
+                file_metadata=file_metadata,
+                config=config,
+                update_mode="replace" if overwrite else "create",
+                dry_run=False,
+                resource_manager=resource_manager,
+            )
+        except asyncio.CancelledError:
+            raise  # Re-raise cancellation
+        except Exception as e:
+            if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                telemetry_logger.log_event({
+                    "event_type": "enforcement_error",
+                    "template": template,
+                    "doc_path": doc_path,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat() + "Z"
+                })
+            return error_response(ErrorType.ENFORCEMENT_FAILED, f"Enforcement failed: {e}")
+        
+        metrics.end_stage("validation")
+        
+        if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+            telemetry_logger.log_event({
+                "event_type": "enforcement_result",
+                "template": template,
+                "doc_path": doc_path,
+                "valid": enforcement_result.valid,
+                "violation_count": len(enforcement_result.violations),
+                "timestamp": datetime.now().isoformat() + "Z"
+            })
+        
+        if not enforcement_result.valid:
+            violations = [
+                {
+                    "type": v.type,
+                    "severity": getattr(v.severity, "value", str(v.severity)),
+                    "message": v.message,
+                    "line": v.line
+                }
+                for v in enforcement_result.violations
+            ]
+            return error_response(
+                ErrorType.ENFORCEMENT_FAILED,
+                "Documentation failed enforcement checks",
+                violations=violations,
+                summary=enforcement_result.summary,
+                auto_fixed=enforcement_result.auto_fixed
+            )
+        
+        # === Stage 2: Write (40-80%) ===
+        await progress_tracker.update_stage("write", "Writing file to disk") if progress_tracker else None
+        metrics.start_stage("write")
+        
+        header = build_ai_header(source_file, component_type, template)
+        content_with_header = _insert_ai_header_after_yaml(header, enforcement_result.content)
+        
+        # Record metrics about content
+        metrics.content_chars = len(enforcement_result.content)
+        metrics.content_lines = len(enforcement_result.content.splitlines())
+        metrics.file_size_bytes = len(content_with_header.encode('utf-8'))
+        metrics.auto_fixed = len(enforcement_result.auto_fixed)
+        metrics.violations_found = len(enforcement_result.violations)
+        metrics.sections_count = content_with_header.count("\n##")
+        
+        if not writer.write_file(doc_path, content_with_header):
+            return error_response(
+                ErrorType.WRITE_FAILED,
+                f"Failed to write file to {doc_path}",
+                filePath=doc_path
+            )
+        
+        # Stage file asynchronously
+        await writer.stage_file_async(doc_path)
+        metrics.end_stage("write")
+        
+        # === Stage 3: Commit (80-100%) ===
+        await progress_tracker.update_stage("commit", "Committing to git") if progress_tracker else None
+        metrics.start_stage("commit")
+        
+        # Generate commit message if not provided
+        if not commit_message:
+            source_name = Path(source_file).stem
+            commit_message = f"docs: add {component_type} documentation for {source_name}"
+        
+        # Commit asynchronously
+        committed = await writer.commit_async(commit_message, [doc_path])
+        metrics.end_stage("commit")
+        
+        # Finalize metrics
+        metrics.finalize()
+        
+        # Report completion
+        await progress_tracker.conclude() if progress_tracker else None
+        
+        result = {
+            "success": True,
+            "filePath": doc_path,
+            "fullPath": str(Path(repo_path) / doc_path),
+            "sourceFile": source_file,
+            "componentType": component_type,
+            "template": template,
+            "committed": committed,
+            "commitMessage": commit_message,
+            "branch": writer.get_current_branch(),
+            "enforcementSummary": enforcement_result.summary,
+            "autoFixed": enforcement_result.auto_fixed,
+            "operationMetrics": metrics.to_dict()
+        }
+        
+        # Log metrics to telemetry
+        if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+            telemetry_logger.log_event({
+                "event_type": "write_success_with_metrics",
+                "template": template,
+                "doc_path": doc_path,
+                "metrics": metrics.to_dict(),
+                "timestamp": datetime.now().isoformat() + "Z"
+            })
+        
+        # Cache result for duplicate detection
+        if duplicate_detector:
+            await duplicate_detector.cache_result(doc_path, content, result)
+        
+        # ==================== PHASE 3: CACHE ENFORCEMENT RESULT ====================
+        if session_cache and hasattr(session_cache, 'cache_enforcement_result'):
+            # Cache the enforcement result for identical content + template combinations
+            session_cache.cache_enforcement_result(content, template, result)
+            logger.debug(f"Cached enforcement result for {template}")
+        # =========================================================================
+        
+        # Clear workflow state after successful write
+        if workflow_tracker:
+            await workflow_tracker.clear(doc_path)
+        
+        return result
+    
+    except asyncio.CancelledError:
+        # Operation cancelled
+        logger.warning(f"Write operation cancelled for {doc_path}")
+        # Try to clean up partial file if it was created
+        try:
+            full_path = Path(repo_path) / doc_path
+            if full_path.exists():
+                full_path.unlink()
+                logger.info(f"Cleaned up partial file: {doc_path}")
+        except Exception as e:
+            logger.error(f"Failed to clean up partial file: {e}")
+        
+        return error_response(
+            ErrorType.WRITE_FAILED,
+            "Documentation write operation was cancelled"
+        )
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in write_documentation_async: {e}", exc_info=True)
+        return error_response(
+            ErrorType.WRITE_FAILED,
+            f"Unexpected error: {e}"
+        )
 
 
 def write_config_file(repo_path: str, config_content: dict) -> dict:
@@ -545,7 +1064,8 @@ def update_documentation_sections_and_commit(
             file_metadata=file_metadata,
             config=config,
             update_mode="replace" if overwrite else "create",
-            dry_run=False
+            dry_run=False,
+            resource_manager=None,
         )
     except Exception as e:
         if telemetry_logger and hasattr(telemetry_logger, "log_event"):
@@ -615,3 +1135,224 @@ def update_documentation_sections_and_commit(
         "enforcementSummary": enforcement_result.summary,
         "autoFixed": enforcement_result.auto_fixed
     }
+
+
+async def update_documentation_sections_and_commit_async(
+    repo_path: str,
+    doc_path: str,
+    section_updates: dict[str, str],
+    template: str = "standard_service_template.md",
+    source_file: str = "",
+    component_type: str = "unknown",
+    add_changelog: bool = True,
+    overwrite: bool = True,
+    config: dict | None = None,
+    telemetry_logger: Optional[TelemetryLogger] = None,
+    progress_tracker: Optional[ProgressTracker] = None,
+    operation_metrics: Optional[OperationMetrics] = None
+) -> dict:
+    """
+    Update documentation sections, enforce template, and commit changes (ASYNC).
+    
+    Includes real-time progress notifications and operation metrics.
+    """
+    config = config or {}
+    metrics = operation_metrics or OperationMetrics(template_name=template)
+    metrics.start_stage("validation")
+    
+    try:
+        # === Stage 1: Validation (0-40%) ===
+        await progress_tracker.update_stage("validation", "Validating section updates") if progress_tracker else None
+        
+        enforcement_cfg = config.get("documentation", {}).get("enforcement", {})
+        if not enforcement_cfg or not enforcement_cfg.get("enabled", False):
+            return error_response(
+                ErrorType.CONFIG_DISABLED,
+                "Documentation enforcement is disabled in config; writes refused for safety"
+            )
+        
+        repo_root = Path(repo_path).resolve()
+        doc_rel = Path(doc_path)
+        if doc_rel.is_absolute():
+            return error_response(
+                ErrorType.PATH_TRAVERSAL,
+                f"doc_path must be repo-relative: {doc_path}"
+            )
+        
+        full_path = (repo_root / doc_rel).resolve()
+        try:
+            full_path.relative_to(repo_root)
+        except ValueError:
+            return error_response(
+                ErrorType.PATH_TRAVERSAL,
+                f"doc_path escapes repository root: {doc_path}"
+            )
+        
+        writer = DocumentationWriter(repo_path)
+        existing_content = writer.read_file(doc_path)
+        if existing_content is None:
+            return error_response(
+                ErrorType.FILE_NOT_FOUND,
+                f"Documentation not found at {doc_path}",
+                filePath=doc_path
+            )
+        
+        update_result = update_documentation_sections(
+            existing_content=existing_content,
+            section_updates=section_updates,
+            add_changelog=add_changelog
+        )
+        
+        if not update_result.get("success"):
+            return update_result
+        
+        updated_content = update_result.get("updated_content", "")
+        file_metadata = FileMetadata(
+            file_path=source_file or doc_path,
+            component_name=Path(source_file or doc_path).stem
+        )
+        
+        if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+            telemetry_logger.log_event({
+                "event_type": "enforcement_start",
+                "template": template,
+                "doc_path": doc_path,
+                "timestamp": datetime.now().isoformat() + "Z"
+            })
+        
+        # Run enforcement
+        try:
+            enforcement_result = enforce_and_fix(
+                markdown=updated_content,
+                template_name=template,
+                file_metadata=file_metadata,
+                config=config,
+                update_mode="replace",
+                dry_run=False,
+                resource_manager=None,
+            )
+        except asyncio.CancelledError:
+            raise  # Re-raise cancellation
+        except Exception as e:
+            if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+                telemetry_logger.log_event({
+                    "event_type": "enforcement_error",
+                    "template": template,
+                    "doc_path": doc_path,
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat() + "Z"
+                })
+            return error_response(ErrorType.ENFORCEMENT_FAILED, f"Enforcement failed: {e}")
+        
+        metrics.end_stage("validation")
+        
+        if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+            telemetry_logger.log_event({
+                "event_type": "enforcement_result",
+                "template": template,
+                "doc_path": doc_path,
+                "valid": enforcement_result.valid,
+                "violation_count": len(enforcement_result.violations),
+                "timestamp": datetime.now().isoformat() + "Z"
+            })
+        
+        if not enforcement_result.valid:
+            violations = [
+                {
+                    "type": v.type,
+                    "severity": getattr(v.severity, "value", str(v.severity)),
+                    "message": v.message,
+                    "line": v.line
+                }
+                for v in enforcement_result.violations
+            ]
+            return error_response(
+                ErrorType.ENFORCEMENT_FAILED,
+                "Documentation failed enforcement checks",
+                violations=violations,
+                summary=enforcement_result.summary,
+                auto_fixed=enforcement_result.auto_fixed
+            )
+        
+        # === Stage 2: Write (40-80%) ===
+        await progress_tracker.update_stage("write", "Writing updated sections") if progress_tracker else None
+        metrics.start_stage("write")
+        
+        header = build_ai_header(source_file, component_type, template)
+        content_with_header = _insert_ai_header_after_yaml(header, enforcement_result.content)
+        
+        # Record metrics
+        metrics.content_chars = len(enforcement_result.content)
+        metrics.content_lines = len(enforcement_result.content.splitlines())
+        metrics.file_size_bytes = len(content_with_header.encode('utf-8'))
+        metrics.auto_fixed = len(enforcement_result.auto_fixed)
+        metrics.violations_found = len(enforcement_result.violations)
+        metrics.sections_count = content_with_header.count("\n##")
+        
+        if not writer.write_file(doc_path, content_with_header):
+            return error_response(
+                ErrorType.WRITE_FAILED,
+                f"Failed to write file to {doc_path}",
+                filePath=doc_path
+            )
+        
+        # Stage file asynchronously
+        await writer.stage_file_async(doc_path)
+        metrics.end_stage("write")
+        
+        # === Stage 3: Commit (80-100%) ===
+        await progress_tracker.update_stage("commit", "Committing changes") if progress_tracker else None
+        metrics.start_stage("commit")
+        
+        commit_message = f"docs: update documentation sections for {Path(doc_path).stem}"
+        committed = await writer.commit_async(commit_message, [doc_path])
+        metrics.end_stage("commit")
+        
+        # Finalize metrics
+        metrics.finalize()
+        
+        # Report completion
+        await progress_tracker.conclude() if progress_tracker else None
+        
+        result = {
+            "success": True,
+            "filePath": doc_path,
+            "fullPath": str(Path(repo_path) / doc_path),
+            "sourceFile": source_file,
+            "componentType": component_type,
+            "template": template,
+            "committed": committed,
+            "commitMessage": commit_message,
+            "branch": writer.get_current_branch(),
+            "updates": update_result.get("updates", []),
+            "enforcementSummary": enforcement_result.summary,
+            "autoFixed": enforcement_result.auto_fixed,
+            "operationMetrics": metrics.to_dict()
+        }
+        
+        # Log metrics to telemetry
+        if telemetry_logger and hasattr(telemetry_logger, "log_event"):
+            telemetry_logger.log_event({
+                "event_type": "update_success_with_metrics",
+                "template": template,
+                "doc_path": doc_path,
+                "metrics": metrics.to_dict(),
+                "timestamp": datetime.now().isoformat() + "Z"
+            })
+        
+        return result
+    
+    except asyncio.CancelledError:
+        logger.warning(f"Update operation cancelled for {doc_path}")
+        return error_response(
+            ErrorType.WRITE_FAILED,
+            "Documentation update operation was cancelled"
+        )
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in update_documentation_sections_and_commit_async: {e}", exc_info=True)
+        return error_response(
+            ErrorType.WRITE_FAILED,
+            f"Unexpected error: {e}"
+        )
+

@@ -59,6 +59,7 @@ class ErrorType(str, Enum):
     CONFIG_DISABLED = "CONFIG_DISABLED"
     WRITE_FAILED = "WRITE_FAILED"
     COMMIT_FAILED = "COMMIT_FAILED"
+    WORKFLOW_VIOLATION = "WORKFLOW_VIOLATION"
 
 
 def error_response(error_type: ErrorType, message: str, **extras: object) -> dict:

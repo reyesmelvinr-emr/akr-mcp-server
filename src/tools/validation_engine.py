@@ -78,12 +78,24 @@ class ValidationEngine:
             if field not in yaml_data or not yaml_data[field]
         ]
         if missing_fields:
+            # Enhanced message with actionable guidance
+            message = (
+                f"Missing or empty YAML fields: {', '.join(sorted(missing_fields))}. "
+                f"Add these fields to the document's YAML front matter at the top. "
+                f"Example:\n"
+                f"---\n"
+                f"feature: <feature-name>\n"
+                f"domain: <ui|backend|database>\n"
+                f"component: <component-name>\n"
+                f"... (see AKR charter for all required fields)\n"
+                f"---"
+            )
             violations.append(
                 Violation(
                     type="missing_yaml_fields",
                     severity=ViolationSeverity.BLOCKER,
                     line=1,
-                    message=f"Missing YAML fields: {', '.join(sorted(missing_fields))}",
+                    message=message,
                 )
             )
         return violations
@@ -98,12 +110,18 @@ class ValidationEngine:
 
         for required in required_names:
             if required.lower() not in present_lower:
+                # Enhanced message with guidance on how to add missing sections
+                message = (
+                    f"Missing required section: {required}. "
+                    f"Add this section to your document. "
+                    f"Use generate_documentation to create a complete stub with all required sections."
+                )
                 violations.append(
                     Violation(
                         type="missing_required_section",
                         severity=ViolationSeverity.BLOCKER,
                         line=None,
-                        message=f"Missing required section: {required}",
+                        message=message,
                         section_name=required,
                     )
                 )
@@ -122,15 +140,20 @@ class ValidationEngine:
         ]
 
         if required_positions != sorted(required_positions):
+            # Enhanced message with expected vs. found order
+            found_order = [s for s in sections if s in required]
+            message = (
+                "Sections are out of order. "
+                f"Expected order: {', '.join(required)}. "
+                f"Found order: {', '.join(found_order)}. "
+                f"Use update_documentation_sections to reorder, or regenerate with generate_documentation."
+            )
             violations.append(
                 Violation(
                     type="section_order",
                     severity=ViolationSeverity.FIXABLE,
                     line=None,
-                    message=(
-                        "Required sections are out of order. "
-                        f"Expected order: {', '.join(required)}"
-                    ),
+                    message=message,
                 )
             )
         return violations

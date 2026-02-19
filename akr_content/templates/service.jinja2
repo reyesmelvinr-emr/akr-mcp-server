@@ -1,0 +1,417 @@
+{# Service Documentation Template for Jinja2 Rendering #}
+{# Based on lean_baseline_service_template.md restructured for Jinja2 #}
+
+# {{ service_name }}
+
+{% block metadata %}
+**Domain**: {{ domain | default_if_empty('Not specified') }}  
+**Namespace**: `{{ namespace | default_if_empty('Not specified') }}`  
+**Status**: {{ status | default('Active') }}  
+**Version**: {{ version | default('1.0') }}  
+**Last Updated**: {{ last_updated }}
+
+{% endblock %}
+
+---
+
+## Overview
+
+{% block overview %}
+{% if service_summary %}
+{{ service_summary }}
+{% else %}
+🤖 **[AI: Provide a 2-3 sentence summary of what this service does and its primary responsibility]**
+{% endif %}
+{% endblock %}
+
+### Capabilities
+
+{% block capabilities %}
+{% if capabilities %}
+{% for capability in capabilities %}
+- {{ capability }}
+{% endfor %}
+{% else %}
+🤖 **[AI: List the main capabilities this service provides]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Quick Reference (TL;DR)
+
+{% block quick_reference %}
+🤖 **[A 1-2 sentence summary for busy developers: What does this service do? When would I use it?]**
+
+**Key Responsibility**: {{ service_summary | default('To be determined') }}
+
+**Primary API Endpoint**: 
+{% if endpoints %}
+`{{ endpoints[0].method }} {{ endpoints[0].path }}`
+{% else %}
+🤖 **[Add the main endpoint here]**
+{% endif %}
+
+**Main Dependencies**: 
+{% if dependencies %}
+{{ dependencies | map(attribute='name') | list | join_list() }}
+{% else %}
+🤖 **[List key dependencies]**
+{% endif %}
+
+{% endblock %}
+
+---
+
+## What & Why
+
+{% block what_and_why %}
+🤖 **[AI: Answer these questions:]**
+
+**What is this service?** 
+- Core purpose and responsibility
+- Key problems it solves
+
+**Why does it exist?** 
+- Business justification
+- What would happen without it?
+- How does it fit into the larger system?
+
+**Who uses it?**
+- Primary consumers (controllers, other services, external clients)
+- Use cases and scenarios
+
+{% endblock %}
+
+---
+
+## Architecture
+
+{% block architecture %}
+🤖 **[AI: Describe how this service is organized and designed]**
+
+**Design Pattern**: 
+- Service layer? Repository pattern? Other?
+
+**Key Components**:
+- What classes/interfaces define the service boundary?
+- What are the major responsibilities?
+
+**Dependencies Diagram**:
+{% if dependencies %}
+```
+{{ service_name }}
+├── {{ dependencies[0].name }}
+{% for dep in dependencies%}
+{% if not loop.first %}
+├── {{ dep.name }}
+{% endif %}
+{% endfor %}
+```
+{% else %}
+🤖 **[Add dependency diagram]**
+{% endif %}
+
+**Database Schema Integration**:
+🤖 **[What tables does this service manage? What are the relationships?]**
+
+{% endblock %}
+
+---
+
+## Dependencies (What This Service Needs)
+
+{% block dependencies %}
+{% if dependencies %}
+| Dependency | Type | Purpose | Critical? |
+|-----------|------|---------|-----------|
+{% for dep in dependencies %}
+| `{{ dep.name }}` | {{ dep.type }} | {{ dep.purpose | truncate_smart(60) }} | {{ dep.is_critical | yes_no('Yes', 'No') }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document each injected dependency - what is it for and is it critical to operation?]**
+{% endif %}
+{% endblock %}
+
+### Missing Dependencies
+
+{% block missing_dependencies %}
+🤖 **[AI: Are there any undocumented or implicit dependencies? (external services, configuration, etc.)]**
+{% endblock %}
+
+---
+
+## API Routes & Endpoints
+
+{% block endpoints %}
+{% if endpoints %}
+{% for endpoint in endpoints %}
+### `{{ endpoint.method | http_method_color }} {{ endpoint.path }}`
+
+**Handler**: `{{ endpoint.handler }}`
+
+{% if endpoint.summary %}
+{{ endpoint.summary }}
+{% endif %}
+
+{% if endpoint.parameters %}
+**Parameters**:
+{% for param in endpoint.parameters %}
+- `{{ param.name }}` ({{ param.type | default('unknown') }})
+{% endfor %}
+{% endif %}
+
+{% if endpoint.response_types %}
+**Response Types**: {{ endpoint.response_types | join_list() }}
+{% endif %}
+
+{% if endpoint.status_codes %}
+**Status Codes**: {{ endpoint.status_codes | join_list() }}
+{% endif %}
+
+{% endfor %}
+{% else %}
+🤖 **[AI: Extract and document all API endpoints - method, path, parameters, status codes, response types]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Validation Rules (AUTO-GENERATED)
+
+{% block validation_rules %}
+{% if validation_rules %}
+| Property | Rule | Error Message |
+|----------|------|---------------|
+{% for rule in validation_rules %}
+| `{{ rule.property }}` | {{ rule.rule_type }} | {{ rule.error_message | truncate_smart(50) }} |
+{% endfor %}
+{% else %}
+🤖 **[AI: Document input validation rules - what fields are validated, how, and what error messages are shown]**
+{% endif %}
+{% endblock %}
+
+---
+
+## Business Rules
+
+{% block business_rules %}
+{% if business_rules %}
+{% for rule in business_rules %}
+### {{ rule.title }}
+
+{{ rule.description }}
+
+**Enforcement Point**: {{ rule.enforcement_point }}  
+**Impact Level**: {{ rule.impact_level }}
+
+{% if rule.related_code %}
+**Related Code**: `{{ rule.related_code }}`
+{% endif %}
+
+{% endfor %}
+{% else %}
+🤖 **[AI: Document business logic, constraints, and invariants that this service maintains]**
+- Example: "Course enrollments are limited to 30 students per section"
+- Example: "A course must have at least one instructor assigned before it can be published"
+- Example: "Once published, a course description cannot be changed"
+{% endif %}
+{% endblock %}
+
+---
+
+## API Contract (AI Context)
+
+{% block api_contract %}
+🤖 **[AI: Provide API contract documentation for third-party integrations]**
+
+**Authentication**: 
+🤖 **[How do consumers authenticate? API keys, OAuth, JWT?]**
+
+**Rate Limits**: 
+🤖 **[Are there rate limits? SLAs?]**
+
+**Error Handling**: 
+🤖 **[How are errors communicated? What error codes are used?]**
+
+**Response Format**: 
+🤖 **[Standardized response envelope? Pagination?]**
+
+{% endblock %}
+
+---
+
+## Data Operations
+
+{% block data_operations %}
+### Create Operations
+
+{% if create_methods %}
+{% for method in create_methods %}
+- `{{ method.name }}()` - Creates {{ method.return_type }}
+{% endfor %}
+{% else %}
+🤖 **[AI: What entities can be created through this service?]**
+{% endif %}
+
+### Read Operations
+
+{% if data_reads %}
+{% for read in data_reads %}
+- **{{ read.operation_type }}** from `{{ read.table_name }}` in `{{ read.method_name }}`
+{% if read.filters %}
+  - Filters: {{ read.filters | join_list() }}
+{% endif %}
+{% endfor %}
+{% else %}
+🤖 **[AI: What queries does this service expose? What tables are read?]**
+{% endif %}
+
+### Update Operations
+
+{% if update_methods %}
+{% for method in update_methods %}
+- `{{ method.name }}()` - Updates {{ method.return_type }}
+{% endfor %}
+{% else %}
+🤖 **[AI: What entities can be updated? Partial updates allowed?]**
+{% endif %}
+
+### Delete Operations
+
+{% if delete_methods %}
+{% for method in delete_methods %}
+- `{{ method.name }}()` - Deletes {{ method.return_type }}
+{% endfor %}
+{% else %}
+🤖 **[AI: Can entities be deleted? Soft delete or hard delete? Cascading deletes?]**
+{% endif %}
+
+{% endblock %}
+
+---
+
+## How It Works
+
+{% block flow %}
+🤖 **[AI: Provide a step-by-step explanation of the service's main workflows]**
+
+### Primary Workflow
+1. User submits a request
+2. System validates the request against business rules
+3. Service queries database for related data
+4. If successful, applies business logic and performs data mutation
+5. Returns result to caller
+
+### Example: [Main Feature Name]
+🤖 **[AI: Walk through one key feature step-by-step with a realistic example]**
+
+{% endblock %}
+
+---
+
+## Questions & Gaps
+
+{% block questions_and_gaps %}
+🤖 **[AI: Document open questions or areas that need clarification]**
+
+### Known Gaps
+- 🤖 **[What's not implemented yet?]**
+- 🤖 **[What's unclear about the design?]**
+- 🤖 **[What needs more investigation?]**
+
+### Assumptions
+- 🤖 **[What are we assuming about external systems?]**
+- 🤖 **[What performance assumptions are we making?]**
+
+{% endblock %}
+
+---
+
+## Data Access Patterns
+
+{% block data_access %}
+### Data Reads (Queries)
+
+{% if data_reads %}
+{% for read in data_reads %}
+- **{{ read.operation_type }}** from `{{ read.table_name }}` in `{{ read.method_name }}`
+{% if read.filters %}
+  - Filters: {{ read.filters | join_list() }}
+{% endif %}
+{% endfor %}
+{% else %}
+🤖 **[AI: What data does this service read? Which tables? What filtering/sorting is applied?]**
+{% endif %}
+
+### Data Writes (Mutations)
+
+{% if data_writes %}
+{% for write in data_writes %}
+- **{{ write.operation_type }}** to `{{ write.table_name }}` in `{{ write.method_name }}`
+{% if write.fields_touched %}
+  - Fields: {{ write.fields_touched | join_list() }}
+{% endif %}
+{% endfor %}
+{% else %}
+🤖 **[AI: What data does this service write/modify? Which tables? What fields change?]**
+{% endif %}
+
+{% endblock %}
+
+---
+
+## Testing Strategy
+
+{% block testing_strategy %}
+🤖 **[AI: How should this service be tested? Unit tests? Integration tests? Key scenarios?]**
+
+### Key Test Scenarios
+
+🤖 **[AI: List critical test cases that cover:]**
+- Happy path scenarios
+- Edge cases and boundary conditions
+- Error scenarios and validation failures
+- Business rule violations
+
+{% endblock %}
+
+---
+
+## Known Issues & Limitations
+
+{% block known_issues %}
+🤖 **[AI: Document any known issues, temporary workarounds, or architectural limitations]**
+
+{% endblock %}
+
+---
+
+## Future Improvements
+
+{% block future_improvements %}
+🤖 **[AI: What improvements or refactorings would enhance this service?]**
+
+{% endblock %}
+
+---
+
+## Related Services
+
+{% block related_services %}
+🤖 **[AI: What other services does this service interact with? How?]**
+
+| Service | Interaction Type | Purpose |
+|---------|-----------------|---------|
+| | | |
+
+{% endblock %}
+
+---
+
+**Source Files Analyzed**: 
+{% for file in source_files %}
+- `{{ file }}`
+{% endfor %}
+
+*This documentation was auto-generated from extracted code. All 🤖 sections require human review and completion.*

@@ -27,13 +27,13 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$SkipVSCode,
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$TemplatesRepo = "https://github.com/reyesmelvinr-emr/core-akr-templates",
     
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$ConfigureRepo
 )
 
@@ -91,14 +91,17 @@ if ($ConfigureRepo) {
         if (Test-Path (Join-Path $RepoPath "packages")) {
             $repoType = "monorepo"
             Write-Info "Auto-detected: Monorepo (packages/ directory found)"
-        } elseif (Test-Path (Join-Path $RepoPath "apps")) {
+        }
+        elseif (Test-Path (Join-Path $RepoPath "apps")) {
             $repoType = "monorepo"
             Write-Info "Auto-detected: Monorepo (apps/ directory found)"
-        } else {
+        }
+        else {
             $repoType = "standard"
             Write-Info "Auto-detected: Standard repository"
         }
-    } else {
+    }
+    else {
         Write-Info "Repository type: $repoType"
     }
     
@@ -107,7 +110,8 @@ if ($ConfigureRepo) {
     $platform = "unknown"
     if ($remoteUrl -match "dev\.azure\.com|visualstudio\.com") {
         $platform = "Azure DevOps"
-    } elseif ($remoteUrl -match "github\.com") {
+    }
+    elseif ($remoteUrl -match "github\.com") {
         $platform = "GitHub"
     }
     Write-Info "Platform: $platform"
@@ -134,17 +138,18 @@ if ($ConfigureRepo) {
         Copy-Item $templatePath $mcpConfigPath -Force
         Write-Step "VS Code MCP configuration installed"
         Write-Info "Location: $mcpConfigPath"
-    } else {
+    }
+    else {
         # Create inline if template doesn't exist
         $mcpConfig = @{
             mcpServers = @{
                 "akr-documentation-server" = @{
                     command = "python"
-                    args = @("$env:AKR_MCP_SERVER_PATH/src/server.py")
-                    env = @{
-                        PYTHONPATH = "$env:AKR_MCP_SERVER_PATH/src"
+                    args    = @("$env:AKR_MCP_SERVER_PATH/src/server.py")
+                    env     = @{
+                        PYTHONPATH              = "$env:AKR_MCP_SERVER_PATH/src"
                         VSCODE_WORKSPACE_FOLDER = "`${workspaceFolder}"
-                        AKR_TEMPLATES_DIR = "$HOME/.akr/templates"
+                        AKR_TEMPLATES_DIR       = "$HOME/.akr/templates"
                     }
                 }
             }
@@ -195,7 +200,8 @@ try {
             exit 1
         }
     }
-} catch {
+}
+catch {
     Write-Error "Python not found in PATH"
     Write-Info "Please install Python 3.10+ from https://www.python.org"
     exit 1
@@ -207,7 +213,8 @@ Write-Step "Step 2: Creating virtual environment"
 if (Test-Path "venv") {
     Write-Warning "Virtual environment already exists. Skipping creation."
     Write-Info "To recreate, delete the 'venv' folder and run setup again."
-} else {
+}
+else {
     Write-Info "Creating venv..."
     python -m venv venv
     
@@ -261,15 +268,18 @@ if (Test-Path $templatesDir) {
         if ($gitStatus -match "Not a git repository") {
             Write-Warning "Directory exists but is not a git repository"
             Write-Info "Please manually remove $templatesDir and run setup again"
-        } else {
+        }
+        else {
             git pull origin main --quiet
             Write-Info "Templates updated successfully"
         }
-    } catch {
+    }
+    catch {
         Write-Warning "Could not update templates: $_"
     }
     Pop-Location
-} else {
+}
+else {
     Write-Info "Cloning core-akr-templates..."
     New-Item -ItemType Directory -Path (Split-Path $templatesDir) -Force | Out-Null
     
@@ -301,7 +311,8 @@ if (-not $SkipVSCode) {
         Write-Warning "GitHub Copilot extension not detected"
         Write-Info "Please install GitHub Copilot from VS Code marketplace"
         Write-Info "Extensions → Search 'GitHub Copilot'"
-    } else {
+    }
+    else {
         Write-Info "GitHub Copilot extension found"
     }
     
@@ -309,11 +320,13 @@ if (-not $SkipVSCode) {
     $mcpConfigPath = Join-Path $vscodeDir "mcp.json"
     if (Test-Path $mcpConfigPath) {
         Write-Info "MCP configuration found: .vscode/mcp.json"
-    } else {
+    }
+    else {
         Write-Warning "MCP configuration not found"
         Write-Info "Expected: .vscode/mcp.json"
     }
-} else {
+}
+else {
     Write-Info "Skipping VS Code configuration (--SkipVSCode specified)"
 }
 
@@ -324,19 +337,59 @@ $logsDir = Join-Path $ScriptDir "logs"
 if (-not (Test-Path $logsDir)) {
     New-Item -ItemType Directory -Path $logsDir | Out-Null
     Write-Info "Created logs directory"
-} else {
+}
+else {
     Write-Info "Logs directory already exists"
 }
 
-# Step 7: Verify installation
-Write-Step "Step 7: Verifying installation"
+# Step 7: Configure global AKR tasks (optional)
+Write-Step "Step 7: Global Task Configuration"
+
+Write-Host "`nWould you like to configure AKR tasks globally for all VS Code workspaces?" -ForegroundColor Yellow
+Write-Info "This allows you to use AKR tasks from any workspace (UI repo, API repo, etc.)"
+Write-Host "Configure global tasks? (Y/N): " -NoNewline -ForegroundColor Yellow
+$response = Read-Host
+
+if ($response -eq "Y" -or $response -eq "y") {
+    Write-Info "Running global task setup..."
+    
+    $setupScript = Join-Path $ScriptDir "scripts\setup_global_tasks.py"
+    if (Test-Path $setupScript) {
+        try {
+            & python $setupScript
+            if ($LASTEXITCODE -eq 0) {
+                Write-Info "Global tasks configured successfully"
+            }
+            else {
+                Write-Warning "Global task setup completed with warnings"
+                Write-Info "You can re-run: python scripts\setup_global_tasks.py"
+            }
+        }
+        catch {
+            Write-Warning "Failed to configure global tasks: $_"
+            Write-Info "You can manually run: python scripts\setup_global_tasks.py"
+        }
+    }
+    else {
+        Write-Warning "Setup script not found: $setupScript"
+        Write-Info "Global task configuration can be done manually later"
+    }
+}
+else {
+    Write-Info "Skipping global task configuration"
+    Write-Info "You can configure later by running: python scripts\setup_global_tasks.py"
+}
+
+# Step 8: Verify installation
+Write-Step "Step 8: Verifying installation"
 
 Write-Info "Checking MCP SDK installation..."
 $mcpVersion = pip show mcp 2>&1
 
 if ($mcpVersion -match "Version: (.+)") {
     Write-Info "MCP SDK version: $($matches[1])"
-} else {
+}
+else {
     Write-Error "MCP SDK not installed correctly"
     exit 1
 }
@@ -344,7 +397,8 @@ if ($mcpVersion -match "Version: (.+)") {
 Write-Info "Verifying server.py..."
 if (Test-Path "src\server.py") {
     Write-Info "Server file found"
-} else {
+}
+else {
     Write-Error "Server file not found: src\server.py"
     exit 1
 }
@@ -386,11 +440,13 @@ if ($response -eq "Y" -or $response -eq "y") {
         if (Test-Path $hookSource) {
             Copy-Item $hookSource $hookDest -Force
             Write-Info "Git hooks installed"
-        } else {
+        }
+        else {
             Write-Warning "Hook script not found: scripts\post-merge"
             Write-Info "Will be available after completing all setup tasks"
         }
-    } else {
+    }
+    else {
         Write-Warning "Not a git repository. Skipping hook installation."
     }
 }

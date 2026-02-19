@@ -9,9 +9,10 @@ Coordinates all components:
 5. File writing with logging
 
 Provides unified validate_and_write() API for integration with server.py.
+Also provides enforce_and_fix_async() for non-blocking enforcement (Phase 4).
 """
 
-import os
+import asyncio
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
 
@@ -39,6 +40,9 @@ class EnforceResult:
     write_warnings: List[str] = None
     dry_run: bool = False
     summary: str = ""
+    suggested_actions: List[str] = None  # NEW: Specific actions to fix violations
+    can_autofix: bool = False             # NEW: Whether auto-fix is available
+    related_docs: List[str] = None       # NEW: Links to relevant documentation
     
     def __post_init__(self):
         """Initialize mutable defaults."""
@@ -48,6 +52,10 @@ class EnforceResult:
             self.write_errors = []
         if self.write_warnings is None:
             self.write_warnings = []
+        if self.suggested_actions is None:
+            self.suggested_actions = []
+        if self.related_docs is None:
+            self.related_docs = []
 
 
 class EnforcementTool:
@@ -260,15 +268,30 @@ def enforce_and_fix(
     file_metadata: FileMetadata,
     config: Dict[str, Any],
     update_mode: str = "replace",
-    dry_run: bool = False
+    dry_run: bool = False,
+    resource_manager: Optional[Any] = None,
 ) -> EnforcementResult:
-    """Validate markdown against template and auto-fix where possible."""
+    """Validate markdown against template and auto-fix where possible.
+    
+    Args:
+        markdown: Content to validate
+        template_name: Template to validate against
+        file_metadata: File metadata for YAML generation
+        config: Configuration dict
+        update_mode: 'replace' or 'merge'
+        dry_run: If True, don't save results
+        resource_manager: Optional shared AKRResourceManager (Phase 2 injection).
+        
+    Returns:
+        EnforcementResult with validation details and auto-fixes
+    """
     enforcement_cfg = (config or {}).get("documentation", {}).get("enforcement", {})
     require_yaml = enforcement_cfg.get("requireYamlFrontmatter", True)
     enforce_section_order = enforcement_cfg.get("enforceSectionOrder", True)
     auto_fix_enabled = enforcement_cfg.get("autoFixEnabled", True)
 
-    schema_builder = TemplateSchemaBuilder()
+    from .template_schema_builder import get_or_create_schema_builder
+    schema_builder = get_or_create_schema_builder(resource_manager)
     parser = BasicDocumentParser()
     yaml_generator = YAMLFrontmatterGenerator()
     validation_engine = ValidationEngine()
@@ -314,3 +337,47 @@ def enforce_and_fix(
         summary=summary,
         auto_fixed=auto_fixed
     )
+
+# ==================== PHASE 4: ASYNC ENFORCEMENT ====================
+async def enforce_and_fix_async(
+    markdown: str,
+    template_name: str,
+    file_metadata: FileMetadata,
+    config: Dict[str, Any],
+    update_mode: str = "replace",
+    dry_run: bool = False,
+    resource_manager: Optional[Any] = None,
+) -> EnforcementResult:
+    """
+    Async wrapper for enforce_and_fix() that runs in a thread pool.
+    
+    Prevents the async event loop from being blocked by CPU-bound validation
+    operations. All validation logic remains in the synchronous enforce_and_fix()
+    function for backward compatibility.
+    
+    Args:
+        markdown: Content to validate
+        template_name: Template to validate against
+        file_metadata: File metadata for YAML generation
+        config: Configuration dict
+        update_mode: 'replace' or 'merge'
+        dry_run: If True, don't save results
+        resource_manager: Optional shared AKRResourceManager (Phase 2).
+    
+    Returns:
+        EnforcementResult with validation details and auto-fixes
+    """
+    # Run CPU-bound enforcement_and_fix in thread pool to avoid blocking event loop
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,  # Use default executor (ThreadPoolExecutor)
+        enforce_and_fix,
+        markdown,
+        template_name,
+        file_metadata,
+        config,
+        update_mode,
+        dry_run,
+        resource_manager,
+    )
+# ================================================================

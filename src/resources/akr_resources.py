@@ -13,6 +13,7 @@ Examples:
     akr://guide/Backend_Service_Documentation_Developer_Guide.md
 """
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
@@ -276,9 +277,43 @@ class AKRResourceManager:
                 return charter
         
         return None
+    
+    # ==================== PHASE 5: ASYNC INITIALIZATION ====================
+    async def async_init(self) -> None:
+        """
+        Async background initialization for resource discovery.
+        
+        Performs resource discovery in thread pool to avoid blocking event loop.
+        Useful for server startup to warm up the lazy caches without blocking.
+        
+        Example:
+            # In server startup
+            resource_mgr = create_resource_manager()
+            await resource_mgr.async_init()  # Discover templates in background
+        """
+        loop = asyncio.get_event_loop()
+        
+        # Discovery happens in thread pool
+        logger.info("🚀 Starting async resource discovery...")
+        
+        # Discover all resource types concurrently
+        await asyncio.gather(
+            loop.run_in_executor(None, self.list_charters),
+            loop.run_in_executor(None, self.list_templates),
+            loop.run_in_executor(None, self.list_guides),
+        )
+        
+        logger.info(
+            f"✅ Async resource discovery complete: "
+            f"{len(self._charters or [])} charters, "
+            f"{len(self._templates or [])} templates, "
+            f"{len(self._guides or [])} guides"
+        )
+    # ================================================================
 
 
 # ==================== NEW CODE: FACTORY FUNCTION ====================
+# ==================== PHASE 5: ASYNC INITIALIZATION ====================
 def create_resource_manager(base_path: Optional[Path] = None) -> AKRResourceManager:
     """
     Create and return a resource manager instance.

@@ -61,7 +61,15 @@
             "autoFixEnabled": true,
             "allowRetry": true,
             "maxRetries": 3,
-            "writeMode": "git"
+            "writeMode": "git",
+            "allowWorkflowBypass": true
         }
+    },
+    "code_analysis": {
+        "enabled": true,
+        "depth": "full",
+        "languages": ["csharp", "typescript", "sql"],
+        "timeout_seconds": 30,
+        "fallback_on_error": "partial"
     }
 }
