@@ -9,21 +9,13 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from server import (
-    health_check,
-    get_server_info,
     list_resources,
-    list_resource_templates,
     read_resource,
-    handle_list_templates,
-    handle_suggest_template,
-    server_state,
-    config,
-    logger,
-    resource_manager
+    list_tools,
+    call_tool,
+    get_resource_manager,
+    logger
 )
 from resources import ResourceCategory
 from datetime import datetime
