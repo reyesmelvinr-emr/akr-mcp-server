@@ -40,19 +40,23 @@ jobs:
         continue-on-error: false
       
       - name: Run test suite with coverage
-        run: pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+        run: pytest tests/ -v --tb=short --cov=src --cov-config=.coveragerc --cov-report=term-missing
         shell: pwsh
       
       - name: Check coverage threshold
         run: |
-          $coverage = pytest tests/ --cov=src --cov-report=term | Select-String "TOTAL.*(\d+)%"
-          if ($coverage -match "TOTAL.*(\d+)%") {
+          $output = pytest tests/ --cov=src --cov-config=.coveragerc --cov-report=term 2>&1 | Out-String
+          if ($output -match "TOTAL.*?(\d+)%") {
             $percent = [int]$matches[1]
             if ($percent -lt 80) {
               Write-Host "❌ Coverage below 80%: $percent%" -ForegroundColor Red
               exit 1
             }
             Write-Host "✅ Coverage threshold met: $percent%" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Could not parse coverage output from pytest" -ForegroundColor Red
+            $output
+            exit 1
           }
         shell: pwsh
 
@@ -86,17 +90,23 @@ jobs:
         continue-on-error: false
       
       - name: Run test suite with coverage
-        run: pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+        run: pytest tests/ -v --tb=short --cov=src --cov-config=.coveragerc --cov-report=term
+        shell: bash
       
       - name: Check coverage threshold
         run: |
-          coverage_line=$(pytest tests/ --cov=src --cov-report=term | grep "TOTAL")
-          percent=$(echo $coverage_line | grep -oP 'TOTAL.*?(\d+)%' | grep -oP '\d+(?=%)')
+          coverage_line=$(pytest tests/ --cov=src --cov-config=.coveragerc --cov-report=term | grep "TOTAL")
+          percent=$(echo "$coverage_line" | grep -oP '\d+(?=%)')
+          if [ -z "$percent" ]; then
+            echo "❌ Could not parse coverage output"
+            exit 1
+          fi
           if [ "$percent" -lt 80 ]; then
             echo "❌ Coverage below 80%: $percent%"
             exit 1
           fi
           echo "✅ Coverage threshold met: $percent%"
+        shell: bash
 
   # Summary job (only runs if all other jobs pass)
   ci-success:
