@@ -211,6 +211,7 @@ None
 {% if referenced_by %}
 {% for ref_table in referenced_by %}
 - [`{{ ref_table }}`](./{{ ref_table }}_doc.md)
+{% endfor %}
 {% else %}
 🤖 **[AI: List tables that have foreign key references to this table]**
 {% endif %}
