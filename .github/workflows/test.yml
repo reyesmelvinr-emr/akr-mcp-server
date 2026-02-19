@@ -65,11 +65,13 @@ jobs:
           percent = int(data['totals']['percent_covered'])
           print(f'Coverage: {percent}%')
           if percent < 80:
-              print(f'❌ Coverage below 80%: {percent}%')
+              print(f'FAILED: Coverage below 80%: {percent}%')
               exit(1)
-          print(f'✅ Coverage threshold met: {percent}%')
+          print(f'SUCCESS: Coverage threshold met: {percent}%')
           "
         shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
 
   # Ubuntu (secondary, for multi-platform CI support)
   test-ubuntu:
@@ -124,11 +126,13 @@ jobs:
           percent = int(data['totals']['percent_covered'])
           print(f'Coverage: {percent}%')
           if percent < 80:
-              print(f'❌ Coverage below 80%: {percent}%')
+              print(f'FAILED: Coverage below 80%: {percent}%')
               exit(1)
-          print(f'✅ Coverage threshold met: {percent}%')
+          print(f'SUCCESS: Coverage threshold met: {percent}%')
           "
         shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
 
   # Summary job (only runs if all other jobs pass)
   ci-success:
