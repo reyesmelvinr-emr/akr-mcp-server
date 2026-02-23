@@ -1,0 +1,3 @@
+[submodule "templates/core"]
+	path = templates/core
+	url = https://github.com/reyesmelvinr-emr/core-akr-templates.git
