@@ -3,6 +3,8 @@ Template schema builder for Phase 1 validation.
 
 Parses template markdown to derive required sections and heading hierarchy.
 Includes in-memory caching with checksum validation.
+
+Dependency: Accepts TemplateResolver (or legacy AKRResourceManager for compatibility)
 """
 
 from __future__ import annotations
@@ -11,8 +13,9 @@ import hashlib
 import re
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
+from resources.template_resolver import TemplateResolver
 from resources.akr_resources import AKRResourceManager
 from .enforcement_tool_types import Section, TemplateSchema
 
@@ -23,7 +26,7 @@ _global_schema_builder: Optional['TemplateSchemaBuilder'] = None
 
 
 def get_or_create_schema_builder(
-    resource_manager: Optional[AKRResourceManager] = None,
+    resolver: Optional[Union[TemplateResolver, AKRResourceManager]] = None,
 ) -> 'TemplateSchemaBuilder':
     """
     Get or create global TemplateSchemaBuilder singleton.
@@ -32,7 +35,8 @@ def get_or_create_schema_builder(
     70-80% performance improvement for repeated templates.
     
     Args:
-        resource_manager: Optional shared AKRResourceManager for phase 2.
+        resolver: Optional TemplateResolver or AKRResourceManager for template loading.
+                 Accepts both for backward compatibility.
     
     Returns:
         Global TemplateSchemaBuilder instance.
@@ -40,9 +44,11 @@ def get_or_create_schema_builder(
     global _global_schema_builder
     
     if _global_schema_builder is None:
-        _global_schema_builder = TemplateSchemaBuilder(resource_manager)
-    elif resource_manager is not None and resource_manager is not _global_schema_builder._resource_manager:
-        _global_schema_builder._resource_manager = resource_manager
+        _global_schema_builder = TemplateSchemaBuilder(resolver)
+    elif resolver is not None:
+        # Update resolver if different instance
+        if isinstance(resolver, TemplateResolver) or isinstance(resolver, AKRResourceManager):
+            _global_schema_builder._resolver = resolver
     
     return _global_schema_builder
 
@@ -156,10 +162,25 @@ class _SchemaCacheEntry:
 
 
 class TemplateSchemaBuilder:
-    """Builds and caches template schemas from markdown templates."""
+    """Builds and caches template schemas from markdown templates.
+    
+    Supports both TemplateResolver (new, Phase 1) and AKRResourceManager (legacy)
+    for backward compatibility.
+    """
 
-    def __init__(self, resource_manager: Optional[AKRResourceManager] = None):
-        self._resource_manager = resource_manager or AKRResourceManager()
+    def __init__(self, resolver: Optional[Union[TemplateResolver, AKRResourceManager]] = None):
+        """
+        Initialize schema builder.
+        
+        Args:
+            resolver: TemplateResolver or AKRResourceManager instance.
+                     If None, creates a default AKRResourceManager.
+        """
+        self._resolver = resolver
+        if self._resolver is None:
+            # Backward compatibility: create AKRResourceManager if nothing provided
+            self._resolver = AKRResourceManager()
+        
         self._schema_cache: dict[str, _SchemaCacheEntry] = {}
 
     def build_schema(self, template_name: str, template_content: str) -> TemplateSchema:
@@ -258,8 +279,24 @@ class TemplateSchemaBuilder:
         return cached.schema if cached else None
 
     def load_template_content(self, template_name: str) -> Optional[str]:
-        """Load template content using AKRResourceManager."""
-        return self._resource_manager.get_resource_content("template", template_name)
+        """
+        Load template content using TemplateResolver or AKRResourceManager.
+        
+        Supports both Phase 1 (TemplateResolver) and legacy (AKRResourceManager).
+        """
+        if isinstance(self._resolver, TemplateResolver):
+            # Phase 1: Use TemplateResolver (3-layer resolution)
+            return self._resolver.get_template(template_name)
+        elif isinstance(self._resolver, AKRResourceManager):
+            # Legacy: Use AKRResourceManager
+            resolved_name = template_name
+            if hasattr(self._resolver, "resolve_template_filename"):
+                resolved, _ = self._resolver.resolve_template_filename(template_name)
+                if resolved:
+                    resolved_name = resolved
+            return self._resolver.get_resource_content("template", resolved_name)
+        else:
+            return None
 
     @staticmethod
     def _calculate_checksum(content: str) -> str:

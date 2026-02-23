@@ -102,7 +102,7 @@ def test_default_role_profiles():
         else:
             print(f"  ✗ {role.value}: NOT FOUND")
     
-    return True
+    return None
 
 
 def test_role_profile_filtering():
@@ -155,7 +155,7 @@ def test_role_profile_filtering():
         assert general_profile.should_ask(category), f"General should answer {category.value}"
     print(f"  ✓ Should answer ALL categories (no filtering)")
     
-    return True
+    return None
 
 
 def test_delegation_suggestions():
@@ -186,7 +186,7 @@ def test_delegation_suggestions():
     assert target == "Technical Lead", f"Expected 'Technical Lead', got '{target}'"
     print(f"  ✓ Correctly suggests Technical Lead for design rationale")
     
-    return True
+    return None
 
 
 def test_interview_session_with_role():
@@ -230,7 +230,7 @@ def test_interview_session_with_role():
         for q in delegated[:3]:  # Show first 3
             print(f"    - {q['section_title']} -> {q['suggested_role']}")
     
-    return True
+    return None
 
 
 def test_all_roles_interview_counts():
@@ -285,7 +285,7 @@ def test_all_roles_interview_counts():
             if total == general_q:
                 print(f"  ✓ {role}: {counts['questions']} + {counts['delegated']} = {general_q} (matches general)")
     
-    return True
+    return None
 
 
 def test_custom_role_profiles():
@@ -348,7 +348,7 @@ def test_custom_role_profiles():
     # Reset back to defaults for other tests
     reset_role_profile_manager()
     
-    return True
+    return None
 
 
 def test_role_profile_manager_list_roles():
@@ -378,7 +378,7 @@ def test_role_profile_manager_list_roles():
         assert exp in role_keys, f"Expected role '{exp}' not found"
     print(f"\n  ✓ All {len(expected)} expected roles found")
     
-    return True
+    return None
 
 
 async def main():
@@ -402,13 +402,9 @@ async def main():
     
     for name, test_func in tests:
         try:
-            result = test_func()
-            if result:
-                passed += 1
-                print(f"\n  ✓ {name}: PASSED")
-            else:
-                failed += 1
-                print(f"\n  ✗ {name}: FAILED")
+            test_func()
+            passed += 1
+            print(f"\n  ✓ {name}: PASSED")
         except Exception as e:
             failed += 1
             print(f"\n  ✗ {name}: ERROR - {str(e)}")

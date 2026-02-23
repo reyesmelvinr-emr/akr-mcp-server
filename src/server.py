@@ -16,8 +16,9 @@ from mcp.server.models import (
 )
 
 
-# Import AKR resource manager
+# Import AKR resource manager and resolver
 from resources import AKRResourceManager, ResourceCategory, create_resource_manager
+from resources.template_resolver import TemplateResolver, create_template_resolver
 
 # ==================== FIXED: Remove invalid imports ====================
 # Import workspace tools
@@ -52,6 +53,20 @@ def get_resource_manager():
         # requires: from resources import create_resource_manager
         resource_manager = create_resource_manager()
     return resource_manager
+
+
+def get_template_resolver():
+    """
+    Create the TemplateResolver on first use and return it.
+    Safe to call repeatedly.
+    """
+    global template_resolver
+    if template_resolver is None:
+        # Create TemplateResolver with configured settings
+        repo_root = Path(__file__).parent.parent  # src/.. → repo root
+        cfg = load_config() if config is None else config
+        template_resolver = create_template_resolver(repo_root, cfg)
+    return template_resolver
 
 
 # ==================== PHASE 3: SESSION CACHE ====================
@@ -93,6 +108,7 @@ server = Server("akr-documentation-server")
 
 # Global state (initialized lazily in fast mode)
 resource_manager: Optional[AKRResourceManager] = None
+template_resolver: Optional[TemplateResolver] = None
 workspace_manager: Optional[object] = None
 config: Optional[dict] = None
 enforcement_logger = None
@@ -146,7 +162,7 @@ def ensure_initialized():
     This function is called before any tool/resource is accessed,
     but skipped during server startup in fast mode.
     """
-    global resource_manager, workspace_manager, config, workflow_tracker, duplicate_detector
+    global resource_manager, template_resolver, workspace_manager, config, workflow_tracker, duplicate_detector
     
     if resource_manager is not None:
         # Already initialized
@@ -178,6 +194,11 @@ def ensure_initialized():
         resource_manager = create_resource_manager()
         logger.info("✅ Resource manager created")
         
+        # Create template resolver (Phase 1 - TemplateResolver)
+        repo_root = Path(__file__).parent.parent
+        template_resolver = create_template_resolver(repo_root, config)
+        logger.info("✅ Template resolver created (3-layer loading enabled)")
+        
         # Create workspace manager (no workspace scan in fast mode)
         if not FAST_MODE:
             workspace_manager = create_workspace_manager(load_config=False)
@@ -193,31 +214,137 @@ def ensure_initialized():
 
 @server.list_resources()
 async def list_resources() -> list[Resource]:
-    mgr = get_resource_manager()
+    """
+    List all available AKR resources (templates, charters).
+    
+    Uses TemplateResolver (Phase 1) with 3-layer loading:
+    1. Submodule (templates/core/) - primary
+    2. Local overrides (akr_content/templates/) - fallback
+    3. Remote HTTP fetch (optional) - preview
+    """
+    ensure_initialized()
+    resolver = get_template_resolver()
+    
     resources: list[Resource] = []
-    for r in mgr.list_resources():
+    
+    # Add all available templates as resources
+    template_ids = resolver.list_templates()
+    for template_id in template_ids:
+        uri = f"akr://template/{template_id}"
         resources.append(
             Resource(
-                uri=r.uri,
-                name=r.name,
-                description=r.description,
-                mimeType=r.mime_type,
+                uri=uri,
+                name=f"Template: {template_id}",
+                description=f"AKR documentation template: {template_id}",
+                mimeType="text/markdown",
             )
         )
+    
+    # Add charters as resources  
+    # (Note: charters loaded from akr_content/ via legacy AKRResourceManager)
+    mgr = get_resource_manager()
+    for charter in mgr.list_charters():
+        uri = f"akr://charter/{charter.name}"
+        resources.append(
+            Resource(
+                uri=uri,
+                name=f"Charter: {charter.name}",
+                description=charter.description,
+                mimeType="text/markdown",
+            )
+        )
+    
+    logger.info(f"✅ Listed {len(resources)} resources ({len(template_ids)} templates + {len(mgr.list_charters())} charters)")
     return resources
 
 
-@server.read_resource()
-async def read_resource(uri: str) -> str:
+@server.read_resource(uri_pattern="akr://template/{template_id}")
+async def read_template_resource(uri: str) -> str:
+    """
+    Read a specific template resource.
+    
+    Args:
+        uri: Resource URI (e.g., akr://template/lean_baseline_service_template)
+    
+    Returns:
+        Template content as markdown
+    """
+    ensure_initialized()
+    resolver = get_template_resolver()
+    
+    # Extract template_id from URI
+    template_id = uri.replace("akr://template/", "")
+    
+    content = resolver.get_template(template_id)
+    if content:
+        logger.debug(f"✅ Read template resource: {uri}")
+        return content
+    
+    # Template not found - return helpful error
+    available = resolver.list_templates()
+    error_msg = f"Template not found: {template_id}\n\nAvailable templates:\n"
+    error_msg += "\n".join(f"  - akr://template/{t}" for t in sorted(available))
+    return error_msg
+
+
+@server.read_resource(uri_pattern="akr://charter/{domain}")
+async def read_charter_resource(uri: str) -> str:
+    """
+    Read a specific charter resource.
+    
+    Args:
+        uri: Resource URI (e.g., akr://charter/backend)
+    
+    Returns:
+        Charter content as markdown
+    """
+    ensure_initialized()
     mgr = get_resource_manager()
-    content = mgr.read_resource(uri)
-    if content is None:
-        available = [res.uri for res in mgr.list_resources()]
-        msg = "Resource not found: {0}\n\nAvailable resources:\n{1}".format(
-            uri, "\n".join(f" - {u}" for u in sorted(available))
+    
+    # Extract domain from URI
+    domain = uri.replace("akr://charter/", "")
+    
+    charter = mgr.get_charter(domain)
+    if charter:
+        content = charter.load_content()
+        logger.debug(f"✅ Read charter resource: {uri}")
+        return content
+    
+    # Charter not found - return helpful error
+    available_domains = ["ui", "backend", "database"]
+    error_msg = f"Charter not found for domain: {domain}\n\nAvailable charters:\n"
+    error_msg += "\n".join(f"  - akr://charter/{d}" for d in available_domains)
+    return error_msg
+
+
+@server.list_resource_templates()
+async def list_resource_templates() -> list[ResourceTemplate]:
+    """
+    List MCP resource templates that allow clients to construct resource URIs dynamically.
+    
+    MCP clients (like Copilot Chat) use these templates to discover how to construct
+    valid resource URIs without enumerating all resources first.
+    
+    Returns:
+        List of ResourceTemplate objects with uriTemplate patterns
+    """
+    ensure_initialized()
+    
+    templates = [
+        ResourceTemplate(
+            uriTemplate="akr://template/{id}",
+            name="AKR Documentation Templates",
+            description="Access AKR documentation templates by ID (e.g., lean_baseline_service_template, standard_service_template)"
+        ),
+        ResourceTemplate(
+            uriTemplate="akr://charter/{domain}",
+            name="AKR Charters",
+            description="Access AKR domain charters by domain: backend, ui, database"
         )
-        return msg
-    return content
+    ]
+    
+    logger.info(f"✅ Listed {len(templates)} resource templates")
+    return templates
 
 
 @server.list_tools()
@@ -272,7 +399,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "template": {
                         "type": "string",
-                        "description": "Template to use (optional; defaults based on component_type)"
+                        "description": "Template filename or shortcut (optional; defaults based on component_type)"
                     }
                 },
                 "required": ["component_name", "component_type"]
@@ -314,7 +441,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "template": {
                         "type": "string",
-                        "description": "Template file to use (optional; auto-selected based on component_type/project_type)"
+                        "description": "Template filename or shortcut (optional; auto-selected based on component_type/project_type)"
                     },
                     "doc_path": {
                         "type": "string",
@@ -376,7 +503,7 @@ async def list_tools() -> list[Tool]:
                     "content": {"type": "string", "description": "Markdown content (REQUIRED)"},
                     "source_file": {"type": "string", "description": "Repo-relative source code file path, e.g. src/handler.cs"},
                     "doc_path": {"type": "string", "description": "Repo-relative output doc path, e.g. docs/api.md"},
-                    "template": {"type": "string", "description": "Template filename, e.g. lean_baseline_service_template.md"},
+                    "template": {"type": "string", "description": "Template filename or shortcut, e.g. lean_baseline_service_template.md or lean"},
                     "component_type": {"type": "string", "description": "Component type, e.g. service, controller"},
                     "overwrite": {"type": "boolean", "default": False},
                     "force_workflow_bypass": {
@@ -400,7 +527,7 @@ async def list_tools() -> list[Tool]:
                         "additionalProperties": {"type": "string"},
                         "description": "Map of section_id to new content"
                     },
-                    "template": {"type": "string", "description": "Template filename, e.g. lean_baseline_service_template.md"},
+                    "template": {"type": "string", "description": "Template filename or shortcut, e.g. lean_baseline_service_template.md or lean"},
                     "source_file": {"type": "string", "description": "Repo-relative source code file path"},
                     "component_type": {"type": "string", "description": "Component type, e.g. service, controller"},
                     "add_changelog": {"type": "boolean", "default": True},
@@ -611,6 +738,18 @@ def _build_stub_content(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _resolve_template_name(template: str) -> tuple[Optional[str], list[str]]:
+    """Resolve template name shortcuts to a concrete filename.
+
+    Returns (resolved_name, matches). If resolved_name is None and matches
+    is non-empty, the input is ambiguous.
+    """
+    rm = get_resource_manager()
+    if hasattr(rm, "resolve_template_filename"):
+        return rm.resolve_template_filename(template)
+    return template, []
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute an AKR documentation tool."""
@@ -645,6 +784,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         template = arguments.get("template", "lean_baseline_service_template.md")
         source_file = arguments.get("source_file", "")
         doc_path = arguments.get("doc_path", f"docs/{component_name}.md")
+
+        resolved_template, template_matches = _resolve_template_name(template)
+        if not resolved_template:
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": f"Template '{template}' is ambiguous." if template_matches else f"Template '{template}' not found.",
+                "matches": template_matches,
+                "hint": "Specify the full template filename if multiple matches exist"
+            }, indent=2))]
+        template = resolved_template
         
         # Validate template exists BEFORE attempting to use it
         try:
@@ -814,6 +963,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     "database": "table_doc_template.md"
                 }
                 template = template_map.get(project_type, "lean_baseline_service_template.md")
+
+            resolved_template, template_matches = _resolve_template_name(template)
+            if not resolved_template:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Template '{template}' is ambiguous." if template_matches else f"Template '{template}' not found.",
+                    "matches": template_matches,
+                    "hint": "Specify the full template filename if multiple matches exist"
+                }, indent=2))]
+            template = resolved_template
             
             # Validate template exists
             try:
@@ -969,14 +1128,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     elif name == "write_documentation":
         try:
             repo_path = str(Path(__file__).parent.parent)
+
+            template_input = arguments.get("template", "lean_baseline_service_template.md")
+            resolved_template, template_matches = _resolve_template_name(template_input)
+            if not resolved_template:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Template '{template_input}' is ambiguous." if template_matches else f"Template '{template_input}' not found.",
+                    "matches": template_matches,
+                    "hint": "Specify the full template filename if multiple matches exist"
+                }, indent=2))]
+            template = resolved_template
             
             # Extract progress token (if client supports it; MCP 2025-11-25+)
             progress_token = arguments.get("_meta", {}).get("progressToken")
             
             # Create operation metrics
-            metrics = OperationMetrics(
-                template_name=arguments.get("template", "lean_baseline_service_template.md")
-            )
+            metrics = OperationMetrics(template_name=template)
 
             # Create progress tracker
             tracker = ProgressTracker(
@@ -991,7 +1159,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 content=arguments.get("content"),
                 source_file=arguments.get("source_file"),
                 doc_path=arguments.get("doc_path"),
-                template=arguments.get("template", "lean_baseline_service_template.md"),
+                template=template,
                 component_type=arguments.get("component_type", "unknown"),
                 overwrite=arguments.get("overwrite", False),
                 force_workflow_bypass=arguments.get("force_workflow_bypass", False),
@@ -1020,7 +1188,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 content=arguments.get("content"),
                 source_file=arguments.get("source_file"),
                 doc_path=arguments.get("doc_path"),
-                template=arguments.get("template", "lean_baseline_service_template.md"),
+                template=template,
                 component_type=arguments.get("component_type", "unknown"),
                 overwrite=arguments.get("overwrite", False),
                 force_workflow_bypass=arguments.get("force_workflow_bypass", False)
@@ -1037,14 +1205,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     elif name == "update_documentation_sections":
         try:
             repo_path = str(Path(__file__).parent.parent)
+
+            template_input = arguments.get("template", "lean_baseline_service_template.md")
+            resolved_template, template_matches = _resolve_template_name(template_input)
+            if not resolved_template:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Template '{template_input}' is ambiguous." if template_matches else f"Template '{template_input}' not found.",
+                    "matches": template_matches,
+                    "hint": "Specify the full template filename if multiple matches exist"
+                }, indent=2))]
+            template = resolved_template
             
             # Extract progress token (if client supports it)
             progress_token = arguments.get("_meta", {}).get("progressToken")
             
             # Create operation metrics
-            metrics = OperationMetrics(
-                template_name=arguments.get("template", "lean_baseline_service_template.md")
-            )
+            metrics = OperationMetrics(template_name=template)
 
             # Create progress tracker
             tracker = ProgressTracker(
@@ -1058,7 +1235,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 repo_path=repo_path,
                 doc_path=arguments.get("doc_path"),
                 section_updates=arguments.get("section_updates"),
-                template=arguments.get("template", "lean_baseline_service_template.md"),
+                template=template,
                 source_file=arguments.get("source_file", ""),
                 component_type=arguments.get("component_type", "unknown"),
                 add_changelog=arguments.get("add_changelog", True),
@@ -1085,7 +1262,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 repo_path=repo_path,
                 doc_path=arguments.get("doc_path"),
                 section_updates=arguments.get("section_updates"),
-                template=arguments.get("template", "lean_baseline_service_template.md"),
+                template=template,
                 source_file=arguments.get("source_file", ""),
                 component_type=arguments.get("component_type", "unknown"),
                 add_changelog=arguments.get("add_changelog", True),
@@ -1100,7 +1277,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 repo_path=repo_path,
                 doc_path=arguments.get("doc_path"),
                 section_updates=arguments.get("section_updates"),
-                template=arguments.get("template", "lean_baseline_service_template.md"),
+                template=template,
                 source_file=arguments.get("source_file", ""),
                 component_type=arguments.get("component_type", "unknown"),
                 add_changelog=arguments.get("add_changelog", True),

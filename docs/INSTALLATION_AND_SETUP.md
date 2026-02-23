@@ -1,6 +1,54 @@
 # Installation and Setup Guide
 
-This guide walks you through setting up AKR-MCP-Server on your local machine and configuring it for your project.
+## ⭐ PHASE 1: Git Submodule Setup (REQUIRED)
+
+Starting with **v0.2.0**, AKR templates are managed via Git submodule (`core-akr-templates`). You **MUST** initialize the submodule after cloning.
+
+### Initialize Submodule (All Platforms)
+
+#### Windows (PowerShell)
+```powershell
+cd akr-mcp-server
+git submodule update --init --recursive
+```
+
+#### macOS/Linux (Bash)
+```bash
+cd akr-mcp-server
+git submodule update --init --recursive
+```
+
+### Verify Submodule Loaded
+
+Check that templates were downloaded successfully:
+
+#### Windows (PowerShell)
+```powershell
+# Should list template files
+Get-ChildItem templates/core/*.md | Select -First 5
+
+# Should show recent commit
+git submodule foreach git log -1 --oneline
+```
+
+#### macOS/Linux (Bash)
+```bash
+# Should list template files
+ls templates/core/*.md | head -5
+
+# Should show recent commit
+git submodule foreach git log -1 --oneline
+```
+
+**Expected output:**
+```
+templates/core
+1a2b3c4 chore: update templates for v1.3.0
+```
+
+⚠️ **If submodule is empty:** Templates will not load, and the server won't find `TEMPLATE_MANIFEST.json`. See [Troubleshooting](#submodule-not-present) for solutions.
+
+---
 
 ## Prerequisites
 
@@ -8,7 +56,7 @@ Before you begin, ensure you have:
 
 - **Python 3.10+** — [Download Python](https://www.python.org/downloads/)
 - **Node.js 16+** (for UI projects) — [Download Node.js](https://nodejs.org/)
-- **Git** — [Download Git](https://git-scm.com/)
+- **Git 2.13+** (for submodule support) — [Download Git](https://git-scm.com/)
 - **Visual Studio Code** — [Download VS Code](https://code.visualstudio.com/)
 - **GitHub Copilot Subscription** — Required for MCP integration with GitHub Copilot
 
@@ -17,7 +65,7 @@ For **API/Database projects** (C#):
 
 ---
 
-## Step 1: Clone and Verify AKR-MCP-Server
+## Step 1: Clone and Initialize Repository
 
 ```bash
 # Clone the repository (if not already done)
@@ -193,7 +241,61 @@ Follow the quick start guide for your project type:
 
 ## Troubleshooting
 
-### Issue: Python not found
+### Submodule Issues (Phase 1 — CRITICAL)
+
+<a name="submodule-not-present"></a>
+
+#### Issue: Submodule directory is empty (templates/core/)
+This means Git didn't clone the submodule content. The TemplateResolver will fail with: `"[ERROR] TEMPLATE_MANIFEST.json not found in submodule"`
+
+**Solution:**
+```bash
+# Initialize submodule (if you haven't already)
+git submodule update --init --recursive
+
+# Or, if the submodule was already cloned but is empty:
+git submodule update --remote --merge
+cd templates/core
+git fetch origin
+git checkout main   # or the pinned tag
+cd ../..
+
+# Verify submodule is now populated
+ls -la templates/core/*.md
+```
+
+#### Issue: "fatal: No submodule mapping found in .gitmodules"
+**Solution:**
+```bash
+# Check if .gitmodules exists and contains the templates/core entry
+cat .gitmodules
+
+# If missing, you need to add the submodule:
+git submodule add https://github.com/reyesmelvinr-emr/core-akr-templates.git templates/core
+git add .gitmodules templates/core
+git commit -m "chore: restore templates submodule"
+```
+
+#### Issue: Submodule at HEAD (not pinned to tag)
+This can cause non-reproducible builds. You should pin to a specific version tag.
+
+**Solution:**
+See [VERSION_MANAGEMENT.md](VERSION_MANAGEMENT.md) for how to properly pin submodule versions and handle updates.
+
+**Quick fix (temporary):**
+```bash
+cd templates/core
+git checkout v1.0.0   # or your desired tag
+cd ../..
+git add templates/core
+git commit -m "chore: pin templates to v1.0.0"
+```
+
+---
+
+### General Setup Issues
+
+#### Issue: Python not found
 **Solution:**
 - Verify Python installation: `python --version`
 - Add Python to PATH: [Python Windows PATH Setup](https://docs.python.org/3/using/windows.html)

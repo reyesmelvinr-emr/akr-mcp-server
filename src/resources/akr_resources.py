@@ -200,6 +200,92 @@ class AKRResourceManager:
     def list_templates(self) -> List[AKRResource]:
         """List all available template resources."""
         return self._discover_templates()
+
+    def resolve_template_filename(self, template_name: str) -> tuple[Optional[str], List[str]]:
+        """Resolve a user-provided template name to a concrete filename.
+
+        Supports:
+        - Exact filename match
+        - Case-insensitive match
+        - Name without .md extension
+        - Simple aliases (e.g., "lean", "standard", "ui")
+        - Partial stem match when unambiguous
+
+        Returns:
+            (resolved_filename, matches)
+            - resolved_filename is None when no match or ambiguous
+            - matches contains candidate filenames when ambiguous
+        """
+        if not template_name:
+            return None, []
+
+        raw = template_name.strip()
+        if raw.startswith("akr://template/"):
+            raw = raw.split("akr://template/", 1)[1]
+
+        available = [t.filename for t in self.list_templates()]
+        if not available:
+            return None, []
+
+        if raw in available:
+            return raw, [raw]
+
+        lowered = raw.lower()
+        lower_map = {name.lower(): name for name in available}
+        if lowered in lower_map:
+            match = lower_map[lowered]
+            return match, [match]
+
+        def normalize(value: str) -> str:
+            cleaned = value.strip().lower()
+            if cleaned.startswith("akr://template/"):
+                cleaned = cleaned.split("akr://template/", 1)[1]
+            if cleaned.endswith(".md"):
+                cleaned = cleaned[:-3]
+            cleaned = cleaned.replace("-", "_").replace(" ", "_")
+            while "__" in cleaned:
+                cleaned = cleaned.replace("__", "_")
+            return cleaned
+
+        normalized_input = normalize(raw)
+        alias_map = {
+            "lean": "lean_baseline_service_template.md",
+            "baseline": "lean_baseline_service_template.md",
+            "lean_baseline": "lean_baseline_service_template.md",
+            "standard": "standard_service_template.md",
+            "comprehensive": "comprehensive_service_template.md",
+            "minimal": "minimal_service_template.md",
+            "ui": "ui_component_template.md",
+            "ui_component": "ui_component_template.md",
+            "table": "table_doc_template.md",
+            "database": "table_doc_template.md",
+        }
+        if normalized_input in alias_map:
+            candidate = alias_map[normalized_input]
+            if candidate in available:
+                return candidate, [candidate]
+
+        stem_map: Dict[str, List[str]] = {}
+        for filename in available:
+            stem_key = normalize(Path(filename).stem)
+            stem_map.setdefault(stem_key, []).append(filename)
+
+        if normalized_input in stem_map:
+            matches = stem_map[normalized_input]
+            if len(matches) == 1:
+                return matches[0], matches
+            return None, matches
+
+        partial_matches = [
+            name for name in available
+            if normalized_input and normalized_input in normalize(Path(name).stem)
+        ]
+        if len(partial_matches) == 1:
+            return partial_matches[0], partial_matches
+        if len(partial_matches) > 1:
+            return None, partial_matches
+
+        return None, []
     
     def list_guides(self) -> List[AKRResource]:
         """List all available guide resources."""
