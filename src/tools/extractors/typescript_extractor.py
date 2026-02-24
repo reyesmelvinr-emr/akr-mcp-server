@@ -1,6 +1,19 @@
 """
+⚠️ DEPRECATED in v0.2.0
+
 TypeScript/React code extractor for analyzing UI component files.
 
+DEPRECATION NOTICE:
+- This extractor uses heuristic-based regex patterns to analyze code.
+- For more accurate results, use Copilot Chat with extracted code context and AKR charters.
+- This module will be removed in v1.0.0.
+
+For better semantic analysis, consider:
+1. Copy-paste relevant code into Copilot Chat
+2. Reference the UI component charter at akr://charter/ui
+3. Ask Chat to analyze the component and generate documentation
+
+Legacy behavior:
 Extracts component props, state, event handlers, hooks, and child components
 from TypeScript/React/TSX source files.
 """

@@ -1,6 +1,20 @@
 """
+⚠️ DEPRECATED in v0.2.0
+
 Failure mode extractor for identifying and documenting exception scenarios.
 
+DEPRECATION NOTICE:
+- This extractor uses heuristic-based regex to identify failure modes from exception handling.
+- Results are often incomplete or incorrect due to reliance on code patterns.
+- For comprehensive failure mode analysis, use Copilot Chat with failure mode charters.
+- This module will be removed in v1.0.0.
+
+For better semantic analysis, consider:
+1. Copy-paste exception handling code into Copilot Chat
+2. Ask Chat to identify all possible failure modes
+3. Document failure modes against the backend charter
+
+Legacy behavior:
 Parses try/catch/finally blocks, extracts exception types, and correlates them
 with dependency usage and operation types to create failure scenario documentation.
 """

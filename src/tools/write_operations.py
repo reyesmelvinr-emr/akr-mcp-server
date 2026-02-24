@@ -29,6 +29,20 @@ from .operation_metrics import OperationMetrics
 logger = logging.getLogger("akr-mcp-server.tools.write_operations")
 
 
+def _check_write_permissions(allow_writes: bool) -> Optional[dict]:
+    if os.getenv("AKR_ENABLE_WRITE_OPS", "false").lower() != "true":
+        return error_response(
+            ErrorType.PERMISSION_DENIED,
+            "Write operations are disabled by default. Set AKR_ENABLE_WRITE_OPS=true to enable."
+        )
+    if not allow_writes:
+        return error_response(
+            ErrorType.PERMISSION_DENIED,
+            "Write operations require allowWrites=true to proceed."
+        )
+    return None
+
+
 class TelemetryLogger(Protocol):
     """Protocol for telemetry logging."""
     def log_event(self, event: dict) -> None:
@@ -346,7 +360,8 @@ def write_documentation(
     overwrite: bool = False,
     config: dict | None = None,
     telemetry_logger: Optional[TelemetryLogger] = None,
-    force_workflow_bypass: bool = False
+    force_workflow_bypass: bool = False,
+    allowWrites: bool = False,
 ) -> dict:
     """
     Write new documentation to the repository.
@@ -364,6 +379,10 @@ def write_documentation(
     Returns:
         Dictionary with result information
     """
+    permission_error = _check_write_permissions(allowWrites)
+    if permission_error:
+        return permission_error
+
     config = config or {}
     enforcement_cfg = config.get("documentation", {}).get("enforcement", {})
     if not enforcement_cfg or not enforcement_cfg.get("enabled", False):
@@ -539,6 +558,7 @@ async def write_documentation_async(
     force_workflow_bypass: bool = False,
     resource_manager: Optional[object] = None,
     session_cache: Optional[object] = None,
+    allowWrites: bool = False,
 ) -> dict:
     """
     Write new documentation to the repository (ASYNC with progress tracking).
@@ -560,6 +580,10 @@ async def write_documentation_async(
     Returns:
         Dictionary with result information (includes operationMetrics)
     """
+    permission_error = _check_write_permissions(allowWrites)
+    if permission_error:
+        return permission_error
+
     config = config or {}
     metrics = operation_metrics or OperationMetrics(template_name=template)
     metrics.start_stage("validation")
@@ -995,11 +1019,16 @@ def update_documentation_sections_and_commit(
     add_changelog: bool = True,
     overwrite: bool = True,
     config: dict | None = None,
-    telemetry_logger: Optional[TelemetryLogger] = None
+    telemetry_logger: Optional[TelemetryLogger] = None,
+    allowWrites: bool = False,
 ) -> dict:
     """
     Update documentation sections, enforce template, and commit changes.
     """
+    permission_error = _check_write_permissions(allowWrites)
+    if permission_error:
+        return permission_error
+
     config = config or {}
     enforcement_cfg = config.get("documentation", {}).get("enforcement", {})
     if not enforcement_cfg or not enforcement_cfg.get("enabled", False):
@@ -1149,13 +1178,18 @@ async def update_documentation_sections_and_commit_async(
     config: dict | None = None,
     telemetry_logger: Optional[TelemetryLogger] = None,
     progress_tracker: Optional[ProgressTracker] = None,
-    operation_metrics: Optional[OperationMetrics] = None
+    operation_metrics: Optional[OperationMetrics] = None,
+    allowWrites: bool = False,
 ) -> dict:
     """
     Update documentation sections, enforce template, and commit changes (ASYNC).
     
     Includes real-time progress notifications and operation metrics.
     """
+    permission_error = _check_write_permissions(allowWrites)
+    if permission_error:
+        return permission_error
+
     config = config or {}
     metrics = operation_metrics or OperationMetrics(template_name=template)
     metrics.start_stage("validation")

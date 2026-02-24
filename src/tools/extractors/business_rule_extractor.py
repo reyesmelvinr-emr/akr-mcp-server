@@ -1,10 +1,24 @@
 """
+⚠️ DEPRECATED in v0.2.0
+
 Business Rule & Use Case Extractor - Phase 9 Enhancement
 
+DEPRECATION NOTICE:
+- This extractor uses heuristic-based regex patterns to infer business rules.
+- Accuracy is limited by heuristic matching; human review is error-prone.
+- For more accurate business rule capture, use Copilot Chat with code context and business logic charters.
+- This module will be removed in v1.0.0.
+
+For better semantic analysis, consider:
+1. Copy-paste relevant code sections into Copilot Chat
+2. Reference the backend charter at akr://charter/backend
+3. Ask Chat to identify business rules and constraints
+
+Legacy behavior:
 Extracts business rules, constraints, invariants, and use cases from C# code.
 Generates FAQ scaffolding from exception messages.
 
-Key capabilities:
+Key legacy capabilities:
 - Extracts business rules from validation patterns
 - Identifies constraints from exception messages
 - Infers invariants from conditional logic

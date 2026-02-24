@@ -1,10 +1,24 @@
 """
+⚠️ DEPRECATED in v0.2.0
+
 Method Flow Analyzer - Phase 8 Enhancement
 
+DEPRECATION NOTICE:
+- This extractor uses heuristic-based regex to trace method execution flows.
+- Flow diagrams are often incomplete or incorrect due to complex control flow.
+- For accurate operation flow analysis, use Copilot Chat with flow context.
+- This module will be removed in v1.0.0.
+
+For better semantic analysis, consider:
+1. Copy-paste relevant method code into Copilot Chat
+2. Ask Chat to generate step-by-step operation flow
+3. Request ASCII diagrams for complex flows
+
+Legacy behavior:
 Extracts step-by-step operation flows from C# method bodies.
 Generates ASCII flow diagrams for documentation.
 
-Key capabilities:
+Key legacy capabilities:
 - Identifies validation steps
 - Detects database queries and persistence operations
 - Extracts business logic steps

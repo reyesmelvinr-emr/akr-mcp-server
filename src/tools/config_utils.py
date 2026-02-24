@@ -60,6 +60,7 @@ class ErrorType(str, Enum):
     WRITE_FAILED = "WRITE_FAILED"
     COMMIT_FAILED = "COMMIT_FAILED"
     WORKFLOW_VIOLATION = "WORKFLOW_VIOLATION"
+    PERMISSION_DENIED = "PERMISSION_DENIED"
 
 
 def error_response(error_type: ErrorType, message: str, **extras: object) -> dict:

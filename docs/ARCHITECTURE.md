@@ -1,554 +1,395 @@
-# System Architecture
+# AKR MCP Server v0.2.0 - Architecture
 
-This document describes the high-level architecture of AKR-MCP-Server, technology decisions, and how components interact.
+## Overview
 
-## System Overview
+The AKR MCP Server is a **design-centric documentation generator** that integrates with Copilot Chat to create technical charters, architecture documents, and compliance records. Rather than automatically generating documentation, it acts as an intelligent **template provider and validation engine**, enabling developers to leverage AI-assisted drafting with structured guidance.
 
-AKR-MCP-Server is a documentation automation system that bridges GitHub Copilot with your codebase to generate and maintain architecture documentation.
+### v0.2.0 Design Shift
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                  GitHub Copilot Chat                     │
-│  "Generate docs for PaymentService"                      │
-└────────────────────┬────────────────────────────────────┘
-                     │ MCP Protocol
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│              MCP Server (Python)                         │
-│  • Handles tool calls (generate, write, update)          │
-│  • Routes to appropriate handlers                        │
-│  • Manages async I/O with Copilot                        │
-└────────────────────┬────────────────────────────────────┘
-                     │
-         ┌───────────┼───────────┐
-         ▼           ▼           ▼
-    ┌────────┐  ┌────────┐  ┌──────────┐
-    │Generate│  │ Write  │  │  Update  │
-    │  Docs  │  │  Docs  │  │Sections  │
-    └─┬──────┘  └───┬────┘  └──────┬───┘
-      │             │              │
-      ▼             ▼              ▼
-      Code        Template      Validation
-      Analysis    Rendering     & Enforcement
-          │           │              │
-          └───────────┼──────────────┘
-                      ▼
-         ┌──────────────────────────┐
-         │  File System & Git       │
-         │  • docs/*.md files       │
-         │  • enforcement.jsonl log │
-         │  • git commits           │
-         └──────────────────────────┘
-```
+**Old Model (v0.1.0):** Automatic analysis → heuristic extraction → document generation  
+**New Model (v0.2.0):** Code context extraction → human/Chat review → structured validation → write on demand
 
-## Key Technologies
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| **Protocol** | Model Context Protocol (MCP) | GitHub Copilot official spec for tool integration |
-| **Runtime** | Python 3.10+ | Fast development, mature ecosystem |
-| **Templating** | Jinja2 | Flexible template engine with custom filters |
-| **Data Format** | YAML + Markdown | Human-readable, git-friendly, standard |
-| **Parsing** | AST + Regex | C# parsing via Roslyn, TypeScript via TypeScript compiler API, SQL via simple regex |
-| **Validation** | Custom schemas | Enforce AKR compliance standards |
-| **Telemetry** | JSON Lines | Streaming logs without need for database |
-| **Version Control** | Git | Track documentation changes alongside code |
-
-## Architecture Patterns
-
-### 1. Layered Architecture
+## High-Level Architecture
 
 ```
-┌───────────────────────────────────┐
-│      Presentation Layer           │
-│   (GitHub Copilot via MCP)        │
-└────────────────┬──────────────────┘
-                 │
-┌────────────────▼──────────────────┐
-│      Application Layer            │
-│   • Tool handlers (generate, write)│
-│   • Orchestration logic           │
-│   • Error handling & response      │
-└────────────────┬──────────────────┘
-                 │
-┌────────────────▼──────────────────┐
-│     Business Logic Layer          │
-│   • Code analysis                 │
-│   • Template rendering            │
-│   • Validation & enforcement      │
-│   • Telemetry                     │
-└────────────────┬──────────────────┘
-                 │
-┌────────────────▼──────────────────┐
-│      Data Access Layer            │
-│   • File I/O                      │
-│   • Git operations                │
-│   • Configuration loading         │
-└───────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Copilot Chat Interface                   │
+│         (Browser-based with integrated MCP resources)       │
+└────────────┬──────────────────────────────────────┬─────────┘
+             │                                      │
+    ┌────────▼─────────────┐             ┌─────────▼──────────┐
+    │ MCP Resources Layer  │             │  MCP Tools Layer   │
+    │                      │             │                    │
+    │ - list_resources()   │             │ - extract_code_... │
+    │ - read_resource()    │             │ - get_charter()    │
+    │ - list_templates()   │             │ - validate_doc...  │
+    │                      │             │ - write_document() │
+    └─────────┬────────────┘             └─────────┬──────────┘
+              │                                    │
+    ┌─────────▼──────────────────────────────────▼────────────┐
+    │              AKR Server Core (FastMCP)                  │
+    └────┬────────────────┬──────────────────┬────────────────┘
+         │                │                  │
+    ┌────▼─────────────┐  │   ┌─────────────▼────────────┐
+    │ Core Modules:    │  │   │  Tool Implementations:   │
+    │ - Config         │  │   │  - CodeAnalyzer         │
+    │ - Logging        │  │   │  - TemplateResolver     │
+    │ - Schema Builder │  │   │  - ValidationEngine     │
+    │ - Document       │  │   │  - FileWriter           │
+    │   Parser         │  │   │  - Enforcement Logger   │
+    └────────────┬─────┘  │   └──────────┬──────────────┘
+                 │        │              │
+                 │  ┌─────▼──────────────▼──────────┐
+                 │  │  Business Logic Layer:        │
+                 │  │  - Template + Charter loading │
+                 │  │  - Code extraction (C#, SQL)  │
+                 │  │  - Schema/tier validation     │
+                 │  │  - Document writing           │
+                 │  │  - Audit trail + security     │
+                 │  └─────┬────────────┬──────────────┘
+                 │        │            │
+          ┌──────▼────┐  ┌▼──────────┐ │
+          │ Git       │  │ HTTP      │ │
+          │ Submodule │  │ Templates │ │
+          │ (Legacy   │  │ (Cloud    │ │
+          │ Templates)│  │ Templates)│ │
+          └───────────┘  └───────────┘ │
+                                       │
+                         ┌─────────────▼──────────────┐
+                         │  File System Layer:        │
+                         │  - Docs/ directory         │
+                         │  - Local file I/O          │
+                         │  - Path resolution         │
+                         └────────────────────────────┘
 ```
 
-### 2. Plugin Architecture for Code Extractors
+## Layer Architecture
 
-The code analysis layer uses plugins to support multiple languages:
+### 1. MCP Interface Layer
+
+**Purpose:** Expose functionality to Copilot Chat as standardized MCP resources and tools.
+
+**Components:**
+
+- **Resources (async discovery)**
+  - `list_resources()`: Enumerate available templates, charters, guides
+  - `read_resource(uri)`: Fetch specific template/charter/guide content
+  - `list_resource_templates()`: List URI patterns for dynamic resource construction
+  - URI Format: `akr://template/{id}`, `akr://charter/{domain}`, `akr://guide/{topic}`
+  - MIME Type: `text/markdown` (all resources are Markdown documents)
+
+- **Tools (action-oriented)**
+  - `extract_code_context()`: Vector code files for language-aware extraction (C# and SQL only)
+  - `get_charter()`: Retrieve or draft a charter document for a code component
+  - `validate_documentation()`: Validate documents against schema tiers (TIER_1/2/3)
+  - `write_documentation()`: Write validated documents to disk with audit trail
+  - `list_templates()`: Discovery tool for available templates
+
+### 2. Core Business Logic Layer
+
+**Purpose:** Implement the core algorithms and workflows for documentation generation and validation.
+
+**Components:**
+
+#### Code Extraction
+- **`CodeAnalyzer`** (src/tools/code_analytics.py)
+  - Deterministic extraction for C# and SQL only
+  - Methods: `detect_language()`, `extract_methods()`, `extract_classes()`, `extract_imports()`, `extract_sql_tables()`, `analyze()`
+  - Returns: Clean JSON with extracted symbols, types, relationships
+  - Error Handling: Graceful degradation with 'partial' flag on failures
+  - Version: v0.2.0+ (deprecated heuristic extractors in v0.1.0)
+
+#### Template Management
+- **`TemplateResolver`** (src/tools/template_resolver.py)
+  - Three-layer resolution strategy:
+    1. Git submodule (pinned tags for consistency)
+    2. Local file overrides (project-specific customization)
+    3. HTTP fetch (cloud templates with fallback)
+  - Schema Caching: Compiled JSONSchema cached for performance
+  - Security: URL validation, timeout limits, no automatic execution
+
+#### Validation
+- **`ValidationEngine`** (src/tools/validation_library.py)
+  - Tier-based strictness levels:
+    - **TIER_1**: Strict validation, ≥80% completeness, BLOCKER for structural issues
+    - **TIER_2**: Moderate validation, ≥60% completeness, FIXABLE issues
+    - **TIER_3**: Lenient validation, ≥30% completeness, informational only
+  - Schema: JSON Schema for front-matter validation
+  - Auto-Fix: Capable of suggesting and applying common fixes
+  - Dry-Run Mode: Default behavior, shows changes without writing
+  - Output: Structured result with errors, warnings, auto-fixed content, diffs
+
+#### Document Writing
+- **`FileWriter`** (src/tools/file_writer.py)
+  - Atomic write operations with validation pre-checks
+  - Modes: Create, Append, Replace (with schema enforcement)
+  - Audit Trail: Detailed logging of all write operations
+  - Permission Gating: Two-layer write protection (env flag + allow flag)
+  - Backup: Automatic backup before destructive operations
+
+#### Security & Audit
+- **`EnforcementLogger`** (src/tools/enforcement_logger.py)
+  - Write operation tracking (JSONL audit log)
+  - Operation metadata: timestamp, user, file, operation, status
+  - Compliance tracking: Enables SoC2/audit trail requirements
+  - Configurable: Adjustable detail levels and filtering
+
+## Data Flow Sequences
+
+### Extract → Charter → Validate → Write Workflow
 
 ```
-┌─────────────────────────────────┐
-│   Code Analyzer (Dispatcher)     │
-└──────────────┬──────────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│ User initiates from Copilot Chat:                                       │
+│ "Generate a charter for my AuthService.cs"                              │
+└──────────────┬──────────────────────────────────────────────────────────┘
                │
-      ┌────────┼────────┬──────────┐
-      ▼        ▼        ▼          ▼
-   ┌──────┐┌──────┐┌──────┐┌──────────┐
-   │C#    ││TypeS ││SQL   ││Python    │
-   │Parser││Script││Parser││Parser    │
-   │      ││Parser││      ││(future)  │
-   └───┬──┘└───┬──┘└───┬──┘└────┬─────┘
-       │       │       │        │
-       └───────┼───────┴────────┘
+        ┌──────▼────────────────────────────────────────┐
+        │ 1. Extract Code Context                        │
+        │    Tool: extract_code_context()                │
+        │    Input: file_path, extraction_types          │
+        │    Output: {methods, classes, imports, ...}     │
+        └──────┬────────────────────────────────────────┘
                │
-               ▼
-        ┌──────────────┐
-        │ Unified Model│
-        │ ServiceModel,│
-        │ ComponentData│
-        │ TableSchema  │
-        └──────────────┘
+        ┌──────▼──────────────────────────────────────────┐
+        │ 2. User Reviews + Chat Drafting                 │
+        │    Location: Copilot Chat browser interface     │
+        │    Action: Review extracted context             │
+        │    Action: Ask Chat to draft charter            │
+        │    Output: Drafted markdown document            │
+        └──────┬───────────────────────────────────────────┘
+               │
+        ┌──────▼─────────────────────────────────────────┐
+        │ 3. Validate Documentation                       │
+        │    Tool: validate_documentation()               │
+        │    Input: markdown, tier, template_id           │
+        │    Checking: Schema compliance, completeness    │
+        │    Output: Errors, warnings, suggested fixes    │
+        └──────┬────────────────────────────────────────┘
+               │
+        ┌──────▼──────────────────────────────────────────┐
+        │ 4. User Refinement (if needed)                  │
+        │    Location: Copilot Chat                       │
+        │    Action: Ask Chat to fix validation issues    │
+        │    Action: Manual editing if necessary          │
+        │    Output: Refined document                     │
+        └──────┬───────────────────────────────────────────┘
+               │
+        ┌──────▼──────────────────────────────────────────┐
+        │ 5. Write to Repository                          │
+        │    Tool: write_documentation()                  │
+        │    Input: file_path, content, operation         │
+        │    Checks: Final schema validation              │
+        │    Audit: Logs to enforcement.jsonl             │
+        │    Output: {success, file_path, metadata}       │
+        └──────┬───────────────────────────────────────────┘
+               │
+        ┌──────▼──────────────────────────────────────┐
+        │ Document written to disk                     │
+        │ Path: /docs/{domain}/{component}_charter.md │
+        │ Audit Trail: Recorded with timestamp + user │
+        └─────────────────────────────────────────────┘
 ```
 
-Each extractor must implement:
-- `extract_services(path)` → List[ServiceEntity]
-- `extract_components(path)` → List[ComponentEntity]
-- `extract_tables(path)` → List[TableEntity]
-
-### 3. Pipeline Architecture
-
-The documentation generation follows a clear pipeline where each stage validates and enriches the previous:
+## Component Dependencies
 
 ```
-INPUT: User asks Copilot to generate docs
-         │
-         ▼
-    ┌──────────────┐
-    │ 1. Extract   │ Parse code, find methods, parameters, types
-    │   Code Data  │ Output: ServiceTemplateContext or ComponentTemplateContext
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │ 2. Load      │ Read template file (lean_baseline_service.md)
-    │ Template     │ Validate schema (required sections defined)
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │ 3. Render    │ Jinja2 renders: {{ context.methods }} + ❓ placeholders
-    │ Template     │ Apply custom filters (title_case, http_method_color, etc.)
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │ 4. Format    │ Add YAML frontmatter, clean markdown
-    │ Output       │ Add git metadata
-    └──────┬───────┘
-           │
-           ▼
-OUTPUT: Markdown doc with 🤖 + ❓ markers
-         Ready for user review in Copilot
+CodeAnalyzer (Phase 4)
+  ├── CSharpExtractor (Phase 4)
+  └── SQLExtractor (Phase 4)
+
+ValidationEngine (Phase 3)
+  ├── BasicDocumentParser
+  ├── TemplateSchemaBuilder
+  └── EnforcedViolation types
+
+FileWriter (Phase 2)
+  ├── EnforcementLogger
+  ├── EnforcedViolation handling
+  └── Path resolution
+
+MCP Server
+  ├── All tools above
+  ├── TemplateResolver
+  └── FastMCP decorators
 ```
 
-## Component Responsibilities
+## API Reference
 
-### MCP Server (src/server.py)
+### MCP Resources
 
-**Responsibility:** Bridge between GitHub Copilot and documentation tools
+#### `list_resources()`
+Lists all discoverable resources (templates, charters, guides).
 
-**Key Functions:**
-- `generate_documentation()` — Creates empty documentation templates
-- `write_documentation()` — Writes and validates documentation
-- `update_documentation_sections()` — Updates specific sections
-
-**Design decisions:**
-- Single-threaded with async/await (handles concurrent Copilot requests)
-- Stateless (each request independent, no shared mutable state)
-- MCP protocol compliant (works with official Copilot integration)
-
-### Code Analyzer (src/tools/code_analyzer.py)
-
-**Responsibility:** Extract relevant code information from source files
-
-**Key Functions:**
-- `populate_template(template, extracted_data, ...)` — Merges code data into template
-- `extract_services(path)` — Find service classes and their methods
-- `extract_components(path)` — Identify UI components and props
-- `extract_tables(path)` — Scan schema for database tables
-
-**Design decisions:**
-- Pluggable extractors by language (supports C#, TypeScript, SQL)
-- AST-based parsing where available (more reliable than regex)
-- Graceful degradation (logs gaps, continues if extraction incomplete)
-- No modification of source code (read-only analysis)
-
-### Template Renderer (src/tools/template_renderer.py)
-
-**Responsibility:** Render Jinja2 templates with custom filters
-
-**Key Functions:**
-- `render(template_name, context)` — Render template with data
-- Custom filters (yes_no, title_case, http_method_color, etc.)
-
-**Design decisions:**
-- Singleton pattern (one Jinja2 environment per process)
-- Custom filters registered globally (reusable across templates)
-- Safe rendering (no arbitrary code execution)
-
-### Enforcement Tool (src/tools/enforcement_tool.py)
-
-**Responsibility:** Validate documentation against AKR standards
-
-**Key Functions:**
-- `enforce(doc_content, template, config)` → EnforceResult
-- Checks: YAML frontmatter, required sections, section order, completeness
-
-**Design decisions:**
-- Hard gate enforcement (blocks unless passes validation)
-- Configurable severity levels (BLOCKER, FIXABLE, WARN)
-- Actionable error messages with suggested fixes
-- Extensible rules system
-
-### Template Schema Builder (src/tools/template_schema_builder.py)
-
-**Responsibility:** Maintain  mapping of templates to required sections
-
-**Key Data:**
-```python
-TEMPLATE_BASELINE_SECTIONS = {
-    "lean_baseline_service_template.md": [
-        "Quick Reference (TL;DR)",
-        "What & Why",
-        # ... 7 more
-    ],
-    # ... other templates
+**Response:**
+```json
+{
+  "resources": [
+    {
+      "uri": "akr://template/lean_baseline_service_template",
+      "name": "Lean Baseline Service Template",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "akr://charter/backend",
+      "name": "Backend Charter",
+      "mimeType": "text/markdown"
+    }
+  ]
 }
 ```
 
-**Design decisions:**
-- Hardcoded baseline sections (not extracted from files)
-- Single source of truth for template requirements
-- Easy to version control and peer review changes
+#### `read_resource(uri)`
+Retrieves the content of a specific resource.
 
-## Data Models
+**Parameters:**
+- `uri` (string): Resource URI, e.g., `akr://template/lean_baseline_service_template`
 
-### ServiceTemplateContext
+**Response:**
+- Markdown content as plain text
 
-```python
-@dataclass
-class ServiceTemplateContext:
-    service_name: str
-    namespace: str
-    language: str
-    dependencies: List[Dependency]
-    public_methods: List[MethodSignature]
-    business_rules: List[str]                # ❓ to be filled by user
-    validation_rules: List[str]              # Auto-extracted
-    data_operations: List[DataOperation]     # Auto-extracted
+### MCP Tools
+
+#### `extract_code_context(repo_path, extraction_types?, language?, file_filter?)`
+
+Extracts code context from files using deterministic (C#, SQL) methods.
+
+**Parameters:**
+- `repo_path` (required): Repository or file path
+- `extraction_types` (optional): Array of ["methods", "classes", "imports", "sql_tables"]
+- `language` (optional): Force language detection ("csharp" or "sql")
+- `file_filter` (optional): Glob pattern for file filtering
+
+**Response:**
+```json
+{
+  "language_detected": "csharp",
+  "methods": [...],
+  "classes": [...],
+  "imports": [...],
+  "metadata": {
+    "language_detected": "csharp",
+    "extractor_version": "0.2.0",
+    "extraction_errors": [],
+    "partial": false
+  }
+}
 ```
 
-### ComponentTemplateContext
+#### `validate_documentation(doc_content, template_id, tier_level?, auto_fix?, dry_run?)`
 
-```python
-@dataclass
-class ComponentTemplateContext:
-    component_name: str
-    component_type: str                      # List, Form, Modal, etc.
-    framework: str                           # React, Vue, Angular
-    props: List[PropDefinition]              # Auto-extracted from JSDoc
-    visual_states: List[str]                 # ❓ to be filled
-    accessibility: AccessibilityNotes        # ⚠️ Partial extraction
+Validates a document against a schema template.
+
+**Parameters:**
+- `doc_content` (required): Markdown document to validate
+- `template_id` (required): Template identifier (e.g., "lean_baseline_service_template")
+- `tier_level` (optional): "TIER_1" (strict), "TIER_2" (moderate), "TIER_3" (lenient). Default: TIER_1
+- `auto_fix` (optional): Boolean, attempt to auto-fix violations. Default: false
+- `dry_run` (optional): Boolean, don't write changes. Default: true
+
+**Response:**
+```json
+{
+  "is_valid": true,
+  "errors": [],
+  "warnings": [],
+  "auto_fixed_content": null,
+  "diff": null,
+  "metadata": {
+    "tier_level": "TIER_1",
+    "template_id": "lean_baseline_service_template",
+    "completeness_percent": 95
+  }
+}
 ```
 
-### TableTemplateContext
+#### `write_documentation(file_path, content, operation?, write_mode?, backup?)`
 
-```python
-@dataclass
-class TableTemplateContext:
-    table_name: str
-    database: str
-    columns: List[ColumnDefinition]          # Auto-extracted
-    primary_key: str
-    foreign_keys: List[ForeignKey]           # Auto-extracted
-    constraints: List[Constraint]            # Auto-extracted
-    business_rules: List[str]                # ❓ to be filled
+Writes validated documentation to disk.
+
+**Parameters:**
+- `file_path` (required): Target file path (e.g., "/docs/services/auth_charter.md")
+- `content` (required): Markdown content to write
+- `operation` (optional): "create" or "update". Default: "create"
+- `write_mode` (optional): "strict" (validates before write) or "force" (writes without validation). Default: "strict"
+- `backup` (optional): Create backup before overwriting. Default: true
+
+**Response:**
+```json
+{
+  "success": true,
+  "file_path": "/docs/services/auth_charter.md",
+  "bytes_written": 2847,
+  "metadata": {
+    "timestamp": "2024-01-15T10:35:00Z",
+    "audit_id": "write_abc123def456"
+  }
+}
 ```
 
-## Data Flow Examples
+## Security Architecture
 
-### Example 1: Generate Service Documentation
+### Write Operation Gating
+1. **Environment Control**: `AKR_WRITE_OPS_ENABLED` env var (default: false)
+2. **Parameter Control**: `allowWrites` parameter in API calls
+3. **User Tracking**: All writes logged with timestamp and user identity (if available)
 
-```
-1. User: "Generate docs for CourseService using lean template"
+### Template Security
+- URL validation: Only HTTPS URLs accepted (if `HTTPS_REQUIRED_FOR_TEMPLATES=true`)
+- Timeout limits: 5-second timeout on HTTP fetches
+- Size limits: Max 1MB template fetch size
+- No automatic code execution: Templates are static Markdown/YAML
 
-2. MCP Server
-   └─> Call code_analyzer.populate_template()
+### Audit Trail
+- Every write operation logged to `enforcement.jsonl`
+- Fields: timestamp, user_id, file_path, operation, status, error (if any)
+- Query: Enables compliance reporting and forensic analysis
 
-3. Code Analyzer
-   ├─> Extract public methods from CourseService.cs
-   ├─> Extract dependencies (constructors)
-   ├─> Extract XML doc comments
-   └─> Return ServiceTemplateContext
+## Testing & Quality
 
-4. Template Renderer  
-   ├─> Load service.jinja2
-   ├─> Inject ServiceTemplateContext
-   ├─> Apply custom filters
-   └─> Render markdown
+### Test Coverage
+- Phase 1 tests: 14 test cases (template resolution, schema building)
+- Phase 2 tests: 8 test cases (write operations, enforcement)
+- Phase 3 tests: 32 test cases (validation library)
+- Phase 4 tests: 22 test cases (code extraction)
+- Phase 5 tests: 18 test cases (e2e workflow, resources, integration)
 
-5. Output
-   ├─ YAML frontmatter (auto-filled)
-   ├─ Quick Reference (🤖 auto-extracted)
-   ├─ What & Why (❓ user fills in)
-   ├─ How It Works (🤖 auto-extracted)
-   ├─ Business Rules (❓ user fills in)
-   └─ ... rest of sections
+### Total: 94 test cases, target coverage ≥80%
 
-6. Return to Copilot
-   └─> User reviews 🤖 sections and fills ❓ placeholders
-```
+### Test Execution
+```bash
+# All tests
+pytest tests/ -v
 
-### Example 2: Write and Validate Documentation
+# With coverage
+pytest tests/ --cov=src --cov-report=html
 
-```
-1. User: "Write this documentation" (filled-in content from step above)
-
-2. MCP Server
-   └─> Call enforcement_tool.enforce()
-
-3. Enforcement Tool
-   ├─> Check YAML frontmatter valid ✓
-   ├─> Check all required sections present ✓
-   ├─> Check sections in correct order ✓
-   ├─> Check completeness >= 80% ✓
-   └─> Return EnforceResult(is_valid=True)
-
-4. File Writer
-   ├─> Create docs/CourseService_doc.md
-   ├─> Git commit with message
-   └─> Log to enforcement.jsonl
-
-5. Return to Copilot
-   └─> "✓ Documentation written successfully and committed to git"
+# Specific module
+pytest tests/test_extract_code_context.py -v
 ```
 
-## Technology Trade-offs
+## v0.3.0 Roadmap
 
-### Decision: Jinja2 vs. String Interpolation
+### Parser Improvements
+- AST-based extraction replacing regex (more accurate, handles edge cases)
+- Support for additional languages: Python, Java, Go, Rust
+- Improved error recovery and partial extraction
 
-**Chose:** Jinja2 template engine
+### Team Identity Support
+- Microsoft Entra ID integration for write operation tracking
+- Group-based permissions (e.g., "architects" can modify charters)
+- Approval workflow integration (TIER_1 changes require review)
 
-**Alternatives:**
-- String interpolation (simple, but limited)
-- Handlebars.js (web-focused)
-- Golang text/template (not Python ecosystem)
+### Performance Optimization
+- Parallel multi-file extraction
+- Distributed validation engine
+- Caching of extracted symbols
 
-**Rationale:**
-- ✅ Powerful custom filter system
-- ✅ Mature, well-tested library
-- ✅ Great documentation
-- ✅ Handles complex conditionals (❓ optional sections)
-- ❌ Learning curve for filter developers
+## References
 
-### Decision: YAML + Markdown vs. JSON
-
-**Chose:** YAML frontmatter + Markdown body
-
-**Alternatives:**
-- Pure JSON (structured but unreadable)
-- XML (verbose)
-- HTML (harder to edit)
-
-**Rationale:**
-- ✅ Human-readable and editable
-- ✅ Git-friendly (diffs make sense)
-- ✅ Web-friendly (github renders .md)
-- ✅ Language agnostic
-- ❌ Some structure loss vs. JSON
-
-### Decision: Schema Validation Approach
-
-**Chose:** Hard gate enforcement (block on failure)
-
-**Alternatives:**
-- Soft validation (warnings only)
-- Post-commit validation (check after write)
-
-**Rationale:**
-- ✅ Prevents incomplete documentation in codebase
-- ✅ Catches errors early (before commit)
-- ✅ Enables high quality standards
-- ❌ Can be frustrating if rules too strict (configurable via enforcement level)
-
-### Decision: Telemetry for Observability
-
-**Chose:** JSON Lines log file (no database)
-
-**Alternatives:**
-- Structured logging to ElasticSearch/Splunk
-- Database (PostgreSQL)
-- File system metrics
-
-**Rationale:**
-- ✅ Zero external dependencies
-- ✅ Easy to analyze with Python scripts
-- ✅ Works offline
-- ✅ Version-controllable (can be committed to git)
-- ❌ No real-time dashboards (batch analysis only)
-
----
-
-## Deployment & Scaling
-
-### Single Developer Setup
-
-Local installation on one machine, uses VS Code + GitHub Copilot.
-
-**Performance targets:**
-- Documentation generation: 500ms - 1s
-- Validation: 50-300ms
-- Total: 1-2s per operation
-
-### Team Setup
-
-Shared MCP server serving multiple developers via VS Code extensions.
-
-**Considerations:**
-- Async request handling (supports concurrent Copilot chats)
-- Rate limiting (optional, if needed)
-- Telemetry aggregation to shared logs
-- Git repo accessible to all team members
-
-### Enterprise Setup
-
-Multiple MCP servers across teams, potentially different codebases.
-
-**Considerations:**
-- Separate `mcp.json` per codebase
-- Separate documentation roots per team
-- Aggregated telemetry dashboards
-- Read-only extractors (no prod code changes)
-
----
-
-## Future Enhancements
-
-### Planned Improvements
-
-1. **Language Support**
-   - Add Python, Java, Go extractors
-   - Support additional templates (Java service, Python utility, etc.)
-
-2. **Advanced Analysis**
-   - Dependency graph visualization
-   - API surface analysis (not just method names but behavior)
-   - Performance metrics extraction
-
-3. **Collaboration Features**
-   - Documentation review workflow
-   - Comments and suggestions in docs
-   - Team consensus tracking
-
-4. **Tooling Integration**
-   - Swagger/OpenAPI sync
-   - Figma design tokens extraction
-   - Storybook integration
-
----
-
-## Architecture Diagrams
-
-### Component Interaction Diagram
-
-```
-┌──────────────────────┐
-│ GitHub Copilot Chat  │
-│  (User Interface)    │
-└──────────────┬───────┘
-               │ MCP requests
-               ▼
-┌──────────────────────────────────────────┐
-│           MCP Server                     │
-│  ┌────────────────────────────────────┐  │
-│  │ Tool Handlers:                     │  │
-│  │ • generate_documentation           │  │
-│  │ • write_documentation              │  │
-│  │ • update_documentation_sections    │  │
-│  └────────────────────────────────────┘  │
-└──────────┬───────────────┬───────────┬───┘
-           │               │           │
-           ▼               ▼           ▼
-    ┌────────────┐  ┌─────────────┐ ┌──────────────┐
-    │Code        │  │Template     │ │Enforcement  │
-    │Analyzer    │  │Renderer     │ │Tool         │
-    │            │  │(Jinja2)     │ │             │
-    │• C# parser │  │•Filters     │ │•Validation  │
-    │• TS parser │  │•Contexts    │ │•Rules       │
-    │• SQL parser│  │•Rendering   │ │             │
-    └────┬───────┘  └──────┬──────┘ └──────┬──────┘
-         │                 │               │
-         └─────────────────┼───────────────┘
-                           │
-                           ▼
-                    ┌────────────────┐
-                    │File System +   │
-                    │Git Operations  │
-                    │                │
-                    │✓ Docs written  │
-                    │✓ Commits made  │
-                    │✓ Telemetry log │
-                    └────────────────┘
-```
-
-### Enforcement Gate Sequence
-
-```
-User submits documentation
-          │
-          ▼
-    Validate YAML
-    ├─ Required fields present?
-    ├─ Frontmatter format valid?
-    └─ Parse successful?
-          │
-          ▼ ✓ Pass
-    Check Required Sections
-    ├─ All sections present?
-    ├─ Content not empty?
-    └─ No ❓ placeholders remaining?
-          │
-          ▼ ✓ Pass
-    Verify Section Order
-    ├─ Matches template order?
-    └─ No sections out of place?
-          │
-          ▼ ✓ Pass
-    Check Link Validity
-    └─ Cross-references exist?
-          │
-          ▼ ✓ Pass
-    Measure Completeness
-    └─ >= configured threshold?
-          │
-          ▼ ✓ Pass
-    ┌─────────────────┐
-    │ WRITE TO DISK   │
-    │ GIT COMMIT      │
-    │ LOG SUCCESS     │
-    └─────────────────┘
-```
-
----
-
-## Getting Help
-
-- **How to use?** → See [Workflows by Project Type](WORKFLOWS_BY_PROJECT_TYPE.md)
-- **Implementation details?** → See [Developer Reference](DEVELOPER_REFERENCE.md)
-- **Setup?** → See [Installation and Setup](INSTALLATION_AND_SETUP.md)
-- **Quick answers?** → See [Quick Reference](QUICK_REFERENCE.md)
+- [MCP Specification](https://modelcontextprotocol.io)
+- [FastMCP Documentation](https://github.com/jlowin/fastmcp)
+- [JSON Schema Validation](https://json-schema.org)
+- [AKR Validation Guide](./VALIDATION_GUIDE.md)
+- [Developer Guide](./DEVELOPER_GUIDE_ENFORCEMENT.md)
+- [Copilot Chat Workflow](./COPILOT_CHAT_WORKFLOW.md)

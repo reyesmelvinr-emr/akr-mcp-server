@@ -39,6 +39,7 @@ from tools.operation_metrics import OperationMetrics
 from tools.workflow_tracker import WorkflowTracker
 from tools.duplicate_detector import DuplicateDetector
 from tools.template_schema_builder import TEMPLATE_BASELINE_SECTIONS
+from tools.code_analytics import CodeAnalyzer
 
 # ---- Lazy managers (avoid heavy work during import/startup) ----
 resource_manager = None  # type: ignore
@@ -99,8 +100,10 @@ logger = logging.getLogger("akr-mcp-server")
 # Check for fast mode flag from environment variable
 FAST_MODE = os.getenv('AKR_FAST_MODE', 'false').lower() == 'true'
 SKIP_INITIALIZATION = os.getenv('AKR_SKIP_INITIALIZATION', 'false').lower() == 'true'
+WRITE_OPS_ENABLED = os.getenv('AKR_ENABLE_WRITE_OPS', 'false').lower() == 'true'
 
 logger.info(f"🚀 Server starting in mode: FAST_MODE={FAST_MODE}, SKIP_INIT={SKIP_INITIALIZATION}")
+logger.info("Write operations: %s", "ENABLED" if WRITE_OPS_ENABLED else "DISABLED (default)")
 # ======================================================================
 
 # Create MCP server instance
@@ -352,27 +355,34 @@ async def list_tools() -> list[Tool]:
     """List all available AKR documentation tools."""
     tools = [
         Tool(
-            name="analyze_codebase",
+            name="extract_code_context",
             description=(
-                "Code analysis not yet fully implemented. "
-                "**Use generate_documentation instead** to create template-compliant documentation stubs. "
-                "The generate_documentation tool creates structured stubs with ❓ placeholders "
-                "that you can enhance with code insights."
+                "Extract code context (methods, classes, imports, SQL schema) from source files. "
+                "Uses deterministic extractors for C# and SQL DDL files. "
+                "Returns structured metadata for documentation and analysis workflows."
             ),
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "codebase_path": {
+                    "repo_path": {
                         "type": "string",
-                        "description": "Path to the codebase to analyze"
+                        "description": "Path to repository or source file to analyze"
                     },
-                    "file_types": {
+                    "extraction_types": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "File types to analyze (e.g., ['.ts', '.tsx', '.py'])"
+                        "description": "Extraction types: methods, classes, imports, sql_tables"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "Language override (csharp, sql). Auto-detects if omitted"
+                    },
+                    "file_filter": {
+                        "type": "string",
+                        "description": "File pattern filter (e.g., *.cs)"
                     }
                 },
-                "required": ["codebase_path"]
+                "required": ["repo_path"]
             }
         ),
         Tool(
@@ -400,11 +410,72 @@ async def list_tools() -> list[Tool]:
                     "template": {
                         "type": "string",
                         "description": "Template filename or shortcut (optional; defaults based on component_type)"
+                    },
+                    "allowWrites": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Must be true to allow file writes"
                     }
                 },
                 "required": ["component_name", "component_type"]
             }
         ),
+        Tool(
+            name="validate_documentation",
+            description=(
+                "Validate documentation against template standards using tier-level rules. "
+                "Returns structured violations, completeness estimate, and optional auto-fixes. "
+                "Default: dry_run=true (returns diff without writing)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "doc_path": {
+                        "type": "string",
+                        "description": "Path to the documentation file to validate (e.g., docs/API.md)"
+                    },
+                    "template_id": {
+                        "type": "string",
+                        "description": "Template ID to validate against (e.g., lean_baseline_service_template)"
+                    },
+                    "tier_level": {
+                        "type": "string",
+                        "enum": ["TIER_1", "TIER_2", "TIER_3"],
+                        "default": "TIER_2",
+                        "description": "Validation strictness: TIER_1=strict (≥80% complete), TIER_2=moderate (≥60%), TIER_3=lenient (≥30%)"
+                    },
+                    "auto_fix": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Attempt auto-fixes for common violations"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "If true with auto_fix, return diff without writing to file"
+                    }
+                },
+                "required": ["doc_path", "template_id"]
+            }
+        ),
+        Tool(
+            name="get_charter",
+            description="Get the AKR charter for a specific documentation domain",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "enum": ["ui", "backend", "database"],
+                        "description": "Documentation domain (ui, backend, database)"
+                    }
+                },
+                "required": ["domain"]
+            }
+        ),
+    ]
+
+    write_tools = [
         Tool(
             name="generate_and_write_documentation",
             description=(
@@ -451,38 +522,14 @@ async def list_tools() -> list[Tool]:
                         "type": "boolean",
                         "default": False,
                         "description": "Whether to overwrite existing file"
+                    },
+                    "allowWrites": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Must be true to allow file writes"
                     }
                 },
                 "required": ["component_name"]
-            }
-        ),
-        Tool(
-            name="validate_documentation",
-            description="Validate documentation against AKR standards",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the documentation file to validate"
-                    }
-                },
-                "required": ["file_path"]
-            }
-        ),
-        Tool(
-            name="get_charter",
-            description="Get the AKR charter for a specific documentation domain",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "domain": {
-                        "type": "string",
-                        "enum": ["ui", "backend", "database"],
-                        "description": "Documentation domain (ui, backend, database)"
-                    }
-                },
-                "required": ["domain"]
             }
         ),
         Tool(
@@ -510,6 +557,11 @@ async def list_tools() -> list[Tool]:
                         "type": "boolean",
                         "default": False,
                         "description": "Allow direct write for new files without generate_documentation (emergency use)"
+                    },
+                    "allowWrites": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Must be true to allow file writes"
                     }
                 },
                 "required": ["content", "source_file", "doc_path"]
@@ -531,13 +583,23 @@ async def list_tools() -> list[Tool]:
                     "source_file": {"type": "string", "description": "Repo-relative source code file path"},
                     "component_type": {"type": "string", "description": "Component type, e.g. service, controller"},
                     "add_changelog": {"type": "boolean", "default": True},
-                    "overwrite": {"type": "boolean", "default": True}
+                    "overwrite": {"type": "boolean", "default": True},
+                    "allowWrites": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Must be true to allow file writes"
+                    }
                 },
                 "required": ["doc_path", "section_updates"]
             }
         )
     ]
-    
+
+    if WRITE_OPS_ENABLED:
+        tools.extend(write_tools)
+    else:
+        logger.info("Write operations disabled; write tools not registered")
+
     return tools
 
 
@@ -760,25 +822,51 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     
     logger.info(f"🔧 Tool called: {name}")
     
-    if name == "analyze_codebase":
-        codebase_path = arguments.get("codebase_path")
-        file_types = arguments.get("file_types", [".ts", ".tsx", ".py", ".java"])
+    if name == "extract_code_context":
+        repo_path = arguments.get("repo_path")
+        extraction_types = arguments.get("extraction_types")
         
-        # Currently not implemented - return guidance
-        result = {
-            "success": False,
-            "error": "analyze_codebase is not yet implemented",
-            "guidance": (
-                "This tool is planned for future implementation. "
-                "For now, please identify components manually and use generate_documentation or write_documentation "
-                "to create AKR-compliant documentation."
-            ),
-            "alternative": "Use generate_documentation with component_name to create template-compliant stubs"
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        try:
+            analyzer = CodeAnalyzer()
+            result = analyzer.analyze(
+                file_path=repo_path,
+                extraction_types=extraction_types
+            )
+            
+            result["metadata"]["server_version"] = "0.2.0"
+            result["metadata"]["extractor"] = "CodeAnalyzer"
+            result["metadata"]["timestamp"] = datetime.utcnow().isoformat()
+            
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+        except Exception as e:
+            error_result = {
+                "success": False,
+                "error": str(e),
+                "error_type": "EXTRACTION_ERROR",
+                "metadata": {
+                    "file_path": repo_path,
+                    "extraction_errors": [str(e)]
+                }
+            }
+            return [TextContent(type="text", text=json.dumps(error_result, indent=2))]
     
     elif name == "generate_documentation":
         # Generate a template-compliant documentation stub with ❓ placeholders
+        if not WRITE_OPS_ENABLED:
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Write operations are disabled by default. Set AKR_ENABLE_WRITE_OPS=true to enable.",
+                "error_type": "PERMISSION_DENIED"
+            }, indent=2))]
+
+        allow_writes = arguments.get("allowWrites", False)
+        if not allow_writes:
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Write operations require allowWrites=true to proceed.",
+                "error_type": "PERMISSION_DENIED"
+            }, indent=2))]
+
         component_name = arguments.get("component_name")
         component_type = arguments.get("component_type", "service")
         template = arguments.get("template", "lean_baseline_service_template.md")
@@ -863,6 +951,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 duplicate_detector=duplicate_detector,
                 resource_manager=get_resource_manager(),
                 session_cache=get_session_cache(),
+                allowWrites=allow_writes,
             )
             
             # Add guidance message
@@ -908,6 +997,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     elif name == "generate_and_write_documentation":
         # Unified scaffolding + generation + writing in a single operation
         try:
+            if not WRITE_OPS_ENABLED:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Write operations are disabled by default. Set AKR_ENABLE_WRITE_OPS=true to enable.",
+                    "error_type": "PERMISSION_DENIED"
+                }, indent=2))]
+
+            allow_writes = arguments.get("allowWrites", False)
+            if not allow_writes:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Write operations require allowWrites=true to proceed.",
+                    "error_type": "PERMISSION_DENIED"
+                }, indent=2))]
+
             component_name = arguments.get("component_name")
             source_files = arguments.get("source_files", [])
             template = arguments.get("template")
@@ -1052,6 +1156,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 duplicate_detector=duplicate_detector,
                 resource_manager=get_resource_manager(),
                 session_cache=get_session_cache(),
+                allowWrites=allow_writes,
             )
             
             # Enhance result message
@@ -1097,22 +1202,94 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             }))]
     
     elif name == "validate_documentation":
-        file_path = arguments.get("file_path")
-        
-        # Currently not implemented as standalone - return guidance
-        result = {
-            "success": False,
-            "error": "validate_documentation is not yet implemented as a standalone tool",
-            "guidance": (
-                "Validation is automatically performed by write_documentation and update_documentation_sections. "
-                "These tools enforce template compliance and return detailed validation results."
-            ),
-            "alternative": {
-                "description": "Use write_documentation or update_documentation_sections - they include automatic validation",
-                "example": "Call write_documentation with your content - it will validate against the template and return violations if any"
+        try:
+            doc_path = arguments.get("doc_path")
+            template_id = arguments.get("template_id")
+            tier_level = arguments.get("tier_level", "TIER_2")
+            auto_fix = arguments.get("auto_fix", False)
+            dry_run = arguments.get("dry_run", True)
+            
+            if not doc_path or not template_id:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Missing required parameters: doc_path and template_id"
+                }, indent=2))]
+            
+            # Read document content
+            try:
+                with open(doc_path, 'r', encoding='utf-8') as f:
+                    doc_content = f.read()
+            except FileNotFoundError:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Document not found: {doc_path}"
+                }, indent=2))]
+            except Exception as e:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": f"Failed to read document: {str(e)}"
+                }, indent=2))]
+            
+            # Import validation engine
+            from tools.validation_library import ValidationEngine, ValidationTier
+            from tools.template_schema_builder import get_or_create_schema_builder
+            
+            # Get schema builder and validation engine
+            schema_builder = get_or_create_schema_builder(resolver)
+            validation_engine = ValidationEngine(schema_builder=schema_builder, config=config)
+            
+            # Perform validation
+            result = validation_engine.validate(
+                doc_content=doc_content,
+                template_id=template_id,
+                tier_level=tier_level,
+                auto_fix=auto_fix,
+                dry_run=dry_run
+            )
+            
+            # Convert to JSON-serializable format
+            output = {
+                "success": True,
+                "is_valid": result.is_valid,
+                "completeness": round(result.completeness * 100, 1),  # Convert to percentage
+                "tier_level": result.tier_level,
+                "violations": [v.to_dict() for v in result.violations],
+                "violation_count": len(result.violations),
+                "blocker_count": sum(1 for v in result.violations if v.severity == "BLOCKER"),
+                "fixable_count": sum(1 for v in result.violations if v.severity == "FIXABLE"),
+                "warning_count": sum(1 for v in result.violations if v.severity == "WARN"),
             }
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+            
+            if result.auto_fixed_content and result.diff:
+                output["auto_fixed_available"] = True
+                output["diff"] = result.diff
+                output["suggestion"] = "Auto-fixes available. Review diff above. Use write_documentation to apply fixes."
+            else:
+                output["auto_fixed_available"] = False
+            
+            if result.metadata:
+                output["metadata"] = {
+                    "template_source": result.metadata.template_source,
+                    "validated_at_utc": result.metadata.validated_at_utc,
+                    "server_version": result.metadata.server_version
+                }
+            
+            return [TextContent(type="text", text=json.dumps(output, indent=2))]
+            
+        except ImportError as e:
+            logger.error(f"ValidationEngine import error: {str(e)}")
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": "Validation engine not available. Ensure jsonschema>=4.0.0 is installed.",
+                "hint": "Run: pip install jsonschema>=4.0.0"
+            }, indent=2))]
+        
+        except Exception as e:
+            logger.error(f"validate_documentation error: {str(e)}", exc_info=True)
+            return [TextContent(type="text", text=json.dumps({
+                "success": False,
+                "error": f"Validation failed: {str(e)}"
+            }, indent=2))]
     
     elif name == "get_charter":
         domain = arguments.get("domain")
@@ -1127,6 +1304,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     elif name == "write_documentation":
         try:
+            if not WRITE_OPS_ENABLED:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Write operations are disabled by default. Set AKR_ENABLE_WRITE_OPS=true to enable.",
+                    "error_type": "PERMISSION_DENIED"
+                }, indent=2))]
+
+            allow_writes = arguments.get("allowWrites", False)
+            if not allow_writes:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Write operations require allowWrites=true to proceed.",
+                    "error_type": "PERMISSION_DENIED"
+                }, indent=2))]
+
             repo_path = str(Path(__file__).parent.parent)
 
             template_input = arguments.get("template", "lean_baseline_service_template.md")
@@ -1169,6 +1361,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 operation_metrics=metrics,
                 resource_manager=get_resource_manager(),
                 session_cache=get_session_cache(),
+                allowWrites=allow_writes,
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
@@ -1191,7 +1384,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 template=template,
                 component_type=arguments.get("component_type", "unknown"),
                 overwrite=arguments.get("overwrite", False),
-                force_workflow_bypass=arguments.get("force_workflow_bypass", False)
+                force_workflow_bypass=arguments.get("force_workflow_bypass", False),
+                allowWrites=allow_writes,
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
@@ -1204,6 +1398,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     elif name == "update_documentation_sections":
         try:
+            if not WRITE_OPS_ENABLED:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Write operations are disabled by default. Set AKR_ENABLE_WRITE_OPS=true to enable.",
+                    "error_type": "PERMISSION_DENIED"
+                }, indent=2))]
+
+            allow_writes = arguments.get("allowWrites", False)
+            if not allow_writes:
+                return [TextContent(type="text", text=json.dumps({
+                    "success": False,
+                    "error": "Write operations require allowWrites=true to proceed.",
+                    "error_type": "PERMISSION_DENIED"
+                }, indent=2))]
+
             repo_path = str(Path(__file__).parent.parent)
 
             template_input = arguments.get("template", "lean_baseline_service_template.md")
@@ -1243,7 +1452,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 config=cfg,
                 telemetry_logger=enforcement_logger,
                 progress_tracker=tracker,
-                operation_metrics=metrics
+                operation_metrics=metrics,
+                allowWrites=allow_writes,
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
@@ -1268,7 +1478,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 add_changelog=arguments.get("add_changelog", True),
                 overwrite=arguments.get("overwrite", True),
                 config=cfg,
-                telemetry_logger=enforcement_logger
+                telemetry_logger=enforcement_logger,
+                allowWrites=allow_writes,
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         except TypeError:
@@ -1281,7 +1492,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 source_file=arguments.get("source_file", ""),
                 component_type=arguments.get("component_type", "unknown"),
                 add_changelog=arguments.get("add_changelog", True),
-                overwrite=arguments.get("overwrite", True)
+                overwrite=arguments.get("overwrite", True),
+                allowWrites=allow_writes,
             )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         except Exception as e:

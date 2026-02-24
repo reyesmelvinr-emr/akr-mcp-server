@@ -102,6 +102,17 @@ See [docs/DEVELOPER_REFERENCE.md](docs/DEVELOPER_REFERENCE.md) for full enforcem
 
 ---
 
+## Write Operations (Disabled by Default)
+
+Write tools are gated to prevent accidental changes. To enable writes:
+
+1. Set environment variable: `AKR_ENABLE_WRITE_OPS=true`
+2. Pass `allowWrites=true` in the tool call
+
+If either check is missing, write operations will return a permission error. See [SECURITY.md](SECURITY.md) for details.
+
+---
+
 ## Troubleshooting
 
 - Quick fixes and task references: [docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)

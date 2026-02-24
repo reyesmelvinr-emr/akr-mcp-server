@@ -1,6 +1,20 @@
 """
+⚠️ DEPRECATED in v0.2.0
+
 Example data extractor for generating realistic request/response examples.
 
+DEPRECATION NOTICE:
+- This extractor uses heuristic-based type inference to generate example data.
+- Generated examples are often incomplete or unrealistic.
+- For realistic examples, ask Copilot Chat to generate them from your code context.
+- This module will be removed in v1.0.0.
+
+For better results, consider:
+1. Copy-paste DTO definitions and usage examples into Copilot Chat
+2. Ask Chat to generate realistic request/response examples
+3. Reference API contracts and validation rules for accuracy
+
+Legacy behavior:
 Parses DTO classes and generates realistic example JSON based on field types,
 validation rules, and comments.
 """
