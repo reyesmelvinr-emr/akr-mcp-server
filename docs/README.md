@@ -128,8 +128,7 @@ akr-mcp-server/
 │   ├── DEVELOPER_REFERENCE.md     # Developer guide
 │   ├── QUICK_REFERENCE.md         # Quick lookup
 │   ├── ARCHITECTURE.md            # System architecture
-│   ├── architecture/              # Architecture diagrams & docs
-│   └── _archived/                 # Historical phase documentation
+│   └── archive/                   # Historical phase documentation
 ├── src/                           # Main source code
 │   ├── server.py                  # MCP server & tool definitions
 │   ├── tools/                     # Tool implementations
@@ -178,6 +177,6 @@ akr-mcp-server/
 ## Documentation Version History
 
 - **Current:** 2026-02-19 — Consolidated documentation focusing on current system state
-- **Archive:** Historical phase documentation available in [_archived](/_archived/) directory
+- **Archive:** Historical phase documentation available in [archive](archive/) directory
 
-For historical context on the Jinja2 migration, regex→template evolution, and implementation phases, see [Archived Documentation](_archived/README.md).
+For historical context on the Jinja2 migration, regex→template evolution, and implementation phases, see [Archived Implementation Plan](archive/IMPLEMENTATION_PLAN_V0.2.0.md).

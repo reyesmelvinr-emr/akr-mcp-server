@@ -68,8 +68,8 @@ Test-Path ".vscode\mcp.json"
 ```
 
 If False, go back to the setup guide for your repository type:
-- [UI Repository Setup](QUICK_START_UI_REPO.md)
-- [API Repository Setup](QUICK_START_API_REPO.md)
+- [UI Repository Setup](WORKFLOWS_BY_PROJECT_TYPE.md#frontend--ui-project)
+- [API Repository Setup](WORKFLOWS_BY_PROJECT_TYPE.md#backend-api-project)
 
 ---
 

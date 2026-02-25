@@ -1,37 +1,119 @@
 # Installation and Setup Guide
 
-## ⭐ PHASE 1: Git Submodule Setup (REQUIRED)
+> **Time Required:** 15-30 minutes  
+> **For:** New team members setting up AKR MCP Server for the first time
 
-Starting with **v0.2.0**, AKR templates are managed via Git submodule (`core-akr-templates`). You **MUST** initialize the submodule after cloning.
+---
 
-### Initialize Submodule (All Platforms)
+## 🎯 What You're Installing
 
-#### Windows (PowerShell)
+The **AKR MCP Server** is a documentation assistant that:
+- ✅ Automatically extracts code context from your projects
+- ✅ Provides templates and validation for consistent documentation
+- ✅ Integrates seamlessly with GitHub Copilot Chat
+- ✅ Works with C#, SQL, TypeScript, and more
+
+**You only need to do this once per laptop/PC.**
+
+---
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Step 1: Clone Repository](#step-1-clone-repository-and-initialize-submodules)
+3. [Step 2: Set Up Python Environment](#step-2-set-up-python-virtual-environment)
+4. [Step 3: Install Dependencies](#step-3-install-python-dependencies)
+5. [Step 4: Configure VS Code](#step-4-configure-vs-code-and-github-copilot)
+6. [Step 5: Verify Installation](#step-5-verify-installation)
+7. [Optional: Global Tasks](#step-6-configure-global-akr-tasks-optional)
+8. [Troubleshooting](#troubleshooting)
+
+---
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+| Requirement | How to Check | Install If Missing |
+|-------------|--------------|-------------------|
+| **Python 3.10+** | `python --version` | [Download Python](https://www.python.org/downloads/) |
+| **Git 2.13+** | `git --version` | [Download Git](https://git-scm.com/downloads) |
+| **VS Code** | `code --version` | [Download VS Code](https://code.visualstudio.com/) |
+| **GitHub Copilot** | Extensions panel in VS Code | [Install Extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) |
+
+### Quick Check (All Platforms)
+
+**Windows (PowerShell):**
 ```powershell
-cd akr-mcp-server
-git submodule update --init --recursive
+python --version
+git --version
+code --version
 ```
 
-#### macOS/Linux (Bash)
+**macOS/Linux (Bash):**
 ```bash
+python3 --version
+git --version
+code --version
+```
+
+**Expected:** All commands return version numbers
+
+**If any are missing, install them before continuing.**
+
+---
+
+## Step 1: Clone Repository and Initialize Submodules
+
+⚠️ **CRITICAL:** Starting with v0.2.0, templates are managed via Git submodule. You **MUST** initialize the submodule after cloning.
+
+### Clone and Initialize
+
+**Windows (PowerShell):**
+```powershell
+# Navigate to your preferred location
+cd "$env:USERPROFILE\Documents"
+
+# Clone repository with submodules
+git clone --recursive <akr-mcp-server-repo-url> akr-mcp-server
+
+# Navigate into folder
 cd akr-mcp-server
+```
+
+**macOS/Linux (Bash):**
+```bash
+# Navigate to your preferred location
+cd ~/Documents
+
+# Clone repository with submodules
+git clone --recursive <akr-mcp-server-repo-url> akr-mcp-server
+
+# Navigate into folder
+cd akr-mcp-server
+```
+
+### If You Already Cloned Without `--recursive`
+
+Initialize the submodule manually:
+
+```bash
+# From within akr-mcp-server directory
 git submodule update --init --recursive
 ```
 
 ### Verify Submodule Loaded
 
-Check that templates were downloaded successfully:
-
-#### Windows (PowerShell)
+**Windows (PowerShell):**
 ```powershell
 # Should list template files
-Get-ChildItem templates/core/*.md | Select -First 5
+Get-ChildItem templates\core\*.md | Select-Object -First 5
 
 # Should show recent commit
 git submodule foreach git log -1 --oneline
 ```
 
-#### macOS/Linux (Bash)
+**macOS/Linux (Bash):**
 ```bash
 # Should list template files
 ls templates/core/*.md | head -5
@@ -43,305 +125,428 @@ git submodule foreach git log -1 --oneline
 **Expected output:**
 ```
 templates/core
-1a2b3c4 chore: update templates for v1.3.0
+a1b2c3d chore: update templates for v1.3.0
 ```
 
-⚠️ **If submodule is empty:** Templates will not load, and the server won't find `TEMPLATE_MANIFEST.json`. See [Troubleshooting](#submodule-not-present) for solutions.
+⚠️ **If templates/core is empty:** See [Troubleshooting: Submodule Issues](#submodule-issues)
 
 ---
 
-## Prerequisites
+## Step 2: Set Up Python Virtual Environment
 
-Before you begin, ensure you have:
+**Why?** Keeps AKR dependencies isolated from other Python projects.
 
-- **Python 3.10+** — [Download Python](https://www.python.org/downloads/)
-- **Node.js 16+** (for UI projects) — [Download Node.js](https://nodejs.org/)
-- **Git 2.13+** (for submodule support) — [Download Git](https://git-scm.com/)
-- **Visual Studio Code** — [Download VS Code](https://code.visualstudio.com/)
-- **GitHub Copilot Subscription** — Required for MCP integration with GitHub Copilot
+### Create and Activate Virtual Environment
 
-For **API/Database projects** (C#):
-- **.NET SDK 6.0+** — [Download .NET](https://dotnet.microsoft.com/download)
-
----
-
-## Step 1: Clone and Initialize Repository
-
-```bash
-# Clone the repository (if not already done)
-git clone <akr-mcp-server-repo>
-cd akr-mcp-server
-
-# Verify Python version
-python --version        # Should be 3.10 or higher
-```
-
----
-
-## Step 2: Install Python Dependencies
-
-```bash
-# Create virtual environment (recommended)
+**Windows (PowerShell):**
+```powershell
+# Create virtual environment
 python -m venv venv
 
 # Activate virtual environment
-# On Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
+```
 
-# On Windows (cmd):
-venv\Scripts\activate.bat
+**If you get an execution policy error:**
+```powershell
+# Allow scripts to run (one-time fix)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-# On macOS/Linux:
+# Try activating again
+.\venv\Scripts\Activate.ps1
+```
+
+**macOS/Linux (Bash):**
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
 source venv/bin/activate
+```
 
-# Install requirements
+**Success:** You should see `(venv)` appear in your terminal prompt.
+
+---
+
+## Step 3: Install Python Dependencies
+
+Make sure your virtual environment is activated (`(venv)` visible in prompt).
+
+```bash
+# Upgrade pip
+pip install --upgrade pip
+
+# Install all requirements
 pip install -r requirements.txt
 ```
 
 **What gets installed:**
-- `mcp` — Model Context Protocol library for Copilot integration
-- `pyyaml` — YAML parsing for documentation frontmatter
+- `fastmcp` or `mcp` — Model Context Protocol library
+- `pyyaml` — YAML parsing for frontmatter
 - `jinja2` — Template rendering engine
-- `pydantic` — Data validation
-- `pytest` — Test framework
+- `jsonschema` — Schema validation
+- `pytest` — Testing framework
+
+**Installation takes about 2-3 minutes.**
 
 ---
 
-## Step 3: Verify Installation
+## Step 4: Configure VS Code and GitHub Copilot
 
-Run the verification test to ensure everything is working:
+### 4.1 Install GitHub Copilot Extension
 
-```bash
-# Test Jinja2 pipeline
-python test_jinja2_pipeline.py
+1. Open VS Code
+2. Go to **Extensions** (Ctrl+Shift+X or Cmd+Shift+X)
+3. Search for "GitHub Copilot"
+4. Click **Install**
+5. Sign in with your GitHub account when prompted
 
-# Expected output:
-# ✓ Template rendering successful
-# ✓ Custom filters working
-# ✓ All fixtures validated
+### 4.2 Create MCP Configuration
+
+The AKR MCP Server uses MCP (Model Context Protocol) to integrate with GitHub Copilot.
+
+**Create `.vscode/mcp.json` in the akr-mcp-server folder:**
+
+**Windows (PowerShell):**
+```powershell
+# Create .vscode directory
+New-Item -ItemType Directory -Path ".vscode" -Force
+
+# Create mcp.json (edit the content after creation)
+New-Item -ItemType File -Path ".vscode\mcp.json" -Force
 ```
 
-Check that the telemetry log file exists:
-
+**macOS/Linux (Bash):**
 ```bash
-# Verify telemetry logging is working
-ls -la logs/enforcement.jsonl
+# Create .vscode directory
+mkdir -p .vscode
 
-# Should show a file with recent entries (within last hour)
+# Create mcp.json
+touch .vscode/mcp.json
 ```
 
----
+**Add this content to `.vscode/mcp.json`:**
 
-## Step 4: Configure Environment Variables
-
-Create a `.env` file in the workspace root (or set system environment variables):
-
-```bash
-# Optional: Set workspace root (usually auto-detected)
-AKR_WORKSPACE_ROOT=C:\path\to\your\project
-
-# Optional: Set log level (default: INFO)
-AKR_LOG_LEVEL=DEBUG
-
-# Optional: Set enforcement strictness (default: standard)
-# Options: lenient, standard, strict
-AKR_ENFORCEMENT_LEVEL=standard
-```
-
-Check your workspace's `mcp.json` for project-specific configuration:
-
+**Windows:**
 ```json
 {
-  "workspace_root": "/path/to/project",
-  "component_mappings": {
-    "path/to/Service.cs": {
-      "template": "lean_baseline_service_template.md",
-      "doc_path": "docs/services/Service_doc.md"
+    "mcpServers": {
+        "akr-mcp-server": {
+            "command": "${workspaceFolder}\\venv\\Scripts\\python.exe",
+            "args": ["${workspaceFolder}\\src\\server.py"],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}\\src"
+            }
+        }
     }
-  },
-  "team": {
-    "maintainers": ["developer@example.com"],
-    "review_required": true
-  }
 }
 ```
 
+**macOS/Linux:**
+```json
+{
+    "mcpServers": {
+        "akr-mcp-server": {
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": ["${workspaceFolder}/src/server.py"],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            }
+        }
+    }
+}
+```
+
+### 4.3 (Optional) Configure Environment Variables
+
+Create a `.env` file in the workspace root for optional configuration:
+
+```bash
+# Optional: Enable write operations (off by default for safety)
+AKR_ENABLE_WRITE_OPS=false
+
+# Optional: Set log level (default: INFO)
+AKR_LOG_LEVEL=INFO
+
+# Optional: Workspace root (usually auto-detected)
+# AKR_WORKSPACE_ROOT=/path/to/your/project
+```
+
 ---
 
-## Step 5: Configure VS Code and GitHub Copilot Extension
+## Step 5: Verify Installation
 
-### 5.1 Install GitHub Copilot Extension
+### Test 1: Open in VS Code
 
-1. Open VS Code
-2. Go to **Extensions** (Ctrl+Shift+X)
-3. Search for "GitHub Copilot"
-4. Click **Install**
-5. Sign in with your GitHub account
+**Open the akr-mcp-server folder in VS Code:**
 
-### 5.2 Enable MCP Server
+```bash
+# From within akr-mcp-server directory
+code .
+```
 
-The AKR-MCP-Server automatically registers when VS Code detects `mcp.json` in your workspace.
+### Test 2: Reload VS Code Window
 
-**Verify registration:**
-1. Open VS Code settings (Ctrl+,)
-2. Search: `GitHub Copilot: MCP Enabled`
-3. Should show ✓ enabled
+1. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
+2. Type: **"Developer: Reload Window"**
+3. Press Enter
 
-**If not auto-detected:**
-1. Create/update `.vscode/settings.json`:
-   ```json
-   {
-     "github.copilot.mcp.servers": {
-       "akr-mcp-server": {
-         "command": "python",
-         "args": ["path/to/akr-mcp-server/src/server.py"],
-         "env": {
-           "PYTHONPATH": "path/to/akr-mcp-server/src"
-         }
-       }
-     }
-   }
+### Test 3: Check MCP Server Status
+
+1. Open **Output** panel: **View → Output** (or `Ctrl+Shift+U`)
+2. Select **"GitHub Copilot Chat"** from the dropdown
+3. Look for:
+   ```
+   [info] Starting server akr-mcp-server
+   [info] Connection state: Running
+   [info] Discovered tools from akr-mcp-server
    ```
 
-2. Reload VS Code (Ctrl+Shift+P → "Developer: Reload Window")
+**If you see errors:** Check [Troubleshooting](#troubleshooting) section below.
 
-### 5.3 Verify MCP Connection
+### Test 4: Enable MCP Server in Copilot
 
-1. Open the **Copilot Chat** panel (Ctrl+L or Activity Bar icon)
-2. Type: `@akr list available templates`
-3. Should see a list of available documentation templates
+1. Open **Copilot Chat** panel (`Ctrl+Shift+I` or sidebar icon)
+2. Click the **settings icon** (⚙️) in chat panel
+3. Look for **"MCP Servers"** section
+4. Verify `akr-mcp-server` is listed and **enabled** (toggle ON)
+
+### Test 5: Run Health Check
+
+In Copilot Chat, type:
+
+```
+Run AKR health check
+```
+
+**Expected Response:**
+```
+✅ AKR MCP Server - Health Check
+
+Server Status: Running
+Templates Available: 10+
+Resources Available: Yes
+Tools Available: Yes
+```
+
+**🎉 If you see this, installation is complete!**
 
 ---
 
-## Step 6: Create Your First Documentation
+## Step 6: Configure Global AKR Tasks (Optional)
 
-Follow the quick start guide for your project type:
+**NEW:** Make AKR tasks available in ALL your VS Code workspaces! 🚀
 
-- **Backend/API Project** → [API Quick Start](WORKFLOWS_BY_PROJECT_TYPE.md#backend-api-project)
-- **Frontend/UI Project** → [UI Quick Start](WORKFLOWS_BY_PROJECT_TYPE.md#frontend--ui-project)
-- **Database Project** → [Database Quick Start](WORKFLOWS_BY_PROJECT_TYPE.md#database-project)
-- **Monorepo** → [Monorepo Setup](WORKFLOWS_BY_PROJECT_TYPE.md#monorepo-setup)
+This optional step allows you to run AKR tasks from any workspace without switching to the akr-mcp-server folder.
+
+### Why Configure Global Tasks?
+
+- ✅ Run tasks from any workspace (UI repo, API repo, database repo)
+- ✅ No workspace switching needed
+- ✅ One-time setup, use everywhere
+- ✅ Simplified workflow
+
+### How to Configure
+
+**Ensure virtual environment is activated, then run:**
+
+```bash
+python scripts/setup_global_tasks.py
+```
+
+**The script will:**
+1. Detect your akr-mcp-server installation path
+2. Set environment variables
+3. Configure VS Code user settings
+4. Backup existing settings
+
+**Follow the prompts and restart VS Code when complete.**
+
+### Verify Global Task Setup
+
+```bash
+python scripts/verify_global_tasks.py
+```
+
+**Expected:** All checks should pass ✓
+
+**If you skip this step:** You can still run tasks from the akr-mcp-server workspace or use Copilot Chat. You can always add global tasks later.
 
 ---
 
-## Step 7: Post-Installation Verification Checklist
+## Post-Installation Checklist
 
 - [ ] Python 3.10+ installed: `python --version`
-- [ ] Dependencies installed: `pip list | grep {mcp,jinja2,pyyaml}`
-- [ ] Virtual environment activated and working
-- [ ] Jinja2 pipeline tests pass: `python test_jinja2_pipeline.py`
-- [ ] Telemetry logging working: `logs/enforcement.jsonl` exists
-- [ ] GitHub Copilot extension installed and signed in
-- [ ] MCP server registered in VS Code
-- [ ] Can list AKR templates via Copilot Chat
-- [ ] `mcp.json` exists in workspace root
-- [ ] `.env` file configured (if needed)
-
----
-
-## Troubleshooting
-
-### Submodule Issues (Phase 1 — CRITICAL)
-
-<a name="submodule-not-present"></a>
-
-#### Issue: Submodule directory is empty (templates/core/)
-This means Git didn't clone the submodule content. The TemplateResolver will fail with: `"[ERROR] TEMPLATE_MANIFEST.json not found in submodule"`
-
-**Solution:**
-```bash
-# Initialize submodule (if you haven't already)
-git submodule update --init --recursive
-
-# Or, if the submodule was already cloned but is empty:
-git submodule update --remote --merge
-cd templates/core
-git fetch origin
-git checkout main   # or the pinned tag
-cd ../..
-
-# Verify submodule is now populated
-ls -la templates/core/*.md
-```
-
-#### Issue: "fatal: No submodule mapping found in .gitmodules"
-**Solution:**
-```bash
-# Check if .gitmodules exists and contains the templates/core entry
-cat .gitmodules
-
-# If missing, you need to add the submodule:
-git submodule add https://github.com/reyesmelvinr-emr/core-akr-templates.git templates/core
-git add .gitmodules templates/core
-git commit -m "chore: restore templates submodule"
-```
-
-#### Issue: Submodule at HEAD (not pinned to tag)
-This can cause non-reproducible builds. You should pin to a specific version tag.
-
-**Solution:**
-See [VERSION_MANAGEMENT.md](VERSION_MANAGEMENT.md) for how to properly pin submodule versions and handle updates.
-
-**Quick fix (temporary):**
-```bash
-cd templates/core
-git checkout v1.0.0   # or your desired tag
-cd ../..
-git add templates/core
-git commit -m "chore: pin templates to v1.0.0"
-```
-
----
-
-### General Setup Issues
-
-#### Issue: Python not found
-**Solution:**
-- Verify Python installation: `python --version`
-- Add Python to PATH: [Python Windows PATH Setup](https://docs.python.org/3/using/windows.html)
-- Use `python3` instead of `python` on some systems
-
-### Issue: Module import errors (mcp, jinja2, etc.)
-**Solution:**
-```bash
-# Ensure virtual environment is activated
-# Then reinstall:
-pip install --upgrade -r requirements.txt
-```
-
-### Issue: GitHub Copilot extension not showing AKR tools
-**Solution:**
-1. Verify `mcp.json` exists in workspace root
-2. Reload VS Code (Ctrl+Shift+P → "Developer: Reload Window")
-3. Check Copilot Chat: "What MCP servers are available?"
-4. View VS Code output panel (View → Output → "MCP") for error messages
-
-### Issue: Telemetry logging not working
-**Solution:**
-```bash
-# Verify logs directory exists
-mkdir -p logs
-
-# Verify write permissions
-touch logs/enforcement.jsonl
-
-# Check file size (should grow as you use tools)
-ls -la logs/enforcement.jsonl
-```
-
-### Issue: Validation errors when writing documentation
-**Solution:**
-- See [Troubleshooting Validation Errors](DEVELOPER_REFERENCE.md#troubleshooting-validation-errors)
-- Common issues: missing required sections, incorrect YAML frontmatter
+- [ ] Git submodule initialized: `templates/core/*.md` files exist
+- [ ] Virtual environment created and activated
+- [ ] Dependencies installed: `pip list | grep mcp`
+- [ ] `.vscode/mcp.json` created
+- [ ] GitHub Copilot extension installed
+- [ ] VS Code reloaded
+- [ ] MCP server shows "Running" in Output panel
+- [ ] MCP server enabled in Copilot Chat settings
+- [ ] Health check passes in Copilot Chat
+- [ ] (Optional) Global tasks configured
 
 ---
 
 ## Next Steps
 
-1. **Choose your project type** and follow the quick start guide
-2. **Read about AKR markers** (🤖 vs ❓) to understand how extraction works
-3. **Review the Quick Reference** for command list
-4. **Set up your first documentation** for a key service/component
+### Choose Your Workflow
+
+Now that the MCP server is installed, you can:
+
+1. **Document a new project:**
+   - [Backend/API Project Quick Start](WORKFLOWS_BY_PROJECT_TYPE.md#backend-api-project)
+   - [Frontend/UI Project Quick Start](WORKFLOWS_BY_PROJECT_TYPE.md#frontend--ui-project)
+   - [Database Project Quick Start](WORKFLOWS_BY_PROJECT_TYPE.md#database-project)
+
+2. **Learn the Copilot Chat workflow:**
+   - See [Copilot Chat Workflow Guide](COPILOT_CHAT_WORKFLOW.md)
+
+3. **Explore available tools:**
+   - See [Quick Reference](QUICK_REFERENCE.md)
+
+---
+
+## Troubleshooting
+
+### Submodule Issues
+
+#### Problem: `templates/core/` directory is empty
+
+This means Git didn't clone the submodule content.
+
+**Solution:**
+```bash
+# Initialize submodule
+git submodule update --init --recursive
+
+# If that doesn't work, try:
+git submodule update --remote --merge
+
+# Verify templates are now present
+ls templates/core/*.md
+```
+
+#### Problem: "No submodule mapping found in .gitmodules"
+
+**Solution:**
+```bash
+# Check if .gitmodules exists
+cat .gitmodules
+
+# If missing, you need to add the submodule
+git submodule add <core-akr-templates-repo-url> templates/core
+git add .gitmodules templates/core
+git commit -m "chore: add templates submodule"
+```
+
+For more submodule help, see [VERSION_MANAGEMENT.md](VERSION_MANAGEMENT.md).
+
+---
+
+### Python Issues
+
+#### Problem: Python not found
+
+**Symptom:** `python : The term 'python' is not recognized`
+
+**Solution:**
+1. Install Python 3.10+ from [python.org](https://www.python.org/downloads/)
+2. **During installation:** Check ✅ "Add Python to PATH"
+3. Restart your terminal
+4. Try `python3` instead of `python` (macOS/Linux)
+
+#### Problem: Virtual environment won't activate
+
+**Windows - Execution policy error:**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\venv\Scripts\Activate.ps1
+```
+
+**macOS/Linux - Permission denied:**
+```bash
+chmod +x venv/bin/activate
+source venv/bin/activate
+```
+
+#### Problem: Module import errors
+
+**Solution:**
+```bash
+# Make sure virtual environment is activated
+# Then reinstall:
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+---
+
+### VS Code / MCP Issues
+
+#### Problem: MCP Server not starting
+
+**Check Output Panel:**
+1. **View → Output** (Ctrl+Shift+U)
+2. Select "GitHub Copilot Chat"
+3. Look for error messages
+
+**Common issues:**
+- Wrong Python version (need 3.10+)
+- Missing dependencies (reinstall: `pip install -r requirements.txt`)
+- Incorrect paths in `.vscode/mcp.json`
+- Virtual environment not activated when starting VS Code
+
+**Solution:**
+```bash
+# Ensure virtual environment is activated
+# Deactivate and reactivate
+deactivate
+source venv/bin/activate  # or .\venv\Scripts\Activate.ps1 on Windows
+
+# Reload VS Code
+# Ctrl+Shift+P → "Developer: Reload Window"
+```
+
+#### Problem: MCP Server not listed in Copilot settings
+
+**Solution:**
+1. Verify `.vscode/mcp.json` exists in akr-mcp-server root
+2. Check JSON syntax (no missing commas/brackets)
+3. Reload VS Code: `Ctrl+Shift+P` → "Developer: Reload Window"
+4. Open Copilot Chat → Settings (⚙️) → MCP Servers
+
+#### Problem: Health check fails or shows 0 templates
+
+**Solution:**
+```bash
+# Verify templates exist
+ls templates/core/*.md
+
+# Should see multiple .md files
+# If empty, see "Submodule Issues" above
+```
+
+---
+
+### GitHub Copilot Issues
+
+#### Problem: Copilot extension not installed
+
+**Solution:**
+1. Open Extensions: `Ctrl+Shift+X`
+2. Search: "GitHub Copilot"
+3. Click Install
+4. Sign in with GitHub account
+
+#### Problem: Not subscribed to Copilot
+
+**Solution:**
+- You need an active GitHub Copilot subscription
+- Check: https://github.com/settings/copilot
 
 ---
 
@@ -350,8 +555,7 @@ ls -la logs/enforcement.jsonl
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
 | Python | 3.10 | 3.11+ |
-| Node.js | 16 LTS | 18 LTS |
-| .NET SDK (if C#) | 6.0 | 7.0+ |
+| Git | 2.13+ | Latest |
 | VS Code | Latest | Latest |
 | RAM | 4 GB | 8 GB |
 | Disk Space | 500 MB | 2 GB |
@@ -360,15 +564,65 @@ ls -la logs/enforcement.jsonl
 
 ## Getting Help
 
-- **Installation issues?** → Check [Troubleshooting](#troubleshooting) section
-- **Project-specific setup?** → See [WORKFLOWS_BY_PROJECT_TYPE.md](WORKFLOWS_BY_PROJECT_TYPE.md)
-- **Technical details?** → See [DEVELOPER_REFERENCE.md](DEVELOPER_REFERENCE.md)
-- **Quick answers?** → See [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+### Documentation Resources
+
+- **Installation issues?** → This guide's [Troubleshooting](#troubleshooting) section
+- **Project-specific setup?** → [Workflows by Project Type](WORKFLOWS_BY_PROJECT_TYPE.md)
+- **Using Copilot Chat?** → [Copilot Chat Workflow Guide](COPILOT_CHAT_WORKFLOW.md)
+- **Command reference?** → [Quick Reference](QUICK_REFERENCE.md)
+- **Technical details?** → [Developer Reference](DEVELOPER_REFERENCE.md)
+
+### Team Support
+
+- **Team Lead:** Template access or repository questions
+- **IT Support:** Python/Git installation issues
+- **AKR Team:** MCP server bugs or feature requests
+
+---
+
+## 💡 Tips for Success
+
+### Keep Everything Updated
+
+```bash
+# Update templates (from templates/core directory)
+cd templates/core
+git pull origin main
+cd ../..
+
+# Update Python dependencies
+pip install -r requirements.txt --upgrade
+
+# Update VS Code and Copilot extension regularly
+# Help → Check for Updates
+```
+
+### Deactivate Virtual Environment When Done
+
+```bash
+# When finished working with AKR
+deactivate
+```
+
+The `(venv)` prefix will disappear from your prompt.
+
+### Save Your Installation Path
+
+Remember where you installed AKR MCP Server:
+- **Windows:** `C:\Users\<YourUsername>\Documents\akr-mcp-server`
+- **macOS/Linux:** `~/Documents/akr-mcp-server`
+
+You may need this path when setting up application repositories.
 
 ---
 
 ## Installation Complete! 🎉
 
-Once you've verified all steps, you're ready to start documenting your project.
+Once you've verified all steps, you're ready to start using AKR MCP Server with GitHub Copilot.
 
-**Next:** Choose your project type guide from [Workflows by Project Type](WORKFLOWS_BY_PROJECT_TYPE.md)
+**Next:** Choose your project type guide from [Workflows by Project Type](WORKFLOWS_BY_PROJECT_TYPE.md) or try the [Copilot Chat Workflow](COPILOT_CHAT_WORKFLOW.md).
+
+---
+
+**Last Updated:** February 25, 2026  
+**Guide Version:** 2.0 (Merged)

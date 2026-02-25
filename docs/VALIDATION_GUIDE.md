@@ -383,7 +383,7 @@ Future versions will support:
 
 - **Related concepts:**
   - [ARCHITECTURE.md](./ARCHITECTURE.md) — System design and components
-  - [IMPLEMENTATION_PLAN_V0.2.0.md](./IMPLEMENTATION_PLAN_V0.2.0.md) — Phase breakdown and roadmap
+  - [archive/IMPLEMENTATION_PLAN_V0.2.0.md](./archive/IMPLEMENTATION_PLAN_V0.2.0.md) — Phase breakdown and roadmap (archived)
 
 ---
 

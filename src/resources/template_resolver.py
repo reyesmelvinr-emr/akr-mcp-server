@@ -145,9 +145,9 @@ class TemplateResolver:
         Get template content using three-layer resolution.
 
         Priority order:
-        1. Local override (akr_content/templates/{template_id}.md)
-        2. Submodule (templates/core/{template_id}.md)
-        3. Remote HTTP fetch (if enabled and pinned version available)
+        1. Submodule (templates/core/{template_id}.md) - PRIMARY SOURCE OF TRUTH
+        2. Local override (akr_content/templates/{template_id}.md) - FALLBACK
+        3. Remote HTTP fetch (if enabled and pinned version available) - LAST RESORT
 
         Args:
             template_id: Template identifier (without .md extension)
@@ -156,16 +156,7 @@ class TemplateResolver:
         Returns:
             Template content as string, or None if not found
         """
-        # Try layer 2: Local override (highest priority for customization)
-        local_content = self._load_from_path(
-            self.local_overrides_path,
-            template_id,
-            source="local-override"
-        )
-        if local_content:
-            return local_content
-
-        # Try layer 1: Submodule (standard templates)
+        # Try layer 1: Submodule (primary source of truth)
         submodule_content = self._load_from_path(
             self.submodule_path,
             template_id,
@@ -173,6 +164,15 @@ class TemplateResolver:
         )
         if submodule_content:
             return submodule_content
+
+        # Try layer 2: Local override (fallback for when submodule is missing)
+        local_content = self._load_from_path(
+            self.local_overrides_path,
+            template_id,
+            source="local-override"
+        )
+        if local_content:
+            return local_content
 
         # Try layer 3: Remote HTTP fetch (if enabled and version specified)
         if self.config.get("http_fetch_enabled", False):

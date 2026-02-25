@@ -29,7 +29,8 @@ def test_list_templates_reads_submodule(tmp_path: Path) -> None:
     assert resolver.list_templates() == ["alpha"]
 
 
-def test_get_template_prefers_local_override(tmp_path: Path) -> None:
+def test_get_template_fallback_to_local_override(tmp_path: Path) -> None:
+    """When template exists in both, submodule has priority (local is fallback)"""
     _create_repo_structure(tmp_path)
     local_path = tmp_path / "akr_content" / "templates"
     core_path = tmp_path / "templates" / "core"
@@ -38,7 +39,8 @@ def test_get_template_prefers_local_override(tmp_path: Path) -> None:
     (core_path / "sample.md").write_text("submodule content", encoding="utf-8")
 
     resolver = TemplateResolver(tmp_path, config={})
-    assert resolver.get_template("sample") == "local content"
+    # NOTE: Priority changed in v0.2.0 - submodule is now primary source of truth
+    assert resolver.get_template("sample") == "submodule content"
 
 
 def test_get_template_falls_back_to_submodule(tmp_path: Path) -> None:

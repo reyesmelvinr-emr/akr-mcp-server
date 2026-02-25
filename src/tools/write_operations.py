@@ -12,6 +12,7 @@ Supports:
 """
 
 import asyncio
+import difflib
 import logging
 import os
 import subprocess
@@ -354,6 +355,7 @@ def write_documentation(
     doc_path: str,
     content: str,
     source_file: str,
+    mode: str = "dry-run",
     component_type: str = "unknown",
     template: str = "standard_service_template.md",
     commit_message: Optional[str] = None,
@@ -371,6 +373,7 @@ def write_documentation(
         doc_path: Relative path for the documentation file
         content: Documentation content to write
         source_file: Source file being documented
+        mode: Operation mode - "dry-run" (preview only, default) or "feature-branch" (write to disk)
         component_type: Type of component (services, controllers, etc.)
         template: Template used for generation
         commit_message: Optional custom commit message
@@ -378,10 +381,20 @@ def write_documentation(
         
     Returns:
         Dictionary with result information
+        For mode="dry-run": {"success": true, "effect": "dry-run", "patch": "<diff>", "preview": "<content>"}
+        For mode="feature-branch": {"success": true, "filePath": "...", "committed": bool}
     """
     permission_error = _check_write_permissions(allowWrites)
     if permission_error:
         return permission_error
+
+    # Validate mode parameter
+    if mode not in ["dry-run", "feature-branch"]:
+        return error_response(
+            ErrorType.INVALID_PARAMETER,
+            f"Invalid mode: {mode}. Must be 'dry-run' or 'feature-branch'",
+            guidance={"valid_modes": ["dry-run", "feature-branch"]}
+        )
 
     config = config or {}
     enforcement_cfg = config.get("documentation", {}).get("enforcement", {})
@@ -456,13 +469,16 @@ def write_documentation(
         })
 
     try:
+        # Map mode parameter to dry_run flag
+        should_dry_run = (mode == "dry-run")
+        
         enforcement_result = enforce_and_fix(
             markdown=content,
             template_name=template,
             file_metadata=file_metadata,
             config=config,
             update_mode="replace" if overwrite else "create",
-            dry_run=False,
+            dry_run=should_dry_run,
             resource_manager=None,
         )
     except Exception as e:
@@ -485,6 +501,42 @@ def write_documentation(
             "violation_count": len(enforcement_result.violations),
             "timestamp": datetime.now().isoformat() + "Z"
         })
+
+    # === DRY-RUN MODE: Return diff preview without writing ===
+    if mode == "dry-run":
+        # Generate the final content with AI header
+        header = build_ai_header(source_file, component_type, template)
+        final_content = _insert_ai_header_after_yaml(header, enforcement_result.content)
+        
+        # Generate unified diff preview
+        original_content = ""
+        if Path(repo_path).joinpath(doc_path).exists():
+            with open(Path(repo_path).joinpath(doc_path), "r", encoding="utf-8") as f:
+                original_content = f.read()
+        
+        diff_lines = list(difflib.unified_diff(
+            original_content.splitlines(keepends=True),
+            final_content.splitlines(keepends=True),
+            fromfile=f"a/{doc_path}",
+            tofile=f"b/{doc_path}",
+            lineterm=""
+        ))
+        unified_diff = "".join(diff_lines) if diff_lines else "(no changes)"
+        
+        return {
+            "success": True,
+            "effect": "dry-run",
+            "patch": unified_diff,
+            "preview": final_content,
+            "filePath": doc_path,
+            "fullPath": str(Path(repo_path) / doc_path),
+            "sourceFile": source_file,
+            "componentType": component_type,
+            "template": template,
+            "enforcementSummary": enforcement_result.summary,
+            "autoFixed": enforcement_result.auto_fixed,
+            "message": "Dry-run mode: no files were written. Review the 'patch' field for proposed changes."
+        }
 
     if not enforcement_result.valid:
         violations = [
@@ -545,6 +597,7 @@ async def write_documentation_async(
     doc_path: str,
     content: str,
     source_file: str,
+    mode: str = "dry-run",
     component_type: str = "unknown",
     template: str = "standard_service_template.md",
     commit_message: Optional[str] = None,
@@ -568,6 +621,7 @@ async def write_documentation_async(
         doc_path: Relative path for the documentation file
         content: Documentation content to write
         source_file: Source file being documented
+        mode: Operation mode - "dry-run" (preview only, default) or "feature-branch" (write to disk)
         component_type: Type of component (services, controllers, etc.)
         template: Template used for generation
         commit_message: Optional custom commit message
@@ -579,10 +633,20 @@ async def write_documentation_async(
         
     Returns:
         Dictionary with result information (includes operationMetrics)
+        For mode="dry-run": {"success": true, "effect": "dry-run", "patch": "<diff>", "preview": "<content>"}
+        For mode="feature-branch": {"success": true, "filePath": "...", "committed": bool}
     """
     permission_error = _check_write_permissions(allowWrites)
     if permission_error:
         return permission_error
+
+    # Validate mode parameter
+    if mode not in ["dry-run", "feature-branch"]:
+        return error_response(
+            ErrorType.INVALID_PARAMETER,
+            f"Invalid mode: {mode}. Must be 'dry-run' or 'feature-branch'",
+            guidance={"valid_modes": ["dry-run", "feature-branch"]}
+        )
 
     config = config or {}
     metrics = operation_metrics or OperationMetrics(template_name=template)
@@ -798,6 +862,9 @@ async def write_documentation_async(
             })
         
         # Run enforcement (PHASE 4: async to avoid blocking event loop)
+        # Map mode parameter to dry_run flag
+        should_dry_run = (mode == "dry-run")
+        
         try:
             enforcement_result = await enforce_and_fix_async(
                 markdown=content,
@@ -805,7 +872,7 @@ async def write_documentation_async(
                 file_metadata=file_metadata,
                 config=config,
                 update_mode="replace" if overwrite else "create",
-                dry_run=False,
+                dry_run=should_dry_run,
                 resource_manager=resource_manager,
             )
         except asyncio.CancelledError:
@@ -832,6 +899,53 @@ async def write_documentation_async(
                 "violation_count": len(enforcement_result.violations),
                 "timestamp": datetime.now().isoformat() + "Z"
             })
+        
+        # === DRY-RUN MODE: Return diff preview without writing ===
+        if mode == "dry-run":
+            import difflib
+            
+            # Build final content with AI header
+            header = build_ai_header(source_file, component_type, template)
+            final_content = _insert_ai_header_after_yaml(header, enforcement_result.content)
+            
+            # Generate unified diff
+            original_lines = content.splitlines(keepends=True)
+            patched_lines = final_content.splitlines(keepends=True)
+            
+            diff = ''.join(difflib.unified_diff(
+                original_lines,
+                patched_lines,
+                fromfile=f"a/{doc_path}",
+                tofile=f"b/{doc_path}",
+                lineterm=''
+            ))
+            
+            metrics.finalize()
+            await progress_tracker.conclude() if progress_tracker else None
+            
+            return {
+                "success": True,
+                "effect": "dry-run",
+                "patch": diff if diff else "(no changes needed)",
+                "preview": final_content,
+                "filePath": doc_path,
+                "fullPath": str(Path(repo_path) / doc_path),
+                "sourceFile": source_file,
+                "componentType": component_type,
+                "template": template,
+                "enforcementSummary": enforcement_result.summary,
+                "autoFixed": enforcement_result.auto_fixed,
+                "violations": [
+                    {
+                        "type": v.type,
+                        "severity": getattr(v.severity, "value", str(v.severity)),
+                        "message": v.message,
+                        "line": v.line
+                    }
+                    for v in enforcement_result.violations
+                ] if not enforcement_result.valid else [],
+                "message": "Dry-run mode: no files were written. Review the 'patch' field for proposed changes."
+            }
         
         if not enforcement_result.valid:
             violations = [

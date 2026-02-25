@@ -1100,7 +1100,7 @@ Follows standard layered architecture:
 
 ## Database Operations
 
-Uses dbo.Users table. See [Users Table Documentation](../database/Users_table.md).
+Uses dbo.Users table. See Users Table Documentation (docs/database/Users_table.md).
 ```
 
 **UserForm documentation (frontend/components/UserForm_doc.md):**
@@ -1117,7 +1117,7 @@ Form for creating and editing users. Calls UserController endpoints.
 4. UserService applies business rules and saves to dbo.Users
 5. Response returned to component, UI updates
 
-See [UserService Documentation](../services/UserService_doc.md) for backend logic.
+See UserService Documentation (docs/services/UserService_doc.md) for backend logic.
 
 ## API Integration
 
@@ -1133,7 +1133,7 @@ const response = await fetch('/api/users', {
 });
 ```
 
-See [API Contract in UserService docs](../services/UserService_doc.md#api-contract) for full endpoint spec.
+See API Contract in UserService docs (docs/services/UserService_doc.md#api-contract) for full endpoint spec.
 ```
 
 **Users table documentation (database/database/Users_table.md):**
@@ -1154,12 +1154,12 @@ Stores user profile data for all platform users.
 ## Related Tables
 
 - Users → Enrollments (user can have many enrollments)
-- See [Enrollments Table](./Enrollments_table.md)
+- See Enrollments Table (docs/database/Enrollments_table.md)
 
 ## Data Source
 
 UserController calls UserService which persists to this table.
-See [UserService Documentation](../services/UserService_doc.md).
+See UserService Documentation (docs/services/UserService_doc.md).
 ```
 
 This creates a documentation web where each piece links to related pieces, showing how the full system works end-to-end.

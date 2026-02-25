@@ -570,7 +570,7 @@ Ctrl+Shift+P → "Developer: Reload Window"
 | [WORKFLOWS_BY_PROJECT_TYPE.md](WORKFLOWS_BY_PROJECT_TYPE.md) | Step-by-step guide for your project type (API, UI, Database, Monorepo) |
 | [DEVELOPER_REFERENCE.md](DEVELOPER_REFERENCE.md) | Architecture, APIs, integration points (for developers extending the system) |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, components, technology decisions |
-| [_archived/README.md](_archived/README.md) | Historical phase documentation (design, implementation history) |
+| [archive/](archive/) | Historical phase documentation (design, implementation history) |
 
 ---
 

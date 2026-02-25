@@ -2,7 +2,9 @@
 # Python 3.10+ required
 
 # MCP SDK - Model Context Protocol for VS Code Copilot integration
-mcp>=1.0.0
+# Version pinned to prevent breaking changes from decorator/return-type churn
+# Includes [cli] extras for mcp command-line tool
+mcp[cli]>=1.26.0,<1.27
 
 # Template rendering (Jinja2 migration - Phase 3)
 Jinja2>=3.0.0

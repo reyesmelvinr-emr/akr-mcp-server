@@ -22,7 +22,7 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
     │                      │             │                    │
     │ - list_resources()   │             │ - extract_code_... │
     │ - read_resource()    │             │ - get_charter()    │
-    │ - list_templates()   │             │ - validate_doc...  │
+    │ - list_resource_...  │             │ - validate_doc...  │
     │                      │             │ - write_document() │
     └─────────┬────────────┘             └─────────┬──────────┘
               │                                    │
@@ -35,7 +35,7 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
     │ - Config         │  │   │  - CodeAnalyzer         │
     │ - Logging        │  │   │  - TemplateResolver     │
     │ - Schema Builder │  │   │  - ValidationEngine     │
-    │ - Document       │  │   │  - FileWriter           │
+    │ - Document       │  │   │  - Write Operations     │
     │   Parser         │  │   │  - Enforcement Logger   │
     └────────────┬─────┘  │   └──────────┬──────────────┘
                  │        │              │
@@ -51,8 +51,8 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
           ┌──────▼────┐  ┌▼──────────┐ │
           │ Git       │  │ HTTP      │ │
           │ Submodule │  │ Templates │ │
-          │ (Legacy   │  │ (Cloud    │ │
-          │ Templates)│  │ Templates)│ │
+          │ (Primary  │  │ (Optional │ │
+          │ Templates)│  │ Preview)  │ │
           └───────────┘  └───────────┘ │
                                        │
                          ┌─────────────▼──────────────┐
@@ -72,18 +72,20 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
 **Components:**
 
 - **Resources (async discovery)**
-  - `list_resources()`: Enumerate available templates, charters, guides
-  - `read_resource(uri)`: Fetch specific template/charter/guide content
+  - `list_resources()`: Enumerate available templates and charters
+  - `read_resource(uri)`: Fetch specific template/charter content
   - `list_resource_templates()`: List URI patterns for dynamic resource construction
-  - URI Format: `akr://template/{id}`, `akr://charter/{domain}`, `akr://guide/{topic}`
+  - URI Format: `akr://template/{id}`, `akr://charter/{domain}`
   - MIME Type: `text/markdown` (all resources are Markdown documents)
 
 - **Tools (action-oriented)**
-  - `extract_code_context()`: Vector code files for language-aware extraction (C# and SQL only)
-  - `get_charter()`: Retrieve or draft a charter document for a code component
+  - `extract_code_context()`: Deterministic code extraction (C# and SQL only)
+  - `get_charter()`: Retrieve a charter document for a documentation domain
   - `validate_documentation()`: Validate documents against schema tiers (TIER_1/2/3)
+  - `generate_documentation()`: Create template-compliant stubs with human placeholders
+  - `generate_and_write_documentation()`: Unified scaffold + validate + write flow
   - `write_documentation()`: Write validated documents to disk with audit trail
-  - `list_templates()`: Discovery tool for available templates
+  - `update_documentation_sections()`: Targeted section updates with enforcement
 
 ### 2. Core Business Logic Layer
 
@@ -100,7 +102,7 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
   - Version: v0.2.0+ (deprecated heuristic extractors in v0.1.0)
 
 #### Template Management
-- **`TemplateResolver`** (src/tools/template_resolver.py)
+- **`TemplateResolver`** (src/resources/template_resolver.py)
   - Three-layer resolution strategy:
     1. Git submodule (pinned tags for consistency)
     2. Local file overrides (project-specific customization)
@@ -117,15 +119,14 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
   - Schema: JSON Schema for front-matter validation
   - Auto-Fix: Capable of suggesting and applying common fixes
   - Dry-Run Mode: Default behavior, shows changes without writing
-  - Output: Structured result with errors, warnings, auto-fixed content, diffs
+  - Output: Structured result with errors, warnings, auto-fixes, diffs
 
 #### Document Writing
-- **`FileWriter`** (src/tools/file_writer.py)
-  - Atomic write operations with validation pre-checks
-  - Modes: Create, Append, Replace (with schema enforcement)
+- **`write_documentation` + `update_documentation_sections`** (src/tools/write_operations.py)
+  - Enforced write operations with validation pre-checks
   - Audit Trail: Detailed logging of all write operations
   - Permission Gating: Two-layer write protection (env flag + allow flag)
-  - Backup: Automatic backup before destructive operations
+  - Safety: Write tools are registered only when write ops are enabled
 
 #### Security & Audit
 - **`EnforcementLogger`** (src/tools/enforcement_logger.py)
@@ -162,7 +163,7 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
         ┌──────▼─────────────────────────────────────────┐
         │ 3. Validate Documentation                       │
         │    Tool: validate_documentation()               │
-        │    Input: markdown, tier, template_id           │
+        │    Input: doc_path, tier, template_id           │
         │    Checking: Schema compliance, completeness    │
         │    Output: Errors, warnings, suggested fixes    │
         └──────┬────────────────────────────────────────┘
@@ -178,7 +179,7 @@ The AKR MCP Server is a **design-centric documentation generator** that integrat
         ┌──────▼──────────────────────────────────────────┐
         │ 5. Write to Repository                          │
         │    Tool: write_documentation()                  │
-        │    Input: file_path, content, operation         │
+        │    Input: content, source_file, doc_path         │
         │    Checks: Final schema validation              │
         │    Audit: Logs to enforcement.jsonl             │
         │    Output: {success, file_path, metadata}       │
@@ -203,7 +204,7 @@ ValidationEngine (Phase 3)
   ├── TemplateSchemaBuilder
   └── EnforcedViolation types
 
-FileWriter (Phase 2)
+WriteOperations (Phase 2)
   ├── EnforcementLogger
   ├── EnforcedViolation handling
   └── Path resolution
@@ -219,24 +220,22 @@ MCP Server
 ### MCP Resources
 
 #### `list_resources()`
-Lists all discoverable resources (templates, charters, guides).
+Lists all discoverable resources (templates and charters).
 
 **Response:**
 ```json
-{
-  "resources": [
-    {
-      "uri": "akr://template/lean_baseline_service_template",
-      "name": "Lean Baseline Service Template",
-      "mimeType": "text/markdown"
-    },
-    {
-      "uri": "akr://charter/backend",
-      "name": "Backend Charter",
-      "mimeType": "text/markdown"
-    }
-  ]
-}
+[
+  {
+    "uri": "akr://template/lean_baseline_service_template",
+    "name": "Template: lean_baseline_service_template",
+    "mimeType": "text/markdown"
+  },
+  {
+    "uri": "akr://charter/backend",
+    "name": "Charter: backend",
+    "mimeType": "text/markdown"
+  }
+]
 ```
 
 #### `read_resource(uri)`
@@ -247,6 +246,23 @@ Retrieves the content of a specific resource.
 
 **Response:**
 - Markdown content as plain text
+
+#### `list_resource_templates()`
+Lists URI patterns for dynamic resource construction.
+
+**Response:**
+```json
+[
+  {
+    "uriTemplate": "akr://template/{id}",
+    "name": "AKR Documentation Templates"
+  },
+  {
+    "uriTemplate": "akr://charter/{domain}",
+    "name": "AKR Charters"
+  }
+]
+```
 
 ### MCP Tools
 
@@ -276,14 +292,14 @@ Extracts code context from files using deterministic (C#, SQL) methods.
 }
 ```
 
-#### `validate_documentation(doc_content, template_id, tier_level?, auto_fix?, dry_run?)`
+#### `validate_documentation(doc_path, template_id, tier_level?, auto_fix?, dry_run?)`
 
 Validates a document against a schema template.
 
 **Parameters:**
-- `doc_content` (required): Markdown document to validate
+- `doc_path` (required): Documentation file path to validate
 - `template_id` (required): Template identifier (e.g., "lean_baseline_service_template")
-- `tier_level` (optional): "TIER_1" (strict), "TIER_2" (moderate), "TIER_3" (lenient). Default: TIER_1
+- `tier_level` (optional): "TIER_1" (strict), "TIER_2" (moderate), "TIER_3" (lenient). Default: TIER_2
 - `auto_fix` (optional): Boolean, attempt to auto-fix violations. Default: false
 - `dry_run` (optional): Boolean, don't write changes. Default: true
 
@@ -303,16 +319,19 @@ Validates a document against a schema template.
 }
 ```
 
-#### `write_documentation(file_path, content, operation?, write_mode?, backup?)`
+#### `write_documentation(content, source_file, doc_path, template?, component_type?, overwrite?, force_workflow_bypass?, allowWrites?)`
 
 Writes validated documentation to disk.
 
 **Parameters:**
-- `file_path` (required): Target file path (e.g., "/docs/services/auth_charter.md")
 - `content` (required): Markdown content to write
-- `operation` (optional): "create" or "update". Default: "create"
-- `write_mode` (optional): "strict" (validates before write) or "force" (writes without validation). Default: "strict"
-- `backup` (optional): Create backup before overwriting. Default: true
+- `source_file` (required): Repo-relative source file path
+- `doc_path` (required): Repo-relative output doc path
+- `template` (optional): Template filename or shortcut
+- `component_type` (optional): Component type, e.g. service, controller
+- `overwrite` (optional): Whether to overwrite existing file (default: false)
+- `force_workflow_bypass` (optional): Allow direct write for new files without generate_documentation (default: false)
+- `allowWrites` (optional): Must be true to allow file writes
 
 **Response:**
 ```json
@@ -330,7 +349,7 @@ Writes validated documentation to disk.
 ## Security Architecture
 
 ### Write Operation Gating
-1. **Environment Control**: `AKR_WRITE_OPS_ENABLED` env var (default: false)
+1. **Environment Control**: `AKR_ENABLE_WRITE_OPS` env var (default: false)
 2. **Parameter Control**: `allowWrites` parameter in API calls
 3. **User Tracking**: All writes logged with timestamp and user identity (if available)
 

@@ -22,8 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `@server.list_resource_templates()`: Expose resource templates for dynamic URI construction
   - All resources return proper MIME types (`text/markdown`)
 - **Documentation**:
-  - [docs/INSTALLATION_AND_SETUP.md](docs/INSTALLATION_AND_SETUP.md): Cross-OS submodule setup guide
-  - [docs/VERSION_MANAGEMENT.md](docs/VERSION_MANAGEMENT.md): Template update workflow and version management
+  - [INSTALLATION_AND_SETUP.md](INSTALLATION_AND_SETUP.md): Cross-OS submodule setup guide
+  - [VERSION_MANAGEMENT.md](VERSION_MANAGEMENT.md): Template update workflow and version management
   - Updated [README.md](README.md) with resource discovery section
 
 #### Phase 2: Write Operations Gating
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation**:
   - [SECURITY.md](SECURITY.md): Trust model, MCP Inspector versions, identity roadmap
   - Updated [README.md](README.md) with "Write Operations (Disabled by Default)" section
-  - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) updated with security considerations
+  - [ARCHITECTURE.md](ARCHITECTURE.md) updated with security considerations
 
 #### Phase 3: Dual-Faceted Validation
 - **Validation engine** (`src/tools/validation_library.py`):
@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Useful for CI/CD integration
 - **Dependencies**: Added `jsonschema>=4.0.0` for JSON Schema validation
 - **Documentation**:
-  - [docs/VALIDATION_GUIDE.md](docs/VALIDATION_GUIDE.md): Comprehensive validation usage guide
+  - [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md): Comprehensive validation usage guide
   - Tier-level explanations, auto-fix capabilities, CI/CD integration examples
 
 #### Phase 4: Extractor Deprecation & Code Analytics
@@ -86,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Local template copies in `akr_content/templates/` removed
   - Built on externalized `core-akr-templates` for single source of truth
 - **Documentation**:
-  - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): Major update reflecting v0.2.0 design shift
+  - [ARCHITECTURE.md](ARCHITECTURE.md): Major update reflecting v0.2.0 design shift
     - Now a template/charter resource provider + validator (not a doc generator)
     - Component dependency diagrams (MCP resources, tools, validators)
     - Data flow: extract → charter → validate → write
@@ -150,14 +150,14 @@ The following extractors **use heuristic-based regex patterns** and are inaccura
 **New Files:**
 - [CHANGELOG.md](CHANGELOG.md) — This file
 - [SECURITY.md](SECURITY.md) — Trust model, MCP compliance, identity roadmap
-- [docs/VERSION_MANAGEMENT.md](docs/VERSION_MANAGEMENT.md) — Submodule workflow
-- [docs/VALIDATION_GUIDE.md](docs/VALIDATION_GUIDE.md) — Validation usage guide
+- [VERSION_MANAGEMENT.md](VERSION_MANAGEMENT.md) — Submodule workflow
+- [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md) — Validation usage guide
 
 **Updated Files:**
 - [README.md](README.md) → Tool list, write-ops section, submodule note, security callout
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) → v0.2.0 design, MCP resources, data flow
-- [docs/INSTALLATION_AND_SETUP.md](docs/INSTALLATION_AND_SETUP.md) → Cross-OS submodule setup
-- [requirements.txt](requirements.txt) → Added `jsonschema>=4.0.0`
+- [ARCHITECTURE.md](ARCHITECTURE.md) → v0.2.0 design, MCP resources, data flow
+- [INSTALLATION_AND_SETUP.md](INSTALLATION_AND_SETUP.md) → Cross-OS submodule setup
+- [requirements.txt](../requirements.txt) → Added `jsonschema>=4.0.0`
 
 ---
 
@@ -274,7 +274,7 @@ Replace references to `analyze_codebase` with `extract_code_context` in custom p
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See LICENSE in the repository root for details.
 
 ---
 

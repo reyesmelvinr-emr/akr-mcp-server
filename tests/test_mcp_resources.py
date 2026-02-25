@@ -145,3 +145,72 @@ async def test_list_resource_templates_returns_patterns(monkeypatch: pytest.Monk
     uri_templates = {tmpl.uriTemplate for tmpl in templates}
     assert "akr://template/{id}" in uri_templates
     assert "akr://charter/{domain}" in uri_templates
+
+
+# ==================== BLOCKER 2: MCP Spec Compliance Tests ====================
+
+class TestMCPResourcesSpecCompliance:
+    """BLOCKER 2: Test MCP resources/read returns spec-compliant payload"""
+    
+    @pytest.mark.asyncio
+    async def test_read_resource_return_type_is_string(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """
+        Verify that read_resource handlers return string (MCP SDK wraps into contents[]).
+        
+        The MCP SDK's @server.read_resource decorator automatically wraps a string return
+        value into the spec-compliant shape: {contents: [{uri, mimeType, text}]}
+        
+        This test verifies the handler returns a string, which is the correct contract.
+        """
+        fake_resolver = FakeResolver()
+        monkeypatch.setattr(server, "ensure_initialized", lambda: None)
+        monkeypatch.setattr(server, "get_template_resolver", lambda: fake_resolver)
+        
+        # Call handler directly
+        result = await server.read_template_resource("akr://template/lean_baseline_service_template")
+        
+        # Handler should return string (SDK wraps it)
+        assert isinstance(result, str), "Handler must return string for SDK to wrap"
+        assert len(result) > 0, "Content should not be empty"
+        assert "# Lean Template" in result
+    
+    @pytest.mark.asyncio
+    async def test_resources_list_has_required_fields(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify resources/list returns resources with uri, name, mimeType"""
+        fake_resolver = FakeResolver()
+        fake_manager = FakeResourceManager()
+        
+        monkeypatch.setattr(server, "ensure_initialized", lambda: None)
+        monkeypatch.setattr(server, "get_template_resolver", lambda: fake_resolver)
+        monkeypatch.setattr(server, "get_resource_manager", lambda: fake_manager)
+        
+        resources = await server.list_resources()
+        
+        assert isinstance(resources, list), "resources must be list"
+        assert len(resources) > 0, "resources must not be empty"
+        
+        # Check each resource has required fields
+        for resource in resources:
+            assert hasattr(resource, 'uri'), "Missing uri field"
+            assert hasattr(resource, 'name'), "Missing name field"
+            assert hasattr(resource, 'mimeType'), "Missing mimeType field"
+            assert str(resource.uri).startswith("akr://"), f"Invalid URI scheme: {resource.uri}"
+            assert resource.mimeType == "text/markdown", f"Wrong mimeType: {resource.mimeType}"
+    
+    @pytest.mark.asyncio
+    async def test_resource_templates_has_uri_template_field(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Verify resources/templates exposes uriTemplate for dynamic URIs"""
+        monkeypatch.setattr(server, "ensure_initialized", lambda: None)
+        
+        templates = await server.list_resource_templates()
+        
+        assert isinstance(templates, list), "resourceTemplates must be list"
+        assert len(templates) > 0, "resourceTemplates must not be empty"
+        
+        # Check each template has uriTemplate field
+        for template in templates:
+            assert hasattr(template, 'uriTemplate'), "Missing uriTemplate field"
+            assert hasattr(template, 'name'), "Missing name field"
+            # uriTemplate should contain placeholder like {id} or {domain}
+            assert "{" in template.uriTemplate and "}" in template.uriTemplate, \
+                f"uriTemplate should have placeholder: {template.uriTemplate}"
