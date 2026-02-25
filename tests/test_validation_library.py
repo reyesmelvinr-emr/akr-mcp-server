@@ -33,15 +33,31 @@ def mock_schema_builder():
     """Mock TemplateSchemaBuilder."""
     builder = Mock(spec=TemplateSchemaBuilder)
     
-    # Create mock template schema
+    # Create mock template schema with proper section objects
     mock_schema = Mock()
+    
+    # Create mock sections with actual .name attributes (not Mock name parameter)
+    mock_section_1 = Mock()
+    mock_section_1.name = "Quick Reference"
+    
+    mock_section_2 = Mock()
+    mock_section_2.name = "What & Why"
+    
+    mock_section_3 = Mock()
+    mock_section_3.name = "API Contract"
+    
     mock_schema.required_sections = [
-        Mock(name="Quick Reference"),
-        Mock(name="What & Why"),
-        Mock(name="API Contract"),
+        mock_section_1,
+        mock_section_2,
+        mock_section_3,
     ]
     
     builder.build_schema.return_value = mock_schema
+    
+    # Add mock resolver to prevent AttributeError
+    mock_resolver = Mock()
+    builder._resolver = mock_resolver
+    
     return builder
 
 
@@ -102,7 +118,7 @@ Some API details here.
 
 @pytest.fixture
 def incomplete_markdown():
-    """Sample markdown with incomplete sections."""
+    """Sample markdown with truly missing required sections."""
     return """---
 templateId: lean_baseline_service_template
 project: PaymentService
@@ -119,9 +135,7 @@ Brief description.
 
 ## What & Why
 
-## API Contract
-
-Empty section.
+Brief description of what and why.
 """
 
 

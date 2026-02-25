@@ -40,20 +40,26 @@ The AKR MCP server provides documentation templates, enforcement, and code analy
 
 ## Quick Start (Server Workspace)
 
-```powershell
-# Navigate to the server repository
-cd "C:\path\to\akr-mcp-server"
+```bash
+# Clone and navigate to the server repository
+cd akr-mcp-server
+
+# Initialize submodule (templates)
+git submodule update --init --recursive
 
 # Create virtual environment
 python -m venv venv
 
-# Activate virtual environment (PowerShell)
+# Activate virtual environment
+# On Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
+# On macOS/Linux:
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Verify Jinja2 pipeline
+# Verify installation
 python test_jinja2_pipeline.py
 ```
 
