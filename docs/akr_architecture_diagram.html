@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AKR Documentation Governance - Architecture Overview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink-900: #1b1f2a;
+        --ink-700: #3a4150;
+        --ink-500: #5c6475;
+        --ink-300: #a9b1c2;
+        --paper-0: #fbfcfe;
+        --paper-50: #f6f8fb;
+        --paper-100: #eef2f8;
+        --line-100: #e3e8f0;
+        --line-200: #d8deea;
+        --blue: #1d4ed8;
+        --green: #15803d;
+        --amber: #b45309;
+        --violet: #6d28d9;
+        --slate: #334155;
+        --shadow: 0 16px 40px rgba(16, 24, 40, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        color: var(--ink-900);
+        background: radial-gradient(circle at top left, #f4f7fb 0%, #f9fafc 40%, #ffffff 100%);
+      }
+
+      .page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 36px 28px 60px;
+      }
+
+      .header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-start;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--line-100);
+      }
+
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        font-size: 11px;
+        color: var(--ink-500);
+      }
+
+      h1 {
+        font-family: "Source Serif 4", "Georgia", serif;
+        font-size: 28px;
+        margin: 6px 0 8px;
+      }
+
+      .subtitle {
+        color: var(--ink-500);
+        font-size: 13px;
+      }
+
+      .badge-row {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        font-size: 11px;
+        background: var(--paper-100);
+        border: 1px solid var(--line-200);
+        color: var(--ink-500);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+
+      section {
+        margin-top: 28px;
+      }
+
+      .section-title {
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        font-size: 11px;
+        color: var(--ink-500);
+        margin-bottom: 12px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid.cols-3 {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      }
+
+      .grid.cols-2 {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .card {
+        background: var(--paper-0);
+        border: 1px solid var(--line-100);
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .card .label {
+        font-weight: 600;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .card .body {
+        font-size: 12px;
+        color: var(--ink-500);
+        line-height: 1.6;
+        white-space: pre-line;
+      }
+
+      .pill {
+        display: inline-block;
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        margin-top: 8px;
+        border: 1px solid currentColor;
+      }
+
+      .zone {
+        border-radius: 14px;
+        border: 1px solid var(--line-100);
+        background: var(--paper-50);
+        padding: 18px;
+      }
+
+      .zone-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .zone-title {
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+      }
+
+      .zone-sub {
+        color: var(--ink-500);
+        font-size: 12px;
+      }
+
+      .zone-badge {
+        margin-left: auto;
+        font-size: 10px;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid currentColor;
+        background: #ffffff;
+      }
+
+      .flows {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      }
+
+      .flow {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line-100);
+        background: var(--paper-0);
+        box-shadow: var(--shadow);
+      }
+
+      .flow .from {
+        font-size: 11px;
+        color: var(--ink-500);
+        min-width: 90px;
+      }
+
+      .flow .arrow {
+        font-weight: 700;
+      }
+
+      .flow .to {
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .flow .desc {
+        font-size: 10px;
+        color: var(--ink-500);
+      }
+
+      .timeline {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(180px, 1fr);
+        overflow-x: auto;
+        gap: 8px;
+        padding-bottom: 8px;
+      }
+
+      .timeline .phase {
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: var(--paper-0);
+        border: 1px solid var(--line-100);
+        box-shadow: var(--shadow);
+      }
+
+      .phase .phase-label {
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      .phase .phase-desc {
+        font-size: 12px;
+        color: var(--ink-500);
+        line-height: 1.5;
+      }
+
+      .footer {
+        margin-top: 28px;
+        font-size: 11px;
+        color: var(--ink-500);
+        border-top: 1px solid var(--line-100);
+        padding-top: 16px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+
+      @media (max-width: 720px) {
+        .header {
+          flex-direction: column;
+        }
+
+        .badge-row {
+          margin-left: 0;
+        }
+
+        .timeline {
+          grid-auto-flow: row;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="header">
+        <div>
+          <div class="eyebrow">AKR Documentation Governance - Ideal End State</div>
+          <h1>Solution Architecture Overview</h1>
+          <div class="subtitle">GitHub Copilot Business, core-akr-templates, Agent Skills, CI Governance</div>
+        </div>
+        <div class="badge-row">
+          <div class="badge">March 2026</div>
+          <div class="badge">Implementation-Ready</div>
+          <div class="badge">Engineering Standards</div>
+        </div>
+      </div>
+
+      <section>
+        <div class="section-title">Documentation Output - Three-Tier Hierarchy</div>
+        <div id="doc-levels" class="grid cols-3"></div>
+      </section>
+
+      <section>
+        <div class="section-title">System Components - Four Layers</div>
+        <div id="zones" class="grid"></div>
+      </section>
+
+      <section>
+        <div class="section-title">Key Data and Control Flows</div>
+        <div id="flows" class="flows"></div>
+      </section>
+
+      <section>
+        <div class="section-title">Implementation Sequence</div>
+        <div id="timeline" class="timeline"></div>
+      </section>
+
+      <section>
+        <div class="section-title">Human-in-the-Loop Gates - Four Levels</div>
+        <div id="hitl" class="grid cols-2"></div>
+      </section>
+
+      <div class="footer">
+        <div>Hosted MCP Context Source availability depends on Copilot Business plan tier validation (Pre-Pilot Test 2).</div>
+        <div>Copilot Studio requires M365 Copilot licensing and a modeled credit budget before deployment.</div>
+      </div>
+    </div>
+
+    <script>
+      const docLevels = [
+        {
+          level: "Level 1",
+          label: "Module Documentation",
+          desc: "Logical grouping of 3-8 domain files to one doc.\nExample: Controller + Service + Repository + DTOs",
+          color: "var(--blue)",
+          output: "docs/modules/{Module}_doc.md",
+        },
+        {
+          level: "Level 2",
+          label: "Database Object Documentation",
+          desc: "Individual table, view, procedure, or function.\nSource: SSDT, scripts, or manual extraction",
+          color: "var(--amber)",
+          output: "docs/database/{Object}_doc.md",
+        },
+        {
+          level: "Level 3",
+          label: "Feature Consolidation",
+          desc: "Cross-module synthesis by feature_tag.\nProduced by consolidate.py",
+          color: "var(--violet)",
+          output: "docs/features/{Feature}_doc.md",
+        },
+      ];
+
+      const zones = [
+        {
+          id: "standards",
+          label: "STANDARDS LAYER",
+          sublabel: "core-akr-templates repo",
+          accent: "var(--blue)",
+          badge: "GitHub Hosted MCP Context Source",
+          nodes: [
+            {
+              label: "Full Charters",
+              sub: "AKR_CHARTER_BACKEND.md\nAKR_CHARTER_UI.md\nAKR_CHARTER_DB.md\nAKR_CHARTER.md",
+              tag: "Reference only",
+            },
+            {
+              label: "Condensed Charters",
+              sub: "copilot-instructions/backend-service.instructions.md\ncopilot-instructions/ui-component.instructions.md\ncopilot-instructions/database.instructions.md",
+              tag: "~2,500 tokens each",
+            },
+            {
+              label: "Templates",
+              sub: "lean_baseline (module variant)\nui_component (module variant)\ntable_doc + feature-consolidated",
+              tag: "10 templates",
+            },
+            {
+              label: "validate_documentation.py",
+              sub: ".akr/scripts/validate_documentation.py\nModule-type aware\npyyaml + Vale + --fail-on",
+              tag: "v1.0",
+            },
+            {
+              label: "modules-schema.json",
+              sub: "project_type + layer enums\nrequired fields + limits",
+              tag: "Phase 1",
+            },
+            {
+              label: "tag-registry.json",
+              sub: "PascalCase feature keys\nregistry enforced",
+              tag: "Feature registry",
+            },
+            {
+              label: "consolidation-config-schema.json",
+              sub: "modulesManifestPath\nwarnOnMissingLayers",
+              tag: "Phase 4",
+            },
+            {
+              label: "TEMPLATE_MANIFEST.json",
+              sub: "templateId to version\nSkill-template coupling",
+              tag: "Version registry",
+            },
+          ],
+        },
+        {
+          id: "developer",
+          label: "DEVELOPER WORKFLOW",
+          sublabel: "IDE + GitHub surfaces",
+          accent: "var(--green)",
+          badge: "Zero additional infrastructure",
+          nodes: [
+            {
+              label: "Agent Skill (SKILL.md)",
+              sub: "Mode A: Propose module groupings\nMode B: Generate documentation\nMode A must precede Mode B",
+              tag: ".github/skills/akr-docs/",
+            },
+            {
+              label: "Copilot Agent Mode",
+              sub: "Interactive: developer-present\nConfirm to generate\nVS Code + Visual Studio",
+              tag: "Real-time",
+            },
+            {
+              label: "Copilot Coding Agent",
+              sub: "Async: Issue to PR\nPhase 2.5 evaluation target\nZero manual steps",
+              tag: "Asynchronous",
+            },
+            {
+              label: ".github/copilot-instructions.md",
+              sub: "Module-centric rules\nCondensed charter fallback\nAssumption 2 fallback",
+              tag: "Per repository",
+            },
+            {
+              label: "modules.yaml",
+              sub: "modules[] + database_objects[]\nproject.layer + project_type + feature\nstatus + max_files + compliance_mode",
+              tag: "Per repository",
+            },
+          ],
+        },
+        {
+          id: "ci",
+          label: "CI / GOVERNANCE LAYER",
+          sublabel: "GitHub Actions",
+          accent: "var(--amber)",
+          badge: "Existing GitHub Actions infrastructure",
+          nodes: [
+            {
+              label: "validate-documentation.yml",
+              sub: "Triggers on docs/**/*.md PRs\nDownloads validator from\ncore-akr-templates/.akr/scripts/",
+              tag: "GitHub Actions",
+            },
+            {
+              label: "Vale Prose Rules",
+              sub: "RequiredSections + Terminology\nHeading case + Passive voice\n7+ rule files migrated",
+              tag: "validation/vale-rules/",
+            },
+            {
+              label: "consolidate.py",
+              sub: "Deterministic Python aggregator\nReads modules.yaml first\nNo AI invocation from Actions",
+              tag: "Phase 4",
+            },
+          ],
+        },
+        {
+          id: "crossfunctional",
+          label: "CROSS-FUNCTIONAL REVIEW",
+          sublabel: "Microsoft Teams surface (Phase 3+)",
+          accent: "var(--violet)",
+          badge: "Requires M365 Copilot license and credit model",
+          nodes: [
+            {
+              label: "Copilot Studio Doc Review Agent",
+              sub: "Triggers on PR label only\nRoutes to PM, QA, Security\nApproval chain logged",
+              tag: "Teams",
+            },
+          ],
+        },
+      ];
+
+      const flows = [
+        {
+          from: "core-akr-templates",
+          to: "Agent Skill (SKILL.md)",
+          label: "condensed charter loaded on demand",
+          color: "var(--blue)",
+        },
+        {
+          from: "modules.yaml",
+          to: "Agent Skill",
+          label: "project_type drives charter selection",
+          color: "var(--green)",
+        },
+        {
+          from: "Agent Skill",
+          to: "Copilot Agent Mode + Coding Agent",
+          label: "auto-loads on all surfaces",
+          color: "var(--green)",
+        },
+        {
+          from: "Copilot Coding Agent",
+          to: "draft PR",
+          label: "Mode A: modules.yaml, Mode B: module doc",
+          color: "var(--green)",
+        },
+        {
+          from: "modules-schema.json",
+          to: "validate_documentation.py",
+          label: "enum validation for layer/project_type",
+          color: "var(--blue)",
+        },
+        {
+          from: "tag-registry.json",
+          to: "modules.yaml",
+          label: "feature key validation",
+          color: "var(--blue)",
+        },
+        {
+          from: "modules.yaml",
+          to: "validate_documentation.py",
+          label: "doc type and required sections",
+          color: "var(--amber)",
+        },
+        {
+          from: "CI Gate (Actions)",
+          to: "PR merge",
+          label: "blocks on unresolved ? in production mode",
+          color: "var(--amber)",
+        },
+        {
+          from: "module docs (Level 1+2)",
+          to: "consolidate.py",
+          label: "matched by feature_tag to Level 3 draft",
+          color: "var(--violet)",
+        },
+        {
+          from: "PR label",
+          to: "Copilot Studio (Teams)",
+          label: "cross-functional approval routing",
+          color: "var(--violet)",
+        },
+      ];
+
+      const phases = [
+        {
+          label: "Phase 0",
+          desc: "Charter compression and module grouping Agent Skill",
+          color: "var(--slate)",
+        },
+        {
+          label: "Phase 1-2",
+          desc: "Foundation: templates, validator, CI gate, pilot project",
+          color: "var(--amber)",
+        },
+        {
+          label: "Phase 2.5",
+          desc: "Coding agent spike for go/no-go on Phase 3",
+          color: "var(--blue)",
+        },
+        {
+          label: "Phase 3+",
+          desc: "Copilot Studio if licensed, optional custom agent",
+          color: "var(--violet)",
+        },
+        {
+          label: "Phase 4",
+          desc: "consolidate.py for deterministic feature consolidation",
+          color: "var(--green)",
+        },
+      ];
+
+      const hitl = [
+        {
+          n: "1",
+          label: "Grouping Validation",
+          who: "Developer",
+          when: "Mode A PR - before any generation",
+          note: "5-10 min; validates modules.yaml groupings",
+          color: "var(--blue)",
+        },
+        {
+          n: "2",
+          label: "Content Review",
+          who: "Developer + Tech Lead",
+          when: "Mode B PR - fills ? sections",
+          note: "20-30 min per module; business rules + gaps",
+          color: "var(--green)",
+        },
+        {
+          n: "3",
+          label: "CI Governance Gate",
+          who: "Automated",
+          when: "PR merge - validate_documentation.py + Vale",
+          note: "Blocks on unresolved ? in production mode",
+          color: "var(--amber)",
+        },
+        {
+          n: "4",
+          label: "Stakeholder Approval",
+          who: "PM, QA, Security",
+          when: "Labeled PRs to Copilot Studio in Teams",
+          note: "Phase 3+ only; requires M365 license",
+          color: "var(--violet)",
+        },
+      ];
+
+      const docLevelsRoot = document.getElementById("doc-levels");
+      docLevels.forEach((lvl) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="label">${lvl.level} - ${lvl.label}</div>
+          <div class="body">${lvl.desc}</div>
+          <div class="pill" style="color: ${lvl.color}; border-color: ${lvl.color};">${lvl.output}</div>
+        `;
+        docLevelsRoot.appendChild(card);
+      });
+
+      const zonesRoot = document.getElementById("zones");
+      zones.forEach((zone) => {
+        const container = document.createElement("div");
+        container.className = "zone";
+        container.innerHTML = `
+          <div class="zone-header">
+            <div class="zone-title" style="color: ${zone.accent};">${zone.label}</div>
+            <div class="zone-sub">${zone.sublabel}</div>
+            <div class="zone-badge" style="color: ${zone.accent};">${zone.badge}</div>
+          </div>
+        `;
+        const grid = document.createElement("div");
+        grid.className = "grid cols-3";
+        zone.nodes.forEach((node) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="label">${node.label}</div>
+            <div class="body">${node.sub}</div>
+            <div class="pill" style="color: ${zone.accent}; border-color: ${zone.accent};">${node.tag}</div>
+          `;
+          grid.appendChild(card);
+        });
+        container.appendChild(grid);
+        zonesRoot.appendChild(container);
+      });
+
+      const flowsRoot = document.getElementById("flows");
+      flows.forEach((flow) => {
+        const card = document.createElement("div");
+        card.className = "flow";
+        card.innerHTML = `
+          <div class="from">${flow.from}</div>
+          <div class="arrow" style="color: ${flow.color};">→</div>
+          <div>
+            <div class="to">${flow.to}</div>
+            <div class="desc">${flow.label}</div>
+          </div>
+        `;
+        flowsRoot.appendChild(card);
+      });
+
+      const timelineRoot = document.getElementById("timeline");
+      phases.forEach((phase) => {
+        const card = document.createElement("div");
+        card.className = "phase";
+        card.innerHTML = `
+          <div class="phase-label" style="color: ${phase.color};">${phase.label}</div>
+          <div class="phase-desc">${phase.desc}</div>
+        `;
+        timelineRoot.appendChild(card);
+      });
+
+      const hitlRoot = document.getElementById("hitl");
+      hitl.forEach((gate) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div class="label">${gate.n}. ${gate.label}</div>
+          <div class="body">${gate.who}\n${gate.when}\n${gate.note}</div>
+          <div class="pill" style="color: ${gate.color}; border-color: ${gate.color};">${gate.who}</div>
+        `;
+        hitlRoot.appendChild(card);
+      });
+    </script>
+  </body>
+</html>
