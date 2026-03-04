@@ -67,7 +67,7 @@ assignees: ''
 
 - **Module Name:** [e.g., CourseDomain]
 - **Project Type:** [api-backend | ui-component | microservice | general]
-- **Business Capability:** [e.g., CourseCatalogManagement] (PascalCase from tag-registry.json)
+- **Business Capability:** [e.g., CourseCatalogManagement] (maps to `businessCapability` field in `modules.yaml`; PascalCase from tag-registry.json)
 - **Files in Module:** [List all files, or reference modules.yaml entry]
 
 ## Documentation Requirements
@@ -90,7 +90,20 @@ This module must be documented following AKR module documentation standards:
    - Business Rules (with "Why It Exists" + "Since When" columns)
    - Data Operations (all reads and writes)
    - Questions & Gaps (populated with open items)
-   - YAML front matter: feature, layer, project_type, status
+   - YAML front matter: businessCapability, feature, layer, project_type, status
+
+### Example YAML front matter (MODULE docs)
+
+```yaml
+---
+businessCapability: CourseCatalogManagement
+feature: FN12345_US678
+layer: API
+project_type: api-backend
+status: draft
+compliance_mode: pilot
+---
+```
    
 4. **Transparency markers:**
    - Mark AI-inferred content with 🤖
@@ -100,6 +113,13 @@ This module must be documented following AKR module documentation standards:
 5. **Validation:**
    - Run `validate_documentation.py --file [output] --fail-on needs`
    - Resolve or mark DEFERRED any validation failures
+
+**Validator output contract (v1.x):**
+- `.summary.total_errors` (number)
+- `.summary.total_warnings` (number)
+- `.summary.average_completeness` (0..1)
+
+A CI smoke step should assert these fields exist on every run.
    
 6. **Output:**
    - Write to `docs/modules/[ModuleName]_doc.md`
@@ -142,7 +162,7 @@ Create 3 test issues covering different module types and complexity levels; assi
 
 ### Test Cases
 
-**IMPORTANT:** Reuse modules from Phase 2 pilot (CourseDomain, EnrollmentDomain, UserDomain) rather than creating new fixtures. This tests real-world pilot results and validates consistency with Phase 2 baseline.
+**IMPORTANT:** Reuse modules from Phase 2 pilot (CourseDomain, CourseManagementUI, EnrollmentDomain) rather than creating new fixtures. This tests real-world pilot results and validates consistency with Phase 2 baseline across both backend and UI workflows.
 
 #### Test Case 1: Standard Backend Module (Baseline)
 
@@ -151,12 +171,12 @@ Create 3 test issues covering different module types and complexity levels; assi
 **Expected Behavior:** Agent generates complete documentation with all sections; passes validation  
 **Acceptance Criteria:** All 8 acceptance criteria met
 
-#### Test Case 2: Mid-Sized Backend Module
+#### Test Case 2: UI Component Module
 
-**Module:** `UserDomain` (4 files, ~600 LOC total) — **reused from Phase 2 Deliverable 6**  
-**Project Type:** `api-backend`  
-**Expected Behavior:** Agent generates complete documentation; handles smaller module efficiently  
-**Acceptance Criteria:** All 8 acceptance criteria met
+**Module:** `CourseManagementUI` (Page + components + hook + types) — **reused from Phase 2 UI pilot**  
+**Project Type:** `ui-component`  
+**Expected Behavior:** Agent generates complete documentation using the UI module variant; passes validation  
+**Acceptance Criteria:** All 8 acceptance criteria met (UI path)
 
 #### Test Case 3: Large Backend Module (Stress Test)
 
@@ -172,18 +192,19 @@ Create 3 test issues covering different module types and complexity levels; assi
 3. **Wait for draft PR** (autonomous generation)
 4. **Validate output** against acceptance criteria
 5. **Measure time** from issue creation to draft PR
-6. **Measure premium requests** consumed (GitHub billing)
+6. **Measure premium requests** consumed (GitHub billing dashboard → Copilot usage)
 7. **Document failures** with specific section/criterion that failed
 
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
+| **Confirm Test Case 2 source module** | Standards author | UI module from Phase 2 pilot identified (e.g., CourseManagementUI); confirmed present in codebase; listed in task table | 30 min |
 | Create Test Case 1 issue | Standards author | Issue created with all fields | 15 min |
 | Assign to coding agent | Standards author | Agent accepts issue; begins work | 5 min |
-| Wait for draft PR | N/A | Agent opens PR autonomously | Variable (agent) |
+| **Wait for draft PR (timeout: 8 hours)** | N/A | Agent opens PR autonomously within 8-hour window; if timeout exceeded, record as FAIL with failure mode "Agent did not complete task within time limit" | Timed (8 hours max) |
 | Validate Test Case 1 output | Developer | All acceptance criteria checked | 30 min |
-| Create Test Case 2 issue | Standards author | Issue created with all fields | 15 min |
+| Create Test Case 2 issue | Standards author | Issue created with all fields; source module confirmed to exist | 15 min |
 | Assign to coding agent | Standards author | Agent accepts issue; begins work | 5 min |
 | Validate Test Case 2 output | Developer | All acceptance criteria checked | 30 min |
 | Create Test Case 3 issue | Standards author | Issue created with all fields | 15 min |
@@ -216,7 +237,7 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 
 ### Testing Matrix
 
-|  | Test Case 1 (Baseline) | Test Case 2 (Mid-Sized) | Test Case 3 (Large) |
+|  | Test Case 1 (Baseline) | Test Case 2 (UI Component) | Test Case 3 (Large) |
 |---|---|---|---|
 | Criterion 1: All sections | ⬜ | ⬜ | ⬜ |
 | Criterion 2: Module Files | ⬜ | ⬜ | ⬜ |
@@ -257,7 +278,7 @@ Measure premium request consumption per module to model monthly cost at team sca
 
 | Metric | Test Case 1 | Test Case 2 | Test Case 3 |
 |---|---|---|---|
-| **Premium requests consumed** | [from GitHub billing] | [from GitHub billing] | [from GitHub billing] |
+| **Premium requests consumed** | [from GitHub billing dashboard Copilot usage] | [from GitHub billing dashboard Copilot usage] | [from GitHub billing dashboard Copilot usage] |
 | **Time to generate** | [minutes] | [minutes] | [minutes] |
 | **Number of agent turns** | [count] | [count] | [count] |
 | **Final PR quality** | [PASS/FAIL] | [PASS/FAIL] | [PASS/FAIL] |
@@ -283,7 +304,8 @@ Monthly cost = (X * Y * Z) * premium request rate
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Query GitHub billing dashboard | Standards author | Request counts per test case documented | 30 min |
+| Query GitHub billing dashboard | Standards author | Request counts per test case documented from Copilot usage view | 30 min |
+| Capture billing evidence artifacts | Standards author | CSV export or screenshots stored under `docs/pilot/phase-2.5/evidence/<test-case>/billing/` | 30 min |
 | Calculate average requests per module | Standards author | Mean across 3 test cases | 15 min |
 | Project monthly cost at team scale | Standards author | Cost model with team size variable | 30 min |
 | Compare to Phase 3 infrastructure cost | Standards author | Azure Function hosting cost vs. coding agent premium requests | 1 hour |

@@ -252,7 +252,7 @@ Update `consolidation-config-schema.json` to support `modulesManifestPath`; docu
 ```
 
 **Behavior:**
-- If `modulesManifestPath` present: `consolidate.py` reads `modules.yaml` first; matches by `feature` tag
+- If `modulesManifestPath` present: `consolidate.py` reads `modules.yaml` first; matches by `businessCapability` tag
 - If `modulesManifestPath` absent: fallback to `docsPath` glob scan (backward compatibility)
 
 ### Dual Config Documentation
@@ -295,7 +295,9 @@ Update `consolidation-config-schema.json` to support `modulesManifestPath`; docu
 | Document dual config split | Standards author | ARCHITECTURE.md explains which config drives which decision | 2 hours |
 | Create example configs | Standards author | Both schemas populated with pilot project examples | 1 hour |
 | Validate schema changes | Standards author | JSON Schema validation passes | 30 min |
-| **Document PAT authentication plan** | Infrastructure lead | Explain `GH_MULTI_REPO_PAT` secret setup for cross-repo sparse checkout; include required permissions (Contents: Read) | 1 hour |
+| **Document field rename decision** | Standards author | Add entry to CHANGELOG documenting: original source analysis uses `feature` field name; Phase 1+ implementation uses `businessCapability` field name; intentional divergence for clarity; Phase 4 consolidate.py uses `businessCapability` as matching key | 1 hour |
+| **Resolve Full-Stack layer enum decision** | Standards lead | Decision: either (A) add `Full-Stack` to `consolidation-config-schema.json`'s `layer` enum, OR (B) document requirement that Full-Stack repos self-identify primary layer in `modules.yaml`; document decision in Deliverable 2 acceptance criteria | 1 hour |
+| **Document PAT authentication plan** | Infrastructure lead | Explain `GH_MULTI_REPO_PAT` secret setup for cross-repo sparse checkout; specify required permissions: (1) `contents:read` on source repos (UI/API/DB), (2) `contents:write` + `pull_requests:write` on feature-docs repo for PR creation; include expiration rotation procedure (90-day cycle recommended) | 1.5 hours |
 
 ---
 
@@ -303,15 +305,20 @@ Update `consolidation-config-schema.json` to support `modulesManifestPath`; docu
 
 ### Objective
 
-Build deterministic Python aggregator that matches module docs by `feature_tag` and fills `feature-consolidated.md` template.
+Build deterministic Python aggregator that matches module docs by `businessCapability` (feature tag) and fills `feature-consolidated.md` template.
+
+### Critical Input Contract: `sectionMapping` from Existing Schema
+
+**IMPORTANT:** Do not re-design document-to-section mapping. The contract already exists in `akr-config-schema.json` under `crossRepository.outputs[].sectionMapping`. Phase 4 implementation **must** read and honour this existing field. Reference it explicitly in any code comments and Phase 4 testing.
 
 ### Design Principles
 
 1. **Deterministic:** No AI invocation from GitHub Actions
-2. **Config-driven:** Reads both config schemas for participation and execution
-3. **Module-aware:** Treats module docs as atomic units (not individual component files)
-4. **Sparse checkout:** Clones only `docs/` and `modules.yaml` per repo (performance)
-5. **Fail-safe:** Warns on missing layers; does not block if one layer absent
+2. **Contract-driven:** Read `sectionMapping` from `akr-config-schema.json`; do not invent mapping logic
+3. **Config-driven:** Reads both config schemas for participation and execution
+4. **Module-aware:** Treats module docs as atomic units (not individual component files)
+5. **Sparse checkout:** Clones only `docs/` and `modules.yaml` per repo (performance)
+6. **Fail-safe:** Warns on missing layers; does not block if one layer absent
 
 ### High-Level Algorithm
 
@@ -332,16 +339,32 @@ def consolidate_feature(feature_tag: str):
     participating_repos = filter_participating(repos)
     
     # Step 4: For each participating repo, read modules.yaml
-    #         Extract modules[] where feature == feature_tag
+    #         Extract modules[] where businessCapability == feature_tag
+    #         Handle absent modules.yaml with fallback
     api_modules = []
     ui_modules = []
     db_objects = []
     
     for repo in participating_repos:
-        modules_yaml = read_modules_yaml(repo, config['modulesManifestPath'])
+        modules_yaml_path = os.path.join(repo, config['modulesManifestPath'])
+        
+        # Handle case where modules.yaml is missing (repo hasn't completed Phase 1 onboarding)
+        if not os.path.exists(modules_yaml_path):
+            # Warn and fall back to docsPath glob scan for this repo only
+            print(f"⚠️ Warning: {repo} has no {config['modulesManifestPath']}");
+            print(f"   Falling back to docsPath glob scan for doc discovery")
+            # Fall back logic: scan docsPath for *_doc.md files; attempt to parse businessCapability from YAML front matter
+            for doc_file in glob.glob(os.path.join(repo, config['docsPath'], config['includePatterns'][0])):
+                doc_front_matter = extract_yaml_front_matter(doc_file)
+                if doc_front_matter.get('businessCapability') == feature_tag:
+                    # Can't determine module vs. db object from glob alone; try to infer from content
+                    api_modules.append({'repo': repo, 'doc_path': doc_file, 'inferred': True})
+            continue
+        
+        modules_yaml = read_modules_yaml(repo, modules_yaml_path)
         
         for module in modules_yaml['modules']:
-            if module['feature'] == feature_tag:
+            if module.get('businessCapability') == feature_tag:
                 if module['project_type'] in ['api-backend', 'microservice']:
                     api_modules.append({
                         'repo': repo,
@@ -419,7 +442,7 @@ def consolidate_feature(feature_tag: str):
 |---|---|---|---|
 | Implement config reading | Standards author | Reads both schemas; validates required fields | 1 day |
 | Implement sparse clone | Standards author | Clones only `docs/` + `modules.yaml` per repo; <2 min for 3 repos | 1 day |
-| Implement `modules.yaml` parsing | Standards author | Matches modules by `feature_tag`; groups by `project_type` | 1 day |
+| Implement `modules.yaml` parsing | Standards author | Matches modules by `businessCapability` tag; groups by `project_type` | 1 day |
 | Implement template filling | Standards author | Replaces `{FOR_EACH_*}` placeholders with matched content | 2 days |
 | Implement missing layers check | Standards author | Reads `warnOnMissingLayers` flag; warns if UI, API, or DB missing | 1 day |
 | Write unit tests | Standards author | ≥85% coverage; tests config reading, matching, template filling | 2 days |
@@ -702,7 +725,7 @@ Confirm `consolidate.py` reads existing `warnOnMissingLayers` flag; does not re-
 | Risk | Impact | Probability | Mitigation |
 |---|---|---|---|
 | Sparse clone fails on large repos | 🟡 Medium | 🟠 Low | Test on largest pilot repos; fall back to full clone if needed |
-| Feature tagging inconsistent across repos | 🔴 High | 🟡 Medium | Validate all pilot repos have consistent `feature` tags before Phase 4 |
+| Feature tagging inconsistent across repos | 🔴 High | 🟡 Medium | Validate all pilot repos have consistent `businessCapability` tags before Phase 4 |
 | PO workflow too complex | 🟡 Medium | 🟠 Low | Test with real PO in Deliverable 6; simplify if friction high |
 | `modules.yaml` schema drift | 🟡 Medium | 🟠 Low | `minimum_standards_version` enforcement prevents drift |
 

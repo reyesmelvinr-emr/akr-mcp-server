@@ -18,20 +18,37 @@ Phase 0 establishes the minimal viable prerequisites for the AKR module-based do
 
 Phase 0 is complete when:
 
-1. ✅ All 3 condensed charters created and validated at target token counts
-2. ✅ Agent Skill authored and validated with Mode A + Mode B
-3. ✅ `modules.yaml` schema defined and example created
-4. ✅ All 5 pre-pilot tests PASS **or** have documented fallback architectures
-5. ✅ Infrastructure audit complete with migration inventory
-6. ✅ Cost baseline model established and budget approved
-7. ✅ Monitoring enabled in pilot `.akr-config.json`
-8. ✅ Pilot project business capability tags added to `tag-registry.json`
-9. ✅ Archive prerequisites completed (tests and validation baselines copied)
+1. ✅ `akr-mcp-server` archived in GitHub (repo set to archived; team notified)
+2. ✅ All 3 condensed charters created and validated at target token counts
+3. ✅ Character limit validated for all condensed charters (≤~4,000 chars fallback; ≤2,500 tokens target)
+4. ✅ Agent Skill authored and validated with Mode A + Mode B
+5. ✅ `modules.yaml` schema defined and example created
+6. ✅ All 6 pre-pilot tests PASS **or** have documented fallback architectures (Test 5 legal review initiated in parallel at Phase 0 start)
+7. ✅ Infrastructure audit complete with migration inventory; all references documented
+8. ✅ Cost baseline model established and budget approved
+9. ✅ Monitoring enabled in pilot `.akr-config.json`
+10. ✅ Pilot project business capability tags added to `tag-registry.json` and distribution verified
+11. ✅ Archive prerequisites completed (tests and validation baselines copied)
 
 **Exit Gate:** All items above checked; Phase 0 retrospective complete; Phase 1 authorized by standards lead.
 
 ---
+### Deliverable 0: Archive `akr-mcp-server` (First Task)
 
+### Objective
+
+Archive the `akr-mcp-server` repository to prevent ongoing references to a deprecated codebase during pilot.
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Set repo to archived | Infrastructure lead | `akr-mcp-server` archived in GitHub settings; access restricted to read-only | 15 min |
+| Copy validation baselines and tests | Standards author | `test_validation_library.py`, `test_extraction.py`, `test_pipeline_e2e.py` copied to `core-akr-templates/tests/` | 30 min |
+| Update any `.gitmodules` references | Standards author | Confirm no submodule references to `akr-mcp-server` exist in active projects | 15 min |
+| Communicate deprecation to team | Standards lead | Team notified of archival; directed to `core-akr-templates` as source of truth | 30 min |
+
+---
 ## Deliverable 1: Charter Compression
 
 ### Objective
@@ -46,9 +63,10 @@ Backend charter at ~11,000 tokens + lean baseline template at ~7,000 tokens = ~1
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Compress `AKR_CHARTER_BACKEND.md` → `copilot-instructions/backend-service.instructions.md` | Standards author | ≤2,500 tokens; all required sections preserved; all marker syntax preserved; all quality thresholds preserved | 3-4 hours |
-| Compress `AKR_CHARTER_UI.md` → `copilot-instructions/ui-component.instructions.md` | Standards author | ≤2,500 tokens; component-specific section requirements preserved | 2-3 hours |
-| Compress `AKR_CHARTER_DB.md` → `copilot-instructions/database.instructions.md` | Standards author | ≤1,500 tokens; object-level documentation rules preserved | 1-2 hours |
+| Compress `AKR_CHARTER_BACKEND.md` → `copilot-instructions/backend-service.instructions.md` | Standards author | ≤2,500 tokens; ≤~4,000 characters fallback; all required sections preserved; all marker syntax preserved; all quality thresholds preserved | 3-4 hours |
+| Compress `AKR_CHARTER_UI.md` → `copilot-instructions/ui-component.instructions.md` | Standards author | ≤2,500 tokens; ≤~4,000 characters fallback; component-specific section requirements preserved | 2-3 hours |
+| Compress `AKR_CHARTER_DB.md` → `copilot-instructions/database.instructions.md` | Standards author | ≤1,500 tokens; ≤~2,500 characters fallback; object-level documentation rules preserved | 1-2 hours |
+| **Validate character count (Sub-test)** | Standards author | **Before declaring compression complete:** All 3 charters validated against ~4,000 character practical limit (Markdown format) | 30 min |
 | Validate compression ratio | Standards author | All 3 charters achieve ≤23% of original token count | 30 min |
 | Cross-reference full charters | Standards author | Each condensed charter includes "Full charter: [link]" reference | 15 min |
 

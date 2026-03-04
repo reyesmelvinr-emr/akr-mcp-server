@@ -48,7 +48,7 @@ Phase 4 (Feature Consolidation)
 | **Phase 2: Pilot Onboarding** | 1-2 weeks per project | Pilot project complete end-to-end, retrospective, onboarding checklist | Zero validation failures; <15 min grouping time |
 | **Phase 2.5: Coding Agent Spike** | 1 week | Acceptance test results; go/no-go recommendation | PASS → Phase 3 skipped; FAIL → Phase 3 authorized |
 | **Phase 3: Automation Extension** | 2-4 weeks (conditional) | Custom @doc-agent or Copilot Studio agent | Only if Phase 2.5 documents specific failure modes |
-| **Phase 4: Feature Consolidation** | 3-4 weeks | consolidate.py, feature-registry, cross-repo workflows | 3-component feature consolidated in <2 min |
+| **Phase 4: Feature Consolidation** | 3-4 weeks | consolidate.py, feature-registry, cross-repo workflows | 6 weeks zero bypass + ≥80% module coverage (hard gate) |
 
 ---
 
@@ -88,11 +88,12 @@ Phase 4 (Feature Consolidation)
 | Risk | Impact | Mitigation | Contingency |
 |---|---|---|---|
 | **Context saturation on large modules** | 🔴 High | Charter compression to ~2,500 tokens; `max_files: 8` governance constraint | Provide `max_files: 5` guidance for large-file modules; stress-test boundary is 8 files |
-| **Hosted MCP context unavailable** | 🟡 Medium | Pre-pilot Test 2 validates availability | Use `.github/copilot-instructions.md` with condensed charter (fits in ~4,000 chars) |
+| **Hosted MCP context unavailable** | 🟡 Medium | Pre-pilot Test 2 validates availability | Use `.github/copilot-instructions.md` with condensed charter that stays within the 2,500-token budget |
 | **Coding agent fails acceptance criteria** | 🟡 Medium | Phase 2.5 binary test with fallback | Phase 3 custom agent authorized only for documented failure modes |
 | **Premium request overage** | 🟡 Medium | Model cost in Phase 0; establish budget baseline | Set billing alerts; monthly review with management |
 | **Legal/compliance blocks AI processing** | 🔴 High | Pre-pilot Test 5 (legal sign-off) | Manual documentation with templates only; no AI generation |
 | **Cross-platform validator failures** | 🟠 Low | Test Ubuntu + macOS + Windows in Phase 1 | Fix platform-specific file path or YAML parsing issues |
+| **Tag-registry distribution lag** | 🟠 Low | Verify `tag-registry.json` is distributed (not just committed) before Phase 2 workflows reference it | Implement pre-flight check in Phase 2 tag verification; use `git lfs` if needed for large registries |
 
 ### Deferred Risks (Post-Pilot)
 
@@ -153,6 +154,7 @@ Before Phase 0 begins, confirm:
 - [ ] Pilot project identified (recommended: TrainingTracker.Api)
 - [ ] Standards team capacity allocated (Phase 0: 1 FTE; Phase 1: 1-2 FTE)
 - [ ] Development team representative assigned for pilot (grouping validation + retrospective)
+- [ ] Default `allowWorkflowBypass: false` verified in all module configs (governance gate)
 
 ---
 
@@ -193,6 +195,47 @@ Each phase has a dedicated implementation plan document:
 
 ---
 
+## Realistic Timeline Estimate
+
+### Total Duration
+
+**estimate: 14-20 weeks (3.5-5 months) from Phase 0 start to Phase 4 completion**
+
+### Detailed Breakdown
+
+| Phase | Duration | Real-World Notes | Cumulative |
+|---|---|---|---|
+| **Phase 0** | 1-2 weeks | Charter compression + pre-pilot tests may take longer if legal review (Test 5) is slow; recommend parallel initiation | Week 2 |
+| **Phase 1** | 3-5 weeks | `validate_documentation.py` implementation ~2 weeks; CI workflow + schema updates ~1-2 weeks; contingency for cross-platform issues | Week 7 |
+| **Phase 2** | 3-6 weeks | 1-2 week pilot onboarding + 2-4 week pilot execution + 1 week retrospective/analysis = 4-7 weeks minimum. **Note:** Phase 2.5 **cannot start** until retrospective is complete | Week 14 |
+| **Phase 2.5** | 1-2 weeks | Depends on Phase 2 completion; binary spike with fixed acceptance criteria | Week 16 |
+| **Phase 3** | 2-4 weeks (conditional) | Only if Phase 2.5 FAIL; skipped if PASS | Week 20 (if needed) |
+| **Phase 4** | 3-4 weeks | Starts after Phase 2 stability plateau (6+ weeks zero bypass); Phase 3 prereq if FAIL | Week 24 (best case) / Week 28 (with Phase 3) |
+
+### Sequencing Notes
+
+1. **Phase 2 retrospective lag:** The biggest timeline risk is Phase 2 running for 4 weeks, retrospective adding 1 week. Phase 2.5 start is blocked until this completes.
+   - **Mitigation:** Run pre-retrospective synthesis weekly; compile final retrospective incrementally
+   - **Early start allowance:** If Phase 2 completes faster, Phase 2.5 can start within days
+
+2. **Phase 4 prerequisites:** Requires 6 weeks post-Phase-2 stability (zero bypass events, ≥80% module coverage). This is a **hard gate**, not a duration estimate.
+   - **Timing:** If Phase 2 ends week 6, Phase 4 starts week 12 (6-week wait) → ends week 16
+   - **Early win:** Stabilit metrics earned Week 3 of Phase 2 → Phase 4 can start Week 9
+
+3. **Phase 3 contingency:** If Phase 2.5 FAIL, adds 2-4 week delay to Phase 4. Plan for this in communication.
+
+### Compressed Timeline (If All Conditions Optimal)
+
+- Phase 0 (2 weeks) + Phase 1 (5 weeks) + Phase 2 (3 weeks + 1 week retro) + 2-week stability wait + Phase 2.5 (1 week) + Phase 4 (3 weeks) = **17 weeks**
+
+### Extended Timeline (With Typical Slowdowns)
+
+- Phase 0 (2 weeks, legal delay +2) + Phase 1 (5 weeks) + Phase 2 (6 weeks pilot + 1 retro) + 6-week stability wait + Phase 2.5 (2 weeks) + Phase 3 (3 weeks if FAIL) + Phase 4 (4 weeks) = **31 weeks**
+
+**Recommended planning baseline: 20-22 weeks (5-5.5 months)**
+
+---
+
 ## Monitoring and Reporting
 
 ### Phase 0-2 Metrics
@@ -207,6 +250,7 @@ Each phase has a dedicated implementation plan document:
 
 - **Coding agent success rate:** % of sessions meeting all acceptance criteria
 - **Premium request consumption:** Requests per module; monthly cost
+- **Validator output contract stability:** `summary.total_errors`, `summary.total_warnings`, `summary.average_completeness` unchanged for v1.x
 - **Custom agent invocations:** If Phase 3; track usage + cost
 - **Phase 4 consolidation time:** Target <2 min per 3-component feature
 

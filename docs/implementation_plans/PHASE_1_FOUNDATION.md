@@ -20,15 +20,18 @@ Phase 1 delivers production-ready infrastructure: module-aware templates, a comp
 Phase 1 is complete when:
 
 1. ✅ `validate_documentation.py` v1.0 authored (~500-650 lines); all tests passing
-2. ✅ CI workflow adapted (8 targeted changes); validates module docs without false positives
+2. ✅ CI workflow adapted (8 targeted changes); **broken download URL fixed and verified working**; validates module docs without false positives
 3. ✅ 2 templates adapted for module architecture; acceptance criterion passed
-4. ✅ `copilot-instructions.md` rewritten with module-centric logic
+4. ✅ `copilot-instructions.md` rewritten with module-centric logic; **Copilot session test passed against CourseDomain example**
 5. ✅ `modules-schema.json` authored with complete validation rules
-6. ✅ `akr-config-schema.json` updated with `project_type` in required tags and `businessCapability` support
+6. ✅ `akr-config-schema.json` updated with `project_type` in required tags and `businessCapability` support; `priorityFilter` passthrough stub added
 7. ✅ HITL alignment documented; `humanInput` role mapping complete
-8. ✅ Governance policies documented (compliance mode graduation, TEMPLATE_MANIFEST narrowing)
-9. ✅ Cross-platform testing passed (Ubuntu, macOS, Windows)
-10. ✅ `core-akr-templates` v1.0.0 tagged and release notes published
+8. ✅ Full-Stack layer enum divergence documented in CHANGELOG/schema README
+9. ✅ `standard_service_template.md` and `minimal_service_template.md` consolidated or explicitly deferred (owned)
+10. ✅ Governance policies documented (compliance mode graduation, TEMPLATE_MANIFEST narrowing)
+11. ✅ Cross-platform testing passed (Ubuntu, macOS, Windows)
+12. ✅ Migration inventory from Phase 0 resolved (all `.akr/` path references documented or closed)
+13. ✅ `core-akr-templates` v1.0.0 tagged and release notes published
 
 **Exit Gate:** All items above checked; Phase 1 retrospective complete; Phase 2 pilot onboarding authorized.
 
@@ -193,14 +196,30 @@ core-akr-templates/
 
 ### Objective
 
-Adapt existing `.akr/workflows/validate-documentation.yml` to work with new `validate_documentation.py` script; fix broken download URL.
+Adapt existing `.akr/workflows/validate-documentation.yml` to work with new `validate_documentation.py` script; **fix broken download URL as FIRST critical task**.
+
+### ⚠️ CRITICAL: Broken Download URL
+
+**Issue:** The workflow currently attempts to download `validate_documentation.py` from a URL that returns 404. This blocks all Phase 2 pilot CI runs.
+
+**Status:** Current broken URL in `.akr/workflows/validate-documentation.yml`:
+```
+https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/scripts/validate_documentation.py
+```
+
+**Correct URL (after v1.0 implementation):**
+```
+https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/.akr/scripts/validate_documentation.py
+```
+
+**Action:** Change 2 (below) includes this URL fix. It must be completed **immediately after** `validate_documentation.py` is committed to the repository, before any Phase 2 pilot project attempts to run CI.
 
 ### Context
 
 **From analysis:** This workflow already exists and already attempts to call `validate_documentation.py`. It is not a rebuild—it is an adaptation with 8 targeted changes plus compatibility verification.
 
 **Current workflow capabilities:**
-- Downloads `validate_documentation.py` from remote URL (currently 404—must fix)
+- Downloads `validate_documentation.py` from remote URL (currently 404—**must fix before Phase 2**)
 - Installs Vale v2.29.0
 - Runs changed-files detection (`tj-actions/changed-files@v41`)
 - Has Checks API permissions configured
@@ -392,6 +411,7 @@ Adapt `lean_baseline_service_template.md` and `ui_component_template.md` for mod
 | **Update all YAML front matter examples to PascalCase** | Standards author | All `businessCapability` examples use PascalCase matching `tag-registry.json` (e.g., `CourseCatalogManagement` not `course-catalogmanagement`) | 1 hour |
 | Test backend template on CourseDomain | Standards author | Output matches `courses_service_doc.md` structure | 2 hours |
 | Test UI template on sample UI module | Standards author | Component grouping logic works; hierarchy clear | 2 hours |
+| **Consolidate template variants** | Standards author | `standard_service_template.md` and `minimal_service_template.md` reviewed and consolidated into `lean_baseline` module variant; OR explicitly deferred with owner assigned to a later phase | 2 hours |
 | Document template selection logic | Standards author | `project_type` → template mapping table in README | 1 hour |
 
 **Critical:** YAML front matter `businessCapability` values must use PascalCase (e.g., `CourseCatalogManagement`) to match `tag-registry.json` keys. Otherwise Phase 4's `consolidate.py` will fail to match module docs by feature tag.
@@ -552,6 +572,7 @@ Goal: concise Copilot-native reference that a developer reads once during onboar
 | Add Agent Skill invocation guidance | Standards author | Mode A vs. Mode B triggers clear | 1 hour |
 | Add `modules.yaml` front matter reference | Standards author | Required fields per doc type documented | 30 min |
 | Validate document length | Standards author | ≤200 lines; concise and scannable | 15 min |
+| **Test copilot-instructions.md with Copilot** | Pilot rep | Run CourseDomain example against rewritten instructions; verify module boundaries identified correctly in Copilot session | 1 hour |
 | Test with Copilot in VS Code | Pilot rep | Instructions load correctly; no broken references | 30 min |
 
 ### Output Location
@@ -569,7 +590,28 @@ Per-project deployment:
 
 ---
 
-## Deliverable 5: Schema Deliverables
+## Deliverable 6.5: Migration Inventory Resolution (From Phase 0)
+
+### Objective
+
+Resolve findings from Phase 0 infrastructure audit: all `.akr/` path references documented or closed.
+
+### Context
+
+Phase 0 included a task: "Run `git grep -l '.akr/'` to find all references across CI/CD configs, scripts, and `.gitmodules`." The inventory was created but no task consumed its findings. Phase 1 must close this loop.
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Review migration inventory from Phase 0 | Standards author | List all `.akr/` references found in grep output | 30 min |
+| Resolve all external references | Standards author | Each reference either: (a) updated to new `.akr/` structure, (b) documented as no-longer-valid, or (c) deleted | 2 hours |
+| Update `.gitmodules` (if present) | Standards author | No references to `akr-mcp-server` submodule; confirm `core-akr-templates` pinned at v1.0.0 | 30 min |
+| Document resolution in CHANGELOG | Standards author | Entry listing all path changes and corrections | 1 hour |
+
+### Output
+
+Phase 1 completion checklist: "Migration inventory fully resolved; zero open `.akr/` path questions"
 
 ### Objective
 
@@ -707,8 +749,9 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Author `modules-schema.json` | Standards author | Complete schema per Part 4 specification | 3 hours |
-| Update `akr-config-schema.json` | Standards author | `project_type` added to `requiredTags`; conditionality documented | 1 hour |
+| Add `modules-schema.json` | Standards author | Complete schema per Part 4 specification | 3 hours |
+| Update `akr-config-schema.json` | Standards author | `project_type` added to `requiredTags`; conditionality documented; `priorityFilter` passthrough field added (v1.1 hook) | 1.5 hours |
+| **Document Full-Stack layer divergence** | Standards author | CHANGELOG entry explaining intentional exclusion of `Full-Stack` from `tag-registry-schema.json` and retention in `modules-schema.json`; cross-reference in schema README | 1 hour |
 | Update `tag-registry-schema.json` layers | Standards author | Decide whether to add `Full-Stack` or document exclusion | 1 hour |
 | Validate schemas with test YAML | Standards author | Example `modules.yaml` validates without errors | 1 hour |
 | Document schema versioning | Standards author | Schema version tied to `core-akr-templates` release tag | 30 min |

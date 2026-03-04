@@ -288,8 +288,24 @@ jobs:
       - name: Count lines (exclude comments and blank lines)
         id: count
         run: |
-          LINES=$(find src -name '*.py' -exec cat {} + | grep -v '^\s*#' | grep -v '^\s*$' | wc -l)
-          echo "lines=$LINES" >> $GITHUB_OUTPUT
+          python - << 'PY'
+          import os
+
+          total = 0
+          for root, _, files in os.walk('src'):
+            for name in files:
+              if name.endswith(('.py', '.ts', '.js', '.cs')):
+                path = os.path.join(root, name)
+                with open(path, 'r', encoding='utf-8', errors='ignore') as handle:
+                  for line in handle:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith('#') or stripped.startswith('//'):
+                      continue
+                    total += 1
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write(f"lines={total}\n")
+          PY
       
       - name: Enforce 500-line ceiling
         run: |

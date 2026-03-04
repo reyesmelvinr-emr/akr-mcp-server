@@ -74,6 +74,7 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Add `core-akr-templates` as submodule | Pilot dev | Submodule pinned to **v1.0.0 release tag** (not `main`); `.gitmodules` configured | 15 min |
+| **Verify `businessCapability` tag distribution** | Standards author | Run or confirm `distribute-tag-registry.yml` completed; all tags used in `modules.yaml` are available in pilot project's `.github/depends/tag-registry.json` (or equivalent location) | 20 min |
 | Configure hosted MCP context source OR `.github/copilot-instructions.md` | Pilot dev | Context source configured; condensed backend charter accessible | 30 min |
 | Copy Agent Skill to project | Pilot dev | `.github/skills/akr-docs/SKILL.md` present; loads in agent mode | 15 min |
 | Deploy `validate-documentation.yml` | Pilot dev | Workflow file in `.github/workflows/`; triggered on draft PR | 30 min |
@@ -82,9 +83,43 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Test CI workflow | Pilot dev | Trigger workflow on draft PR; verify it runs without errors | 30 min |
 | Create CODEOWNERS file | Pilot dev | Standards team + tech lead as owners for `docs/**` AND `modules.yaml` (e.g., `docs/** @org/standards-team @tech-lead` + `modules.yaml @org/standards-team`) | 20 min |
 
+Recommended CODEOWNERS additions:
+- `docs/modules/**  @org/standards-team @tech-lead`
+- `modules.yaml     @org/standards-team`
+
 **Critical:** Submodule must reference the v1.0.0 release tag, not `main`. Using `main` will cause instability if breaking changes are merged to `core-akr-templates` after pilot begins.
 
 **Critical:** `modules.yaml` must be in CODEOWNERS to prevent rogue changes to `compliance_mode` or `max_files` limits without standards team review.
+
+### Critical: Submodule Rollback and Patch Strategy
+
+**Why this matters:** `core-akr-templates` will be actively developed after v1.0.0. If a validation bug is discovered mid-pilot, you have three options:
+
+1. **Hotfix release** (Recommended): Standards team authors patch release (v1.0.1), pilot project updates submodule pin
+2. **Stay on v1.0.0 + local workaround**: Pilot project applies git patch locally; documents workaround; rolls forward on next release
+3. **Fork fix to feature branch**: Pilot project temporarily uses branch pin; merges back when patch released
+
+**Decision:** 
+- Primary: Watch for validation errors; escalate to standards team for hotfix release decision
+- Escalation criteria: Blocking CI validation (phase can't proceed), affecting >1 module, or required for compliance
+- Hotfix SLA: 24 hours to release patch if escalated
+
+**Approval:** Standards lead + infrastructure lead authorize patch release; communication goes out before pin update
+
+---
+
+### Critical: Mode A → Mode B Sequencing (Cannot Skip Mode A)
+
+**Governance rule:** Mode B (documentation generation) **cannot run** without an **approved Mode A** `modules.yaml`. 
+
+**Enforcement:**
+- CI check prevents draft PRs with Mode B doc changes if `modules.yaml` status is `draft`
+- Error message: "modules.yaml must be approved (status != draft) before generating documentation"
+- Developer workaround: Contact standards team to manually approve `modules.yaml`; only for exceptions
+
+**Why:** Skipping Mode A to save time leads to incorrect module groupings, which invalidates all downstream documentation and Phase 4 consolidation.
+
+---
 
 ### Initial `modules.yaml` Template
 
@@ -109,6 +144,20 @@ unassigned: []
 
 ### Hosted MCP Context Source Configuration
 
+**Critical first step: Verify tag distribution (before creating modules.yaml)**
+
+Before creating the pilot project's `modules.yaml`, confirm that business capability tags have been **distributed** to application repos. The tags are added to `tag-registry.json` in Phase 0, but `distribute-tag-registry.yml` is the distribution mechanism. If tags aren't distributed when CI runs `validate_documentation.py`, validation will fail on "unknown `businessCapability`".
+
+**Verification steps:**
+1. Confirm `CourseCatalogManagement` (+ others) are committed to `tag-registry.json` in `core-akr-templates`
+2. Run `distribute-tag-registry.yml` workflow (manual trigger or verify scheduled run completed)
+3. Verify that distribution destination (`.github/depends/tag-registry.json` or equivalent in pilot project) contains the new tags
+4. Only then create pilot project's `modules.yaml` with those `businessCapability` values
+
+**Ownership:** Standards author ensures distribution before signaling "ready for modules.yaml authoring"
+
+---
+
 **If Test 2 passed (Pre-pilot):**
 
 1. Open VS Code Settings → Copilot → MCP
@@ -118,7 +167,7 @@ unassigned: []
 
 **If Test 2 failed (Pre-pilot fallback):**
 
-1. Copy condensed backend charter to `.github/copilot-instructions.md`
+1. Copy the **condensed backend charter** to `.github/copilot-instructions.md` (must be ≤ **2,500 tokens**; enforced by our tokenizer check)
 2. Document: this is per-repository distribution until hosted MCP available
 3. Future migration path: when hosted MCP becomes available, remove from `.github/copilot-instructions.md`
 
@@ -199,6 +248,7 @@ Draft `modules.yaml` with:
 | Open Mode A PR | Pilot dev | Draft PR with checklist; assigned to tech lead | 5 min |
 | Tech lead approval | Tech lead | Groupings approved; PR merged | 5 min |
 | Record validation time | Standards author | Actual time vs. 15 min target documented | 2 min |
+| Capture workflow timestamps | Standards author | Mode A PR open/merge, Mode B PR open, CI start/end timestamps captured for retrospective | 5 min |
 
 ### Success Metrics
 
@@ -572,6 +622,7 @@ Validate that updated onboarding checklist works on a second project; prove repe
 ### Retrospective Outputs
 
 - **Phase 2 completion metrics:** Pilot vs. second project comparison
+- **Deterministic timing metrics:** Event-derived grouping validation time and time-to-doc from PR/CI timestamps
 - **v1.1.0 backlog:** Features deferred or identified during pilot
 - **Onboarding playbook:** Final checklist + lessons learned
 - **Phase 2.5 authorization:** Standards lead go/no-go decision
@@ -585,7 +636,7 @@ Validate that updated onboarding checklist works on a second project; prove repe
 | Pilot developer unavailable mid-pilot | 🟡 Medium | 🟠 Low | Assign backup developer before pilot begins |
 | Mode A groups files incorrectly | 🟡 Medium | 🟡 Medium | 15-minute validation catches; developer reassigns |
 | CI false positives frustrate team | 🔴 High | 🟠 Low | Monitor false positive rate; hot-fix validator if >5% |
-| Visual Studio workflow broken | 🟡 Medium | 🟠 Low | Phase 0 Test 6 baseline passed; pilot validates real project integration; document workarounds if issues found |
+| Visual Studio workflow broken | 🟡 Medium | 🟠 Low | Phase 0 Visual Studio validation passed; pilot validates real project integration; document workarounds if issues found |
 | Pilot metrics don't support Phase 2.5 | 🟡 Medium | 🟠 Low | Retrospective determines if manual workflow sufficient |
 
 ---
