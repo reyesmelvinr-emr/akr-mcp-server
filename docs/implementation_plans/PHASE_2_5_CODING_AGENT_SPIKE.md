@@ -78,6 +78,7 @@ This module must be documented following AKR module documentation standards:
 
 1. **Load context:**
    - Read `modules.yaml` to identify module files and metadata
+   - Mapping rule: use `modules.yaml.modules[].businessCapability` directly for YAML front matter `businessCapability`; do not remap from legacy `feature` fields in older docs
    - Load condensed charter from `copilot-instructions/[project_type].instructions.md`
    
 2. **Generate documentation:**

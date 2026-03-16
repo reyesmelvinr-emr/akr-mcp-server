@@ -227,6 +227,12 @@ Build minimal custom agent addressing **only** documented Phase 2.5 failure mode
 
 **Option A — Code-Defined Scripts via `@skill.script` (Preferred; evaluate first)**
 
+**Compatibility constraints (required):**
+- Code-defined skills via `@skill.script` are currently available in the **Python SDK path only**.
+- Pin the SDK dependency during implementation and pilot, then re-validate on upgrades.
+  - Recommended baseline: `agent-framework>=X.Y.Z,<X+1.0.0` (replace `X.Y.Z` with the current tested release at implementation start)
+- If implementation stack is TypeScript/Node-only, Option A is not available; use Option B/C.
+
 ```python
 """
 Custom @doc-agent — Failure mode handlers as code-defined Agent Skills
@@ -282,6 +288,21 @@ skills_provider = SkillsProvider(
   skills=[doc_agent_skill],
   require_script_approval=True,   # See Script Approval section below
 )
+```
+
+**Required custom-agent instruction extension (`SKILL.md` or equivalent):**
+
+```markdown
+When deterministic extraction or chunked assembly is required, call `run_skill_script` explicitly:
+
+1. Operation extraction failure mode:
+  - `run_skill_script("extract-operations", {"file_paths": "<space-separated paths>"})`
+2. Large module/chunking failure mode:
+  - `run_skill_script("generate-chunked", {"module_path": "<path>", "output_path": "<path>"})`
+3. Project type ambiguity failure mode:
+  - `run_skill_script("detect-project-type", {"file_tree_json": "<json>"})`
+
+Do not assume scripts run automatically based only on registration.
 ```
 
 **Option B — Webhook Handler (Azure Functions / GitHub Actions; fallback if in-process insufficient)**
@@ -441,7 +462,7 @@ occur. This maps directly onto the AKR compliance mode progression:
 
 ### Implementation
 
-**1. Add `script_approval_required` to `.akr-config.json` schema:**
+**1. Use `script_approval_required` from the Phase 1 schema baseline:**
 
 ```json
 {
@@ -450,7 +471,7 @@ occur. This maps directly onto the AKR compliance mode progression:
 }
 ```
 
-**2. Wire to `SkillsProvider` in the custom agent:**
+**2. Wire field value to `SkillsProvider` in the custom agent:**
 
 ```python
 from agent_framework import SkillsProvider
@@ -479,8 +500,9 @@ while result.user_input_requests:
     print(f"[AKR APPROVAL REQUIRED] Script: {script_name}")
     print(f"  Args: {script_args}")
 
-    # Present to developer/reviewer for approval
-    approved = prompt_developer_for_approval(script_name, script_args)
+    # Present request to the host UI surface.
+    # In Copilot-hosted contexts this may be surfaced by the platform, not terminal I/O.
+    approved = get_approval_from_host_ui(script_name, script_args)
 
     approval_response = request.to_function_approval_response(approved=approved)
     result = await agent.run(approval_response, session=session)
@@ -495,24 +517,29 @@ execution attempt:
 - Arguments passed
 - Approved / rejected (with reviewer identity if available)
 - ISO 8601 timestamp
+- `alternative_approach_used` flag when a script is rejected and the agent continues via a non-script path
 
 Log format (append to `.akr/logs/script-approvals.jsonl`):
 
 ```json
-{"timestamp": "2026-03-16T10:00:00Z", "script": "extract-operations", "args": {"file_paths": "..."}, "approved": true, "reviewer": "developer@org.com"}
+{"timestamp": "2026-03-16T10:00:00Z", "script": "extract-operations", "args": {"file_paths": "..."}, "approved": true, "reviewer": "developer@org.com", "alternative_approach_used": false}
 ```
+
+**Implementation risk (must validate before production):** Approval UI/event wiring (`user_input_requests`
+and response submission) is platform-dependent in VS Code Copilot Chat and may not behave like standalone
+SDK sample loops. Confirm host behavior in Phase 0 Test 7 and again in a Phase 3 pre-production run.
 
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Add `script_approval_required` field to `akr-config-schema.json` | Standards author | Field present; type `boolean`; default `false`; description references compliance mode | 30 min |
+| Verify Phase 1 `script_approval_required` schema field exists in target repo | Standards author | Field present; type `boolean`; default `false`; schema version includes update | 15 min |
 | Implement `SkillsProvider` wiring from `.akr-config.json` | Standards author | `require_script_approval` reads from config; not hardcoded | 1 hour |
-| Implement approval loop in agent invocation | Standards author | Loop handles all `user_input_requests`; rejected scripts produce informational message | 2 hours |
+| Implement approval loop in agent invocation | Standards author | Loop handles all `user_input_requests`; rejected scripts produce informational message; host UI integration point documented | 2 hours |
 | Implement audit log writer | Standards author | `.akr/logs/script-approvals.jsonl` created; each approval/rejection appended | 1 hour |
 | Test: pilot mode — no approval prompt | Developer | `compliance_mode: pilot` + `script_approval_required: false` → scripts run without prompt | 30 min |
 | Test: production mode — approval required | Developer | `compliance_mode: production` + `script_approval_required: true` → prompt appears before script runs | 30 min |
-| Test: rejection path | Developer | Rejected script → agent reports limitation and suggests alternative approach | 30 min |
+| Test: rejection path | Developer | Rejected script → agent reports limitation and suggests alternative approach; log includes `alternative_approach_used` | 30 min |
 | Document in `VALIDATION_GUIDE.md` | Standards author | Section added: "Script Approval in Production Mode" | 1 hour |
 
 ---
@@ -534,6 +561,7 @@ Validate that custom automation addresses Phase 2.5 failure modes without introd
 | **Template integration:** Custom agent loads templates | Templates not embedded in agent code | Agent reads from `core-akr-templates`; no hardcoded templates |
 | **Script Approval: pilot mode** | `compliance_mode: pilot` → no approval prompt | Scripts run immediately without prompt |
 | **Script Approval: production mode** | `compliance_mode: production` → approval prompt before script execution | Prompt shown; audit log entry written |
+| **Script Approval: rejection behavior** | Rejected script request path | Agent either exits safely or uses fallback; audit log includes `alternative_approach_used` |
 
 ### Tasks
 
@@ -603,6 +631,8 @@ Document custom agent design, deployment, and maintenance for long-term ownershi
 | Azure Function cold starts cause delays | 🟠 Low | 🟡 Medium | Use Azure Functions Premium Plan if latency critical |
 | Custom agent diverges from Agent Skills | 🔴 High | 🟡 Medium | CI checks enforce no logic duplication; integration tests validate |
 | `@skill.script` in-process permission scope too broad | 🟡 Medium | 🟠 Low | Review script function permissions; use `require_script_approval=True` in production; document accepted scope in `ARCHITECTURE.md` |
+| `user_input_requests` approval UI surface behaves differently in Copilot-hosted sessions | 🔴 High | 🟡 Medium | Validate host UI behavior in Phase 0 Test 7 and Phase 3 pre-prod smoke test; if unsupported, keep `script_approval_required=false` and use PR review as HITL fallback |
+| Agent Framework SDK API drift changes `@skill.script` contract | 🟡 Medium | 🟠 Low | Pin `agent-framework` version during rollout; require release-note review before upgrades |
 
 ---
 
@@ -619,7 +649,8 @@ Phase 3 succeeds when:
 ✅ Documentation complete: ARCHITECTURE, DEPLOYMENT, USAGE, MAINTENANCE  
 ✅ Phase 3 retrospective complete; Phase 4 authorized  
 ✅ Deployment option evaluated in required order (D → A → B → C); rationale documented if D rejected
-✅ `script_approval_required` flag in `akr-config-schema.json`; wired to `SkillsProvider`; pilot=false / production=true
+✅ `script_approval_required` flag from Phase 1 schema baseline is wired to `SkillsProvider`; pilot=false / production=true
+✅ Token budget re-validated for Phase 3 path: condensed charter + SKILL instructions + code-skill tool definitions + source files remains within operational context limits for max-size module
 
 **Exit gate:** Custom automation deployed and validated; Phase 4 work authorized by standards lead **in writing** (GitHub comment, email, or approval record) before Phase 4 begins.
 

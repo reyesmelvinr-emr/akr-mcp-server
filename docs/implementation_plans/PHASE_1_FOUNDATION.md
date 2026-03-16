@@ -295,6 +295,11 @@ paths:
 **`--changed-files` Contract:**  
 Reads space-separated file paths compatible with `tj-actions/changed-files@v41` output format. The script must split on whitespace and process each path as workspace-relative. Example workflow integration:
 
+> **Compatibility note (required):** The legacy `akr-mcp-server/scripts/validation/validate_documentation.py`
+> implementation used `git diff --name-only` when `--changed-files` was set. Phase 1 v1.0 must
+> **not** reuse that behavior. In v1.0, `--changed-files` means explicit file list input from
+> workflow outputs/environment so CI scope is deterministic and PR-accurate.
+
 ```yaml
 - name: Get changed files
   id: changed-files
@@ -790,12 +795,26 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
 }
 ```
 
+**Additional Phase 1 schema field (for Phase 3/4 compatibility):**
+
+```json
+"script_approval_required": {
+  "type": "boolean",
+  "default": false,
+  "description": "When true, custom-agent script execution must require explicit user approval before running side-effecting script skills"
+}
+```
+
+This field is introduced in Phase 1 so downstream phases can rely on a stable schema even if
+Phase 3 automation is skipped after a successful Phase 2.5 outcome.
+
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Author `modules-schema.json` | Standards author | Complete schema per Part 4 specification | 3 hours |
 | Update `akr-config-schema.json` | Standards author | `project_type` added to `requiredTags`; conditionality documented | 1 hour |
+| Add `script_approval_required` to `akr-config-schema.json` | Standards author | Boolean field present with default `false`; description references custom-agent script gating | 30 min |
 | Update `tag-registry-schema.json` layers | Standards author | Decide whether to add `Full-Stack` or document exclusion | 1 hour |
 | Validate schemas with test YAML | Standards author | Example `modules.yaml` validates without errors | 1 hour |
 | Document schema versioning | Standards author | Schema version tied to `core-akr-templates` release tag | 30 min |
@@ -932,13 +951,16 @@ Logs every file write during the session to a local JSONL file, providing a sess
     "postToolUse": [
       {
         "type": "command",
-        "bash": "mkdir -p .akr/logs && echo \"{\\\"timestamp\\\": \\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\", \\\"tool\\\": \\\"$TOOL_NAME\\\", \\\"file\\\": \\\"$TOOL_INPUT_FILE_PATH\\\"}\" >> .akr/logs/session-$(date +%Y%m%d).jsonl",
+        "bash": "mkdir -p .akr/logs; if [ \"$TOOL_NAME\" = \"write_file\" ] || [ \"$TOOL_NAME\" = \"create_file\" ] || [ \"$TOOL_NAME\" = \"run_skill_script\" ]; then echo \"{\\\"timestamp\\\": \\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\", \\\"tool\\\": \\\"$TOOL_NAME\\\", \\\"file\\\": \\\"$TOOL_INPUT_FILE_PATH\\\"}\" >> .akr/logs/session-$(date +%Y%m%d).jsonl; fi",
         "timeoutSec": 5
       }
     ]
   }
 }
 ```
+
+`run_skill_script` is included so Phase 3 code-skill executions are visible in the same session
+audit trail as file write operations.
 
 **`.github/hooks/agentStop.json` - Auto-Validation Gate**
 
@@ -969,7 +991,7 @@ Runs `validate_documentation.py` automatically when the agent session ends. Resu
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Author `postToolUse.json` audit logger hook | Standards author | File present at `.github/hooks/postToolUse.json`; bash command writes valid JSONL to `.akr/logs/session-YYYYMMDD.jsonl` | 1 hour |
+| Author `postToolUse.json` audit logger hook | Standards author | File present at `.github/hooks/postToolUse.json`; bash command writes valid JSONL to `.akr/logs/session-YYYYMMDD.jsonl`; monitored tools include `write_file`, `create_file`, `run_skill_script` | 1 hour |
 | Author `agentStop.json` auto-validation hook | Standards author | File present at `.github/hooks/agentStop.json`; hook runs `validate_documentation.py` and writes output to `.akr/logs/last-validation.json`; handles missing `modules.yaml` gracefully | 1 hour |
 | Add `.akr/logs/` to `.gitignore` | Standards author | Log files not committed; `session-*.jsonl` pattern in `.gitignore` | 10 min |
 | Test `postToolUse` hook in Claude Code session | Standards author | File write events appear in `.akr/logs/session-YYYYMMDD.jsonl` after Mode B run | 30 min |

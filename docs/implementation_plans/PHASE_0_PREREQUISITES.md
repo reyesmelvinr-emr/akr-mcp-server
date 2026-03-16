@@ -10,7 +10,7 @@
 
 Phase 0 establishes the minimal viable prerequisites for the AKR module-based documentation system. Every deliverable in this phase is a proven blocker—charter compression prevents context saturation, pre-pilot tests validate foundational assumptions, and infrastructure audit prevents rework.
 
-**Critical Path:** Charter compression → Pre-pilot Test 1 (code analysis) → remaining tests in parallel
+**Critical Path:** Charter compression → Pre-pilot Test 1 (code analysis) → Pre-pilot Test 7 (Code Skills availability) → remaining tests in parallel
 
 ---
 
@@ -21,7 +21,7 @@ Phase 0 is complete when:
 1. ✅ All 3 condensed charters created and validated at target token counts
 2. ✅ Agent Skill authored and validated with Mode A + Mode B + Mode C
 3. ✅ `modules.yaml` schema defined and example created
-4. ✅ All 6 pre-pilot tests PASS **or** have documented fallback architectures
+4. ✅ All 7 pre-pilot tests PASS **or** have documented fallback architectures
 5. ✅ Infrastructure audit complete with migration inventory
 6. ✅ Cost baseline model established and budget approved
 7. ✅ Monitoring enabled in pilot `.akr-config.json`
@@ -165,7 +165,7 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal), M
 | Add frontmatter block: `disable-model-invocation`, `optimized-for`, `tested-on` | Standards author | Frontmatter present above `SKILL_VERSION` comment; syntax valid per Agent Skills spec | 30 min |
 | Add self-reporting block as first SKILL body instruction | Standards author | SKILL body begins with `CRITICAL: When this skill is loaded, begin EVERY response with: ✅ akr-docs INVOKED AND STEPS EXECUTED — Steps followed: 1. [step] — completed...` | 30 min |
 | Add `<!-- akr-generated -->` metadata header before validation/write steps in Mode B | Standards author | Mode B writes metadata header to draft output before validator run and before file write; block includes `skill`, `mode`, `template`, `steps-completed`, `generated-at` fields | 30 min |
-| Create `SKILL-COMPAT.md` skeleton | Standards author | File present at `.github/skills/akr-docs/SKILL-COMPAT.md`; contains: (1) model compatibility matrix with columns Model, Pass Rate, Known Issues, Workaround; rows for `claude-sonnet-4-6` and `gpt-4o` populated after Phase 0 eval runs; (2) "Future Enhancement Paths" section with placeholder row for "Dynamic resource-based skill hydration" (see note below) | 1 hour |
+| Create `SKILL-COMPAT.md` skeleton | Standards author | File present at `.github/skills/akr-docs/SKILL-COMPAT.md`; contains: (1) model compatibility matrix with columns Model, Pass Rate, Known Issues, Workaround; rows for `claude-sonnet-4-6` and `gpt-4o` populated after Phase 0 eval runs; (2) invocation-surface matrix including `coding-agent`, `custom-agent`, and `code-skills` (`run_skill_script`) rows; (3) "Future Enhancement Paths" section with placeholder row for "Dynamic resource-based skill hydration" (see note below) | 1 hour |
 
 > **`SKILL-COMPAT.md` — Future Enhancement Paths section:** Include a second table in the skeleton
 > with columns: Enhancement, Description, Trigger Condition, Estimated Effort. Add one placeholder
@@ -349,18 +349,18 @@ core-akr-templates/
 
 ### Objective
 
-Validate six foundational assumptions before Phase 1 investment. Each test must PASS or have a documented fallback architecture.
+Validate seven foundational assumptions before Phase 1 investment. Each test must PASS or have a documented fallback architecture.
 
 ### Test Execution Sequence
 
 **Critical dependencies:**
 - **Test 5 (Legal/Compliance):** Start on Day 1 (parallel) — longest lead time (2-6 weeks external dependency)
-- **Test 1 → Test 3:** Sequential — Test 1 validates charter compression works
+- **Test 1 → Test 7:** Sequential — Test 1 validates charter compression works; Test 7 validates Code Skills availability before Phase 3 assumptions are relied on
 - **Test 2:** Independent — can run parallel with Test 1
-- **Test 4:** Requires Tests 1-3 to pass first (needs functional agent for cost baseline)
+- **Test 4:** Requires Tests 1-3 and 7 to pass first (needs functional agent for cost baseline)
 - **Test 6 (Visual Studio):** Can run parallel after Test 1 passes
 
-**Execution order:** Start Test 5 immediately → Test 1 → (Test 2 + Test 3 + Test 6 in parallel) → Test 4
+**Execution order:** Start Test 5 immediately → Test 1 → Test 7 → (Test 2 + Test 3 + Test 6 in parallel) → Test 4
 
 ### Test 1: Code Analysis Capability
 
@@ -400,12 +400,14 @@ Validate six foundational assumptions before Phase 1 investment. Each test must 
 2. Check Settings → Copilot → MCP in VS Code
 3. Verify context source appears and loads on new sessions
 4. Test in Visual Studio (not just VS Code)
+5. Evaluate whether `@skill.resource` dynamic resource hydration is available in the current SDK/toolchain as a replacement path for static charter distribution
 
 **Pass criteria:**
 - Context source visible in settings
 - Available in both VS Code and Visual Studio
 - Context loads automatically on session start
 - Condensed charters accessible without manual file loading
+- `@skill.resource` feasibility status documented (available now vs. defer), including constraints and migration effort estimate
 
 **Fail fallback:**
 - Use `.github/copilot-instructions.md` with condensed charter as primary delivery
@@ -526,6 +528,35 @@ Validate six foundational assumptions before Phase 1 investment. Each test must 
 
 **Owner:** Standards author + pilot .NET developer  
 **Estimated Time:** 3 hours
+
+---
+
+### Test 7: Code Skills Availability
+
+**What it validates:** Agent Framework Code Skills (`@skill.script` + `run_skill_script`) and script approval surfaces are available in the target VS Code Copilot environment before Phase 3 depends on them.
+
+**Prerequisite:** Test 1 complete (skill baseline available)
+
+**Method:**
+1. Install/pin `agent-framework` package in an isolated test environment
+2. Create minimal `@skill.script` function (no side effects)
+3. Verify invocation via `run_skill_script` from the coding agent flow
+4. Enable `require_script_approval=True` and verify whether `user_input_requests` approval prompts are surfaced in VS Code Copilot Chat
+5. Reject one request and confirm behavior and logs
+
+**Pass criteria:**
+- `@skill.script` registration succeeds using Python SDK
+- `run_skill_script` invocation succeeds for the test function
+- Approval prompt behavior is confirmed and documented (supported/unsupported + UX surface)
+- Rejection behavior documented with evidence (alternative path vs. informative failure)
+
+**Fail fallback:**
+- Record Option D as unavailable for current environment
+- Default Phase 3 path to Option B/C (GitHub Actions or Azure-hosted approach) for failure modes that require automation
+- Keep deterministic Phase 1/2 gates unchanged
+
+**Owner:** Standards author  
+**Estimated Time:** 30-45 min
 
 ---
 
@@ -840,6 +871,7 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 | **Add deprecation notice to README** | Standards author | Update `akr-mcp-server` README with redirect to `core-akr-templates` and archival notice | 30 min |
 | **Add deprecation notice for setup scripts** | Standards author | Update `core-akr-templates` README noting `setup.ps1`/`setup.sh` are deprecated; remove from docs | 30 min |
 | Update workflow download URLs | Standards author | Broken downloads removed or replaced before archive | 30 min |
+| Document non-portable legacy scripts | Standards author | `validate_traceability.py` and `analyze_doc_impact.py` explicitly marked as legacy-architecture scripts requiring refactor before migration | 20 min |
 
 ### Archival Checklist
 
@@ -849,6 +881,7 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 - [ ] GitHub Actions secrets audited and revoked
 - [ ] README updated with archival notice and redirect
 - [ ] Deprecated setup scripts documented in `core-akr-templates`
+- [ ] Legacy scripts `validate_traceability.py` and `analyze_doc_impact.py` marked non-portable (old `docs/features` + `docs/testing` assumptions) and excluded from direct migration
 - [ ] Repository marked read-only
 - [ ] Submodule references in other repos noted (will break; redirect in archived README provides mitigation)
 
@@ -857,6 +890,7 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 - These files are referenced in Phase 1 and Phase 2.5 acceptance criteria.
 - Archive must not proceed until all checklist items complete.
 - Legal review (Test 5) should be consulted before revoking secrets.
+- `validate_traceability.py` and `analyze_doc_impact.py` from `akr-mcp-server` are not migration candidates without refactor to the module/database/feature hierarchy and current YAML front matter semantics.
 
 ---
 
@@ -885,10 +919,11 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 | Risk | Impact | Probability | Mitigation |
 |---|---|---|---|
 | Charter compression loses critical rules | 🔴 High | 🟡 Medium | Validate each condensed charter against `test_pipeline_e2e.py` acceptance test |
-| Test 5 (legal sign-off) delays entire timeline | 🔴 High | 🟡 Medium | Start legal request immediately; run Tests 1-4 in parallel |
+| Test 5 (legal sign-off) delays entire timeline | 🔴 High | 🟡 Medium | Start legal request immediately; run Tests 1-4 and 7 in parallel where dependencies allow |
 | Test 1 (code analysis) fails multiple runs | 🟡 Medium | 🟠 Low | Fallback to deterministic `CodeAnalyzer` + hosted MCP governance |
 | Test 2 (hosted MCP) unavailable at current tier | 🟡 Medium | 🟠 Low | Fallback to `.github/copilot-instructions.md` with condensed charter. Secondary long-term fallback: dynamic `@skill.resource` hydration via custom `SkillsProvider` (tracked in `SKILL-COMPAT.md` Future Enhancement Paths) |
 | Test 3 (large module) shows truncation | 🟡 Medium | 🟠 Low | Reduce `max_files` guidance to 5 for large-file modules |
+| Test 7 (Code Skills availability) unsupported in current VS Code Copilot environment | 🟡 Medium | 🟠 Low | Mark Option D unavailable; document evidence; use Option B/C if Phase 3 is authorized |
 
 ---
 
@@ -899,7 +934,7 @@ Phase 0 succeeds when:
 ✅ 3 condensed charters at ≤2,500 tokens each  
 ✅ Agent Skill Mode A + Mode B + Mode C authored and validated  
 ✅ `modules.yaml` schema defined and examples created  
-✅ 6/6 pre-pilot tests PASS or have documented fallback  
+✅ 7/7 pre-pilot tests PASS or have documented fallback  
 ✅ Infrastructure audit complete with migration inventory  
 ✅ `registered-repos.yaml` created with pilot repo entry  
 ✅ Cost model approved by management  

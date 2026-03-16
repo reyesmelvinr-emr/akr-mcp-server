@@ -44,7 +44,7 @@ Phase 4 (Feature Consolidation)
 
 | Phase | Duration | Deliverables | Blocking Criteria |
 |---|---|---|---|
-| **Phase 0: Prerequisites** | 1-2 weeks | Condensed charters (3), Agent Skill (3 modes + frontmatter + self-reporting block), `modules.yaml` schema, pre-pilot tests (6), eval framework (`evals/` directory + `benchmark.json` baseline), `SKILL-COMPAT.md` skeleton | All 6 pre-pilot tests PASS or have fallback; `benchmark.json` baseline populated |
+| **Phase 0: Prerequisites** | 1-2 weeks | Condensed charters (3), Agent Skill (3 modes + frontmatter + self-reporting block), `modules.yaml` schema, pre-pilot tests (7), eval framework (`evals/` directory + `benchmark.json` baseline), `SKILL-COMPAT.md` skeleton | All 7 pre-pilot tests PASS or have fallback; `benchmark.json` baseline populated |
 | **Phase 1: Foundation** | 3-5 weeks | Templates (2 adapted), `validate_documentation.py` (with metadata header check), CI workflow, schemas (1 new), hooks (`postToolUse` + `agentStop`), `SKILL-COMPAT.md` v1.0 | CI validation working; hooks distributed; pilot-ready release tag v1.0.0 |
 | **Phase 2: Pilot Onboarding** | 1-2 weeks per project | Pilot project complete end-to-end, retrospective, onboarding checklist | Zero validation failures; <15 min grouping time |
 | **Phase 2.5: Coding Agent Spike** | 1 week | Acceptance test results; go/no-go recommendation | PASS → Phase 3 skipped; FAIL → Phase 3 authorized |
@@ -59,7 +59,7 @@ Phase 4 (Feature Consolidation)
 
 | Phase | Success Metric | Target |
 |---|---|---|
-| Phase 0 | Pre-pilot test pass rate | 6/6 or documented fallback for each |
+| Phase 0 | Pre-pilot test pass rate | 7/7 or documented fallback for each |
 | Phase 1 | validate_documentation.py accuracy | Zero false positives on module docs |
 | Phase 2 | Time-to-first-documented-PR | ≤45 minutes (grouping + generation + review) |
 | Phase 2.5 | Coding agent section completeness | 100% required sections, zero truncations |
