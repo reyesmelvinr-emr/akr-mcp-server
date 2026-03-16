@@ -466,6 +466,7 @@ Adapt `lean_baseline_service_template.md` and `ui_component_template.md` for mod
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Adapt `lean_baseline_service_template.md` | Standards author | Module Files, Operations Map, full-stack diagram sections added | 4 hours |
+| Update existing `lean_baseline_service_template.md` front matter block | Standards author | Existing front matter includes both `businessCapability` (PascalCase) and `feature` (work-item ID format) to match Phase 1 validation contract | 30 min |
 | Adapt `ui_component_template.md` | Standards author | Module Files, component hierarchy diagram sections added | 3 hours |
 | Add module-scope YAML front matter | Standards author | `businessCapability`, `feature`, `layer`, `project_type`, `status` fields documented | 1 hour |
 | **Update all YAML front matter examples to PascalCase** | Standards author | All `businessCapability` examples use PascalCase matching `tag-registry.json` (e.g., `CourseCatalogManagement` not `course-catalogmanagement`) | 1 hour |
@@ -966,6 +967,9 @@ audit trail as file write operations.
 
 Runs `validate_documentation.py` automatically when the agent session ends. Results written to `.akr/logs/last-validation.json`. If validation fails, the developer sees the error immediately in their terminal before opening a PR.
 
+Because local hooks do not run inside GitHub Actions, no `tj-actions` outputs exist at hook time.
+The hook must derive a local changed-file list and pass it explicitly to `--changed-files`.
+
 ```json
 {
   "version": 1,
@@ -973,7 +977,7 @@ Runs `validate_documentation.py` automatically when the agent session ends. Resu
     "agentStop": [
       {
         "type": "command",
-        "bash": "if [ -f modules.yaml ]; then python .akr/scripts/validate_documentation.py --changed-files --output json --fail-on needs | tee .akr/logs/last-validation.json; else echo '{\"summary\": {\"note\": \"modules.yaml not found — skipping module-aware validation\"}}'; fi",
+        "bash": "if [ -f modules.yaml ]; then CHANGED_FILES=$(git diff --name-only --diff-filter=AM HEAD -- docs); if [ -n \"$CHANGED_FILES\" ]; then python .akr/scripts/validate_documentation.py --changed-files \"$CHANGED_FILES\" --output json --fail-on needs | tee .akr/logs/last-validation.json; else python .akr/scripts/validate_documentation.py --all docs/modules --output json --fail-on needs | tee .akr/logs/last-validation.json; fi; else echo '{\"summary\": {\"note\": \"modules.yaml not found — skipping module-aware validation\"}}'; fi",
         "timeoutSec": 60
       }
     ]
@@ -985,6 +989,7 @@ Runs `validate_documentation.py` automatically when the agent session ends. Resu
 
 - Hooks run in Claude Code sessions. Availability in GitHub Copilot depends on Copilot's hook support at the time of Phase 1 execution.
 - If hooks are not supported by Copilot at Phase 1 time, document this as a known gap and surface the issue in `SKILL-COMPAT.md`. The CI gate (`agentStop` equivalent) remains the enforcement fallback.
+- Local hook `git diff` usage is limited to producing an explicit file list input for `--changed-files`; validator semantics remain explicit-list based.
 - Hook files are in `.github/hooks/` to keep them with other GitHub-managed skill files and to allow CODEOWNERS control.
 
 ### Tasks
@@ -992,13 +997,13 @@ Runs `validate_documentation.py` automatically when the agent session ends. Resu
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Author `postToolUse.json` audit logger hook | Standards author | File present at `.github/hooks/postToolUse.json`; bash command writes valid JSONL to `.akr/logs/session-YYYYMMDD.jsonl`; monitored tools include `write_file`, `create_file`, `run_skill_script` | 1 hour |
-| Author `agentStop.json` auto-validation hook | Standards author | File present at `.github/hooks/agentStop.json`; hook runs `validate_documentation.py` and writes output to `.akr/logs/last-validation.json`; handles missing `modules.yaml` gracefully | 1 hour |
+| Author `agentStop.json` auto-validation hook | Standards author | File present at `.github/hooks/agentStop.json`; hook derives local changed files and passes explicit list to `--changed-files` (fallback `--all docs/modules` when no local changes); writes output to `.akr/logs/last-validation.json`; handles missing `modules.yaml` gracefully | 1 hour |
 | Add `.akr/logs/` to `.gitignore` | Standards author | Log files not committed; `session-*.jsonl` pattern in `.gitignore` | 10 min |
 | Test `postToolUse` hook in Claude Code session | Standards author | File write events appear in `.akr/logs/session-YYYYMMDD.jsonl` after Mode B run | 30 min |
 | Test `agentStop` hook in Claude Code session | Standards author | Validation output appears in `.akr/logs/last-validation.json`; errors surfaced before PR opened | 30 min |
 | Verify hook JSON syntax against Agent Skills spec | Standards author | Both JSON files validate without errors | 15 min |
 | Add hooks note to onboarding checklist | Standards author | Onboarding checklist (Phase 2 Deliverable 9) includes step to confirm `.github/hooks/` directory present and both files present | 10 min |
-| Document hook unavailability fallback | Standards author | `SKILL-COMPAT.md` includes row noting if hooks are unsupported in Copilot at time of Phase 1; workaround = run `validate_documentation.py --changed-files --fail-on needs` manually before opening PR | 30 min |
+| Document hook unavailability fallback | Standards author | `SKILL-COMPAT.md` includes row noting if hooks are unsupported in Copilot at time of Phase 1; workaround = run `validate_documentation.py --changed-files "<space-separated file list>" --fail-on needs` manually before opening PR (or `--all docs/modules` when no file list available) | 30 min |
 
 ### Output Locations
 
