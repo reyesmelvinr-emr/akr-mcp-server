@@ -74,52 +74,29 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Add `core-akr-templates` as submodule | Pilot dev | Submodule pinned to **v1.0.0 release tag** (not `main`); `.gitmodules` configured | 15 min |
-| **Verify `businessCapability` tag distribution** | Standards author | Run or confirm `distribute-tag-registry.yml` completed; all tags used in `modules.yaml` are available in pilot project's `.github/depends/tag-registry.json` (or equivalent location) | 20 min |
 | Configure hosted MCP context source OR `.github/copilot-instructions.md` | Pilot dev | Context source configured; condensed backend charter accessible | 30 min |
-| Copy Agent Skill to project | Pilot dev | `.github/skills/akr-docs/SKILL.md` present; loads in agent mode | 15 min |
+| Confirm initial skill copy from submodule | Pilot dev | `.github/skills/akr-docs/SKILL.md` copied from `.akr/templates/.github/skills/akr-docs/SKILL.md`; `SKILL_VERSION` matches current release | 10 min |
 | Deploy `validate-documentation.yml` | Pilot dev | Workflow file in `.github/workflows/`; triggered on draft PR | 30 min |
 | Create initial `modules.yaml` | Pilot dev | Project section complete; `modules[]` empty; `database_objects[]` empty | 30 min |
 | Configure Vale | Pilot dev | Vale rules at `validation/vale-rules/`; `.vale.ini` configured | 30 min |
 | Test CI workflow | Pilot dev | Trigger workflow on draft PR; verify it runs without errors | 30 min |
-| Create CODEOWNERS file | Pilot dev | Standards team + tech lead as owners for `docs/**` AND `modules.yaml` (e.g., `docs/** @org/standards-team @tech-lead` + `modules.yaml @org/standards-team`) | 20 min |
+| Create CODEOWNERS file | Pilot dev | Standards team + tech lead as owners for `docs/**`, `modules.yaml`, and `.github/skills/akr-docs/SKILL.md` | 20 min |
+| Register repo in `core-akr-templates` | Standards author | Entry added to `registered-repos.yaml`; registration PR merged | 15 min |
+| Verify distribution workflow reaches this repo | Pilot dev | `workflow_dispatch` targeting this repo opens an update PR | 15 min |
+| Confirm `.github/hooks/` directory present | Pilot dev | Both `postToolUse.json` and `agentStop.json` present in application repo (distributed by `distribute-skill.yml`); test by running a Mode B session and confirming `.akr/logs/session-YYYYMMDD.jsonl` is created | 15 min |
 
 Recommended CODEOWNERS additions:
 - `docs/modules/**  @org/standards-team @tech-lead`
 - `modules.yaml     @org/standards-team`
+- `.github/skills/akr-docs/SKILL.md  @org/standards-team`
 
 **Critical:** Submodule must reference the v1.0.0 release tag, not `main`. Using `main` will cause instability if breaking changes are merged to `core-akr-templates` after pilot begins.
 
+**Note on skill maintenance:** After onboarding, developers should never manually edit `.github/skills/akr-docs/SKILL.md` in application repositories. All updates originate in `core-akr-templates` and are delivered automatically via pull request.
+
 **Critical:** `modules.yaml` must be in CODEOWNERS to prevent rogue changes to `compliance_mode` or `max_files` limits without standards team review.
 
-### Critical: Submodule Rollback and Patch Strategy
-
-**Why this matters:** `core-akr-templates` will be actively developed after v1.0.0. If a validation bug is discovered mid-pilot, you have three options:
-
-1. **Hotfix release** (Recommended): Standards team authors patch release (v1.0.1), pilot project updates submodule pin
-2. **Stay on v1.0.0 + local workaround**: Pilot project applies git patch locally; documents workaround; rolls forward on next release
-3. **Fork fix to feature branch**: Pilot project temporarily uses branch pin; merges back when patch released
-
-**Decision:** 
-- Primary: Watch for validation errors; escalate to standards team for hotfix release decision
-- Escalation criteria: Blocking CI validation (phase can't proceed), affecting >1 module, or required for compliance
-- Hotfix SLA: 24 hours to release patch if escalated
-
-**Approval:** Standards lead + infrastructure lead authorize patch release; communication goes out before pin update
-
----
-
-### Critical: Mode A → Mode B Sequencing (Cannot Skip Mode A)
-
-**Governance rule:** Mode B (documentation generation) **cannot run** without an **approved Mode A** `modules.yaml`. 
-
-**Enforcement:**
-- CI check prevents draft PRs with Mode B doc changes if `modules.yaml` status is `draft`
-- Error message: "modules.yaml must be approved (status != draft) before generating documentation"
-- Developer workaround: Contact standards team to manually approve `modules.yaml`; only for exceptions
-
-**Why:** Skipping Mode A to save time leads to incorrect module groupings, which invalidates all downstream documentation and Phase 4 consolidation.
-
----
+**Critical:** `.github/skills/akr-docs/SKILL.md` must be in CODEOWNERS so manual edits cannot bypass standards-team review.
 
 ### Initial `modules.yaml` Template
 
@@ -144,20 +121,6 @@ unassigned: []
 
 ### Hosted MCP Context Source Configuration
 
-**Critical first step: Verify tag distribution (before creating modules.yaml)**
-
-Before creating the pilot project's `modules.yaml`, confirm that business capability tags have been **distributed** to application repos. The tags are added to `tag-registry.json` in Phase 0, but `distribute-tag-registry.yml` is the distribution mechanism. If tags aren't distributed when CI runs `validate_documentation.py`, validation will fail on "unknown `businessCapability`".
-
-**Verification steps:**
-1. Confirm `CourseCatalogManagement` (+ others) are committed to `tag-registry.json` in `core-akr-templates`
-2. Run `distribute-tag-registry.yml` workflow (manual trigger or verify scheduled run completed)
-3. Verify that distribution destination (`.github/depends/tag-registry.json` or equivalent in pilot project) contains the new tags
-4. Only then create pilot project's `modules.yaml` with those `businessCapability` values
-
-**Ownership:** Standards author ensures distribution before signaling "ready for modules.yaml authoring"
-
----
-
 **If Test 2 passed (Pre-pilot):**
 
 1. Open VS Code Settings → Copilot → MCP
@@ -175,7 +138,7 @@ Before creating the pilot project's `modules.yaml`, confirm that business capabi
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Complete onboarding checklist | Pilot dev | All 8 items checked | 3 hours |
+| Complete onboarding checklist | Pilot dev | All 10 items checked | 3 hours |
 | Document onboarding friction points | Pilot dev | Notes on unclear steps or missing instructions | 30 min |
 | Validate tooling end-to-end | Standards author | Agent Skill loads; CI triggers; Vale runs | 1 hour |
 | Schedule Mode A session | Standards author + pilot dev | 1-hour pairing session on calendar | 5 min |
@@ -452,6 +415,8 @@ Run pilot for 2-4 weeks to accumulate real-world usage data; iterate on template
 | **Validation pass rate on first PR** | CI logs | ≥95% pass without errors |
 | **Grouping proposal accuracy** | % of groups needing reassignment | ≥90% accepted as-is |
 | **Developer satisfaction** | Post-pilot survey | "Faster than manual" consensus |
+| **Self-reporting block present rate** | Manual spot-check of Copilot Chat responses | 100% of skill responses begin with `✅ akr-docs INVOKED` block |
+| **`<!-- akr-generated -->` header present rate** | `grep` over merged module docs | 100% of merged module docs contain metadata header |
 
 ### Tasks
 
@@ -480,6 +445,8 @@ Conduct retrospective with quantitative metrics and qualitative feedback; decide
 5. **Developer experience:** Was workflow faster than manual documentation?
 6. **Visual Studio parity:** Did VS workflow work as well as VS Code?
 7. **Phase 2.5 readiness:** Do metrics support expanding to coding agent?
+8. **Skill reliability:** Was the self-reporting block present in 100% of sessions? If not, when was it absent - and did the metadata header check in CI catch the gap?
+9. **Model compatibility:** Did any GPT-4o-specific failure modes emerge (e.g., Mode B truncation on large modules)? Document specific module/file-count where truncation first occurred, if any.
 
 ### Retrospective Outputs
 
@@ -490,6 +457,8 @@ Conduct retrospective with quantitative metrics and qualitative feedback; decide
 - **Onboarding checklist refinement:** Steps that were unclear or redundant
 - **v1.1.0 scope:** Features to include in next minor release
 - **Phase 2.5 authorization:** Go/no-go for coding agent spike
+- **Skill reliability report:** Self-reporting block presence rate + metadata header presence rate across all pilot Mode B sessions; root cause noted for any absence events
+- **`SKILL-COMPAT.md` v1.1 update:** GPT-4o failure modes observed during pilot (if any) documented before Phase 2.5 begins; pass rates in `benchmark.json` updated with pilot real-world data
 
 ### Tasks
 
@@ -529,12 +498,20 @@ Finalize onboarding checklist based on pilot learnings; prepare for second proje
 ## Setup (estimated: 3 hours)
 - [ ] Add core-akr-templates as submodule at v1.0.0
 - [ ] Configure hosted MCP context source (or .github/copilot-instructions.md)
-- [ ] Copy Agent Skill to .github/skills/akr-docs/
+- [ ] Confirm initial SKILL.md copy from submodule and verify `SKILL_VERSION` header
+- [ ] Confirm `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` present (distributed with SKILL.md); run Mode B session to verify `.akr/logs/` is created
 - [ ] Deploy validate-documentation.yml workflow
 - [ ] Create initial modules.yaml (project section only)
 - [ ] Configure Vale rules
 - [ ] Test CI workflow on draft PR
 - [ ] Create CODEOWNERS file
+
+## Skill Distribution Registration (estimated: 30 min)
+- [ ] Confirm `SKILL_VERSION` header in .github/skills/akr-docs/SKILL.md
+- [ ] Add .github/skills/akr-docs/SKILL.md to CODEOWNERS: @org/standards-team
+- [ ] Standards author adds repo to registered-repos.yaml in core-akr-templates
+- [ ] Test distribution workflow: workflow_dispatch targeting this repo opens a PR
+- [ ] Merge test PR to confirm end-to-end flow works
 
 ## Mode A — Grouping Proposal (estimated: 1 hour)
 - [ ] Invoke Agent Skill Mode A: "propose module groupings"
@@ -626,6 +603,7 @@ Validate that updated onboarding checklist works on a second project; prove repe
 - **v1.1.0 backlog:** Features deferred or identified during pilot
 - **Onboarding playbook:** Final checklist + lessons learned
 - **Phase 2.5 authorization:** Standards lead go/no-go decision
+- **`benchmark.json` update:** Real-world pilot pass rates added alongside Phase 1 synthetic baseline; delta between synthetic and real-world documented if significant
 
 ---
 
@@ -636,7 +614,7 @@ Validate that updated onboarding checklist works on a second project; prove repe
 | Pilot developer unavailable mid-pilot | 🟡 Medium | 🟠 Low | Assign backup developer before pilot begins |
 | Mode A groups files incorrectly | 🟡 Medium | 🟡 Medium | 15-minute validation catches; developer reassigns |
 | CI false positives frustrate team | 🔴 High | 🟠 Low | Monitor false positive rate; hot-fix validator if >5% |
-| Visual Studio workflow broken | 🟡 Medium | 🟠 Low | Phase 0 Visual Studio validation passed; pilot validates real project integration; document workarounds if issues found |
+| Visual Studio workflow broken | 🟡 Medium | 🟠 Low | Phase 0 Test 6 baseline passed; pilot validates real project integration; document workarounds if issues found |
 | Pilot metrics don't support Phase 2.5 | 🟡 Medium | 🟠 Low | Retrospective determines if manual workflow sufficient |
 
 ---
@@ -655,12 +633,14 @@ Phase 2 succeeds when:
 ✅ Pilot retrospective conducted; lessons documented  
 ✅ Onboarding checklist finalized  
 ✅ Second project onboarded successfully  
+✅ Self-reporting block present in 100% of observed pilot Mode B sessions (or absence events documented with root cause)  
+✅ `<!-- akr-generated -->` metadata header present in 100% of merged module docs (validated by CI)  
 
-**Exit gate:** Phase 2 retrospective complete; Phase 2.5 authorized if metrics support expanded rollout.
+**Exit gate:** Phase 2 retrospective complete; Phase 2.5 authorized by standards lead **in writing** (GitHub comment, email, or approval record) before Phase 2.5 begins.
 
 ---
 
-**Next Phase:** [Phase 2.5: Coding Agent Spike](PHASE_2.5_CODING_AGENT_SPIKE.md)
+**Next Phase:** [Phase 2.5: Coding Agent Spike](PHASE_2_5_CODING_AGENT_SPIKE.md)
 
 **Related Documents:**
 - [Phase 1: Foundation](PHASE_1_FOUNDATION.md)

@@ -18,37 +18,21 @@ Phase 0 establishes the minimal viable prerequisites for the AKR module-based do
 
 Phase 0 is complete when:
 
-1. ✅ `akr-mcp-server` archived in GitHub (repo set to archived; team notified)
-2. ✅ All 3 condensed charters created and validated at target token counts
-3. ✅ Character limit validated for all condensed charters (≤~4,000 chars fallback; ≤2,500 tokens target)
-4. ✅ Agent Skill authored and validated with Mode A + Mode B
-5. ✅ `modules.yaml` schema defined and example created
-6. ✅ All 6 pre-pilot tests PASS **or** have documented fallback architectures (Test 5 legal review initiated in parallel at Phase 0 start)
-7. ✅ Infrastructure audit complete with migration inventory; all references documented
-8. ✅ Cost baseline model established and budget approved
-9. ✅ Monitoring enabled in pilot `.akr-config.json`
-10. ✅ Pilot project business capability tags added to `tag-registry.json` and distribution verified
-11. ✅ Archive prerequisites completed (tests and validation baselines copied)
+1. ✅ All 3 condensed charters created and validated at target token counts
+2. ✅ Agent Skill authored and validated with Mode A + Mode B + Mode C
+3. ✅ `modules.yaml` schema defined and example created
+4. ✅ All 6 pre-pilot tests PASS **or** have documented fallback architectures
+5. ✅ Infrastructure audit complete with migration inventory
+6. ✅ Cost baseline model established and budget approved
+7. ✅ Monitoring enabled in pilot `.akr-config.json`
+8. ✅ Pilot project business capability tags added to `tag-registry.json`
+9. ✅ Registered repository registry established for downstream skill updates
+10. ✅ Archive prerequisites completed (tests and validation baselines copied)
 
-**Exit Gate:** All items above checked; Phase 0 retrospective complete; Phase 1 authorized by standards lead.
-
----
-### Deliverable 0: Archive `akr-mcp-server` (First Task)
-
-### Objective
-
-Archive the `akr-mcp-server` repository to prevent ongoing references to a deprecated codebase during pilot.
-
-### Tasks
-
-| Task | Owner | Acceptance Criteria | Estimated Time |
-|---|---|---|---|
-| Set repo to archived | Infrastructure lead | `akr-mcp-server` archived in GitHub settings; access restricted to read-only | 15 min |
-| Copy validation baselines and tests | Standards author | `test_validation_library.py`, `test_extraction.py`, `test_pipeline_e2e.py` copied to `core-akr-templates/tests/` | 30 min |
-| Update any `.gitmodules` references | Standards author | Confirm no submodule references to `akr-mcp-server` exist in active projects | 15 min |
-| Communicate deprecation to team | Standards lead | Team notified of archival; directed to `core-akr-templates` as source of truth | 30 min |
+**Exit Gate:** All items above checked; Phase 0 retrospective complete; Phase 1 authorized by standards lead **in writing** (GitHub comment, email, or approval record).
 
 ---
+
 ## Deliverable 1: Charter Compression
 
 ### Objective
@@ -63,12 +47,12 @@ Backend charter at ~11,000 tokens + lean baseline template at ~7,000 tokens = ~1
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Compress `AKR_CHARTER_BACKEND.md` → `copilot-instructions/backend-service.instructions.md` | Standards author | ≤2,500 tokens; ≤~4,000 characters fallback; all required sections preserved; all marker syntax preserved; all quality thresholds preserved | 3-4 hours |
-| Compress `AKR_CHARTER_UI.md` → `copilot-instructions/ui-component.instructions.md` | Standards author | ≤2,500 tokens; ≤~4,000 characters fallback; component-specific section requirements preserved | 2-3 hours |
-| Compress `AKR_CHARTER_DB.md` → `copilot-instructions/database.instructions.md` | Standards author | ≤1,500 tokens; ≤~2,500 characters fallback; object-level documentation rules preserved | 1-2 hours |
-| **Validate character count (Sub-test)** | Standards author | **Before declaring compression complete:** All 3 charters validated against ~4,000 character practical limit (Markdown format) | 30 min |
+| Compress `AKR_CHARTER_BACKEND.md` → `copilot-instructions/backend-service.instructions.md` | Standards author | ≤2,500 tokens; all required sections preserved; all marker syntax preserved; all quality thresholds preserved | 3-4 hours |
+| Compress `AKR_CHARTER_UI.md` → `copilot-instructions/ui-component.instructions.md` | Standards author | ≤2,500 tokens; component-specific section requirements preserved | 2-3 hours |
+| Compress `AKR_CHARTER_DB.md` → `copilot-instructions/database.instructions.md` | Standards author | ≤1,500 tokens; object-level documentation rules preserved | 1-2 hours |
 | Validate compression ratio | Standards author | All 3 charters achieve ≤23% of original token count | 30 min |
 | Cross-reference full charters | Standards author | Each condensed charter includes "Full charter: [link]" reference | 15 min |
+| Validate compressed charters with tokenizer check | Standards author | Use tiktoken GPT-4 encoder consistently; **also count tokens using a GPT-4o tokenizer** to confirm budgets hold for Copilot (GPT-4o) users, not only Claude users | 30 min |
 
 ### What Must Be Retained
 
@@ -164,7 +148,7 @@ Resolve the collision between legacy `feature` tags (`FN#####_US#####`) and the 
 
 ### Objective
 
-Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal) and Mode B (documentation generation) workflows.
+Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal), Mode B (documentation generation), and Mode C (interactive HITL completion for existing drafts with unresolved ❓ markers) workflows.
 
 ### Tasks
 
@@ -172,9 +156,58 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal) an
 |---|---|---|---|
 | Author `SKILL.md` with Mode A workflow | Standards author | Full specification from Part 5 of analysis document implemented | 2 hours |
 | Author `SKILL.md` with Mode B workflow | Standards author | Loads condensed charter based on `project_type`; references `modules.yaml` | 2 hours |
+| Author `SKILL.md` with Mode C workflow | Standards author | Enumerates unresolved `❓` markers; guides interactive in-editor resolution; re-runs validator after each batch | 2 hours |
 | Add prerequisite check in Mode B | Standards author | Mode B stops if `modules.yaml` status is `draft` | 30 min |
-| Document skill invocation patterns | Standards author | "propose module groupings" → Mode A; "generate documentation for X" → Mode B | 1 hour |
-| Validate skill loads in VS Code | Pilot rep | Skill appears in agent mode skill list | 15 min |
+| Document skill invocation patterns | Standards author | "propose module groupings" → Mode A; "generate documentation for X" → Mode B; "walk me through ❓ sections" → Mode C | 1 hour |
+| Validate skill loads in VS Code | Pilot rep | Skill appears in agent mode skill list; all three modes trigger correctly | 15 min |
+| Add `SKILL_VERSION` header to `SKILL.md` | Standards author | First line is `<!-- SKILL_VERSION: v1.0.0 -->` matching release tag | 5 min |
+| Document version bump requirement | Standards author | CONTRIBUTING or release checklist states version must be updated on every skill change | 10 min |
+| Add frontmatter block: `disable-model-invocation`, `optimized-for`, `tested-on` | Standards author | Frontmatter present above `SKILL_VERSION` comment; syntax valid per Agent Skills spec | 30 min |
+| Add self-reporting block as first SKILL body instruction | Standards author | SKILL body begins with `CRITICAL: When this skill is loaded, begin EVERY response with: ✅ akr-docs INVOKED AND STEPS EXECUTED — Steps followed: 1. [step] — completed...` | 30 min |
+| Add `<!-- akr-generated -->` metadata header before validation/write steps in Mode B | Standards author | Mode B writes metadata header to draft output before validator run and before file write; block includes `skill`, `mode`, `template`, `steps-completed`, `generated-at` fields | 30 min |
+| Create `SKILL-COMPAT.md` skeleton | Standards author | File present at `.github/skills/akr-docs/SKILL-COMPAT.md`; contains: (1) model compatibility matrix with columns Model, Pass Rate, Known Issues, Workaround; rows for `claude-sonnet-4-6` and `gpt-4o` populated after Phase 0 eval runs; (2) "Future Enhancement Paths" section with placeholder row for "Dynamic resource-based skill hydration" (see note below) | 1 hour |
+
+> **`SKILL-COMPAT.md` — Future Enhancement Paths section:** Include a second table in the skeleton
+> with columns: Enhancement, Description, Trigger Condition, Estimated Effort. Add one placeholder
+> row:
+>
+> | Enhancement | Description | Trigger Condition | Estimated Effort |
+> |---|---|---|---|
+> | Dynamic resource-based skill hydration | Replace static condensed charters and `benchmark.json` with `@skill.resource` decorated functions that serve live data at read time; requires custom Python `SkillsProvider` | Static charter staleness observed in pilot OR `benchmark.json` thresholds become stale during Phase 4 multi-repo runs | Medium — new Python agent layer required |
+>
+> This placeholder requires no action in Phase 0. It documents the upgrade path so it is not
+> re-discovered independently if the problem emerges during pilot.
+
+### SKILL.md Header Format
+
+```markdown
+---
+name: akr-docs
+description: >
+  Generate AKR module documentation following charters and templates.
+  Invoke explicitly via /akr-docs [mode-a | mode-b | mode-c] [target].
+disable-model-invocation: true
+optimized-for: claude-sonnet-4-6
+tested-on:
+  - claude-sonnet-4-6   # ✅ pass rate ≥90% (Phase 0 baseline)
+  - gpt-4o              # ⚠️ ~75%, Mode B truncation on large modules (Phase 0 baseline)
+user-invocable: true
+skill-version: 1.0.0
+---
+<!-- SKILL_VERSION: v1.0.0 -->
+<!-- Distribution: Managed by core-akr-templates. Do not edit this file directly in application repos. -->
+<!-- Updates: Delivered automatically via PR when core-akr-templates releases a new version. -->
+
+CRITICAL: When this skill is loaded, begin EVERY response with the following confirmation block:
+✅ akr-docs INVOKED AND STEPS EXECUTED
+Steps followed: 1. [first step] — completed | 2. [second step] — completed | ...
+Do not skip this block under any circumstances.
+
+# AKR Documentation Agent Skill
+...
+```
+
+The version header makes drift visible and gives distribution automation a reliable verification point after merge.
 
 ### Mode A Workflow Summary
 
@@ -195,9 +228,45 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal) an
 3. Read all source files listed in module's `files[]` array
 4. Generate module documentation using appropriate base template
 5. Apply transparency markers: `🤖` for inferred, `❓` for required human input
-6. Run `validate_documentation.py` against draft
-7. Write to `doc_output` path on feature branch
-8. Open draft PR with content review checklist
+6. Write `<!-- akr-generated -->` metadata header block to the top of the draft output
+7. Run `validate_documentation.py` against draft
+8. Write to `doc_output` path on feature branch
+9. Open draft PR with content review checklist
+
+> **Phase 0 execution note:** During pre-pilot tests in this phase, `validate_documentation.py` is not yet implemented (built in Phase 1). Use the manual checklist in Tests 1 and 3 to assess section completeness and metadata/header presence.
+
+### Mode B — Required Metadata Header (Pre-Validation Gate)
+
+Before validation and before writing the final file, Mode B **must** write the following header to the top of the generated draft document. This is checked by `validate_documentation.py` in Phase 1+ and its absence is a validator failure.
+
+```markdown
+<!-- akr-generated
+skill: akr-docs
+skill-version: v1.0.0
+mode: B
+template: {name of template used}
+charter: {condensed charter filename loaded}
+modules-yaml-status: approved
+steps-completed: 1,2,3,4,5,6,7,8,9
+generated-at: {ISO 8601 timestamp}
+-->
+```
+
+**Validator failure message when absent:** `"AKR metadata header missing — skill may not have been properly invoked. Re-run using /akr-docs mode-b [module]."`
+
+**Distribution note:** This instruction is part of the SKILL.md body and is therefore automatically distributed to all registered repositories via `distribute-skill.yml` when a new skill version is released. No per-project action required.
+
+### Mode C Workflow Summary
+
+Mode C replaces the original `/docs.interview` slash command. It is invoked on existing documents — not during initial generation — to resolve unresolved `❓` markers interactively.
+
+1. Read the existing documentation file; enumerate all unresolved `❓` markers grouped by section
+2. Present one `❓` item at a time with local section context
+3. Ask targeted clarification questions; propose replacement text grounded in code evidence
+4. Apply accepted edits immediately; mark unresolved items as `DEFERRED` with rationale and owner
+5. Re-run `validate_documentation.py` after each section or batch
+6. Summarize: total `❓` resolved, remaining `DEFERRED` items, any blockers requiring domain-owner input
+7. Open/update draft PR with HITL completion checklist
 
 ### Output Location
 
@@ -264,12 +333,15 @@ Define the complete `modules.yaml` schema and create reference examples for API 
 
 ```
 core-akr-templates/
-  schemas/
-    modules-schema.json       (NEW — does not exist yet)
+  .akr/
+    schemas/
+      modules-schema.json       (NEW — does not exist yet; authored in Phase 1 Deliverable 5)
   examples/
     modules.yaml              (TrainingTracker.Api reference)
     modules-ui-example.yaml   (UI project reference)
 ```
+
+> **Path note:** `modules-schema.json` is defined here in Phase 0 as a schema specification but physically created in Phase 1 Deliverable 5 alongside the other existing schemas (`akr-config-schema.json`, `tag-registry-schema.json`, `consolidation-config-schema.json`) in `.akr/schemas/`. The Phase 0 deliverable for this item is the schema field specification document, not the JSON file itself.
 
 ---
 
@@ -308,6 +380,7 @@ Validate six foundational assumptions before Phase 1 investment. Each test must 
 - Operations Map covers ≥90% of public methods across all files
 - Architecture diagram shows full stack (Controller → Service → Repository → DB)
 - ≥90% consistency across 3 runs
+- Phase 0 completeness assessment recorded using manual checklist (validator integration begins in Phase 1)
 
 **Fail fallback:**
 - Retain `CodeAnalyzer` from `akr-mcp-server` for deterministic extraction
@@ -354,7 +427,7 @@ Validate six foundational assumptions before Phase 1 investment. Each test must 
 1. Create test module: 8 files, ~250 lines each, ~2,000 total LOC
 2. Invoke Mode B with condensed backend charter
 3. Check output for section truncation or omission
-4. Run `validate_documentation.py` (mock if not yet available)
+4. Use manual validation checklist in Phase 0 (script integration deferred to Phase 1)
 
 **Pass criteria:**
 - All MODULE-required sections present
@@ -363,6 +436,7 @@ Validate six foundational assumptions before Phase 1 investment. Each test must 
 - Business Rules table complete
 - Data Operations section covers all reads and writes
 - No "..." or "[content omitted]" artifacts
+- Metadata header and required YAML front matter fields present (manual check in Phase 0)
 
 **Fail fallback:**
 - Enforce `max_files: 5` guidance for large-file modules
@@ -519,6 +593,179 @@ git config --file .gitmodules --get-regexp path
 
 ---
 
+## Deliverable 5A: Registered Repos Registry
+
+### Objective
+
+Create `registered-repos.yaml` in `core-akr-templates` as the source of truth for which application repositories receive automated `SKILL.md` updates.
+
+### Why Needed Before Phase 1
+
+Phase 1 distribution cannot target repositories without a maintained registry. Authoring this in Phase 0 ensures the first pilot can be updated immediately after onboarding.
+
+### Schema
+
+```yaml
+# core-akr-templates/registered-repos.yaml
+schema_version: "1.0"
+distribution:
+  skill_source_path: ".github/skills/akr-docs/SKILL.md"
+  pr_title_template: "chore: update AKR Agent Skill to {version}"
+  pr_body_template: "automated-skill-update"
+  target_branch: "main"
+  auto_assign_reviewers: true
+
+repos:
+  - org: reyesmelvinr-emr
+    name: TrainingTracker.Api
+    skill_path: .github/skills/akr-docs/SKILL.md
+    onboarded: 2026-03-01
+    standards_version: v1.0.0
+    team_contact: "@tech-lead-handle"
+    compliance_mode: pilot
+```
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Create `registered-repos.yaml` with pilot project entry | Standards author | File present at repo root; schema validates; `TrainingTracker.Api` is first entry | 20 min |
+| Create PR body template `automated-skill-update.md` | Standards author | Template present at `.github/pr-templates/`; placeholders documented | 20 min |
+| Document registry maintenance procedure | Standards author | CONTRIBUTING updated with "add repo to registry during onboarding" | 15 min |
+| Add `registered-repos.yaml` to CODEOWNERS | Standards author | Standards lead approval required for add/remove changes | 10 min |
+
+### CODEOWNERS Addition
+
+```text
+# Skill distribution registry — standards lead approval required for all changes
+registered-repos.yaml   @org/standards-lead
+```
+
+### Output Locations
+
+```
+core-akr-templates/
+  registered-repos.yaml                            (NEW)
+  .github/
+    pr-templates/
+      automated-skill-update.md                    (NEW)
+```
+
+---
+
+## Deliverable 5B: Skill Evaluation Framework
+
+### Objective
+
+Establish a baseline eval suite and benchmark record for `akr-docs` skill performance before Phase 1 authoring begins. Results populate `SKILL-COMPAT.md` and `benchmark.json`; they also define the acceptance thresholds for subsequent phase eval runs.
+
+### Why Phase 0
+
+Pre-pilot Tests 1 and 3 already run the skill against real inputs. Adding structured assertions to those runs costs minimal time and produces the Phase 1 baseline automatically - without requiring a separate eval pass later.
+
+### Eval Directory Structure
+
+Create the following directory and files in `core-akr-templates`:
+
+```
+evals/
+  cases/
+    mode-a-standard.yaml         # Mode A assertions for Test 1 standard run
+    mode-b-coursedomain.yaml     # Mode B assertions matching courses_service_doc.md
+    mode-b-large-module.yaml     # Mode B stress test: 8-file module, no truncation
+  datasets/
+    coursedomain-files/          # Input files used in Pre-pilot Test 1
+  benchmark.json                 # Pass rates + token counts per model version
+```
+
+### `benchmark.json` Schema
+
+```json
+{
+  "last-updated": "YYYY-MM-DD",
+  "schema-version": "1.0",
+  "models": {
+    "claude-sonnet-4-6": {
+      "mode-a-standard":       { "pass-rate": null, "avg-tokens": null },
+      "mode-b-coursedomain":   { "pass-rate": null, "avg-tokens": null },
+      "mode-b-large-module":   { "pass-rate": null, "avg-tokens": null, "known-issue": null }
+    },
+    "gpt-4o": {
+      "mode-a-standard":       { "pass-rate": null, "avg-tokens": null },
+      "mode-b-coursedomain":   { "pass-rate": null, "avg-tokens": null },
+      "mode-b-large-module":   { "pass-rate": null, "avg-tokens": null, "known-issue": null }
+    },
+    "coding-agent": {}
+  }
+}
+```
+
+> `null` values are populated after each phase eval run. Do not publish to `core-akr-templates` main branch until at least one run is complete.
+
+### `mode-b-coursedomain.yaml` Assertions (Sample)
+
+```yaml
+case: mode-b-coursedomain
+description: Mode B output for CourseDomain must match courses_service_doc.md structure
+inputs:
+  module: CourseDomain
+  project_type: api-backend
+  files: [datasets/coursedomain-files/]
+assertions:
+  - section_present: "Module Files"
+  - section_present: "Operations Map"
+  - section_present: "Architecture Overview"
+  - section_present: "Business Rules"
+  - section_present: "Data Operations"
+  - yaml_front_matter_field: businessCapability
+  - yaml_front_matter_field: project_type
+  - metadata_header_present: true
+  - no_truncation_markers: true
+  - self_reporting_block_in_response: true
+pass_threshold: 10/10
+```
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Create `evals/` directory structure in `core-akr-templates` | Standards author | All directories and placeholder files present | 30 min |
+| Author `mode-a-standard.yaml` assertions | Standards author | Assertions match Pre-pilot Test 1 acceptance criteria exactly | 1 hour |
+| Author `mode-b-coursedomain.yaml` assertions | Standards author | Assertions reference `courses_service_doc.md` sections; includes `metadata_header_present` and `self_reporting_block_in_response` assertions | 1 hour |
+| Author `mode-b-large-module.yaml` assertions | Standards author | Includes 8-file boundary check and no-truncation assertion | 1 hour |
+| Create `benchmark.json` with null baseline | Standards author | File present; schema valid; all `null` values to be populated after Tests 1 and 3 | 30 min |
+| Run eval cases during Pre-pilot Test 1 | Standards author | Assertions checked against output; results recorded in `benchmark.json` | Part of Test 1 (no additional time) |
+| Run eval cases during Pre-pilot Test 3 | Standards author | Large-module assertions checked; results recorded | Part of Test 3 (no additional time) |
+| Populate `SKILL-COMPAT.md` with Phase 0 results | Standards author | Model compatibility matrix rows for `claude-sonnet-4-6` and `gpt-4o` populated with actual pass rates | 1 hour |
+
+### Gate Dependency
+
+`mode-b-coursedomain.yaml` requires the condensed backend charter (Deliverable 1) to exist before it can be written. Complete charter compression before authoring eval cases.
+
+**Execution sequence (required):** charter compression → `SKILL.md` authoring (Mode A/B/C + metadata/self-reporting) → pre-pilot eval runs (Tests 1 and 3) → populate `benchmark.json` and `SKILL-COMPAT.md` with actual results → Phase 0 exit gate sign-off.
+
+`benchmark.json` population is a final exit-gate task, not a parallel prerequisite for earlier Deliverable 5B authoring.
+
+### Output Locations
+
+```
+core-akr-templates/
+  evals/
+    cases/
+      mode-a-standard.yaml         (NEW)
+      mode-b-coursedomain.yaml     (NEW)
+      mode-b-large-module.yaml     (NEW)
+    datasets/
+      coursedomain-files/          (NEW — copy from pre-pilot test inputs)
+    benchmark.json                 (NEW — null baseline)
+  .github/
+    skills/
+      akr-docs/
+        SKILL-COMPAT.md            (NEW — populated after Phase 0 eval runs)
+```
+
+---
+
 ## Deliverable 6: Cost Modeling and Budget Approval
 
 ### Objective
@@ -538,10 +785,11 @@ Establish monthly premium request budget baseline and monitoring thresholds.
 
 ### Cost Model Inputs
 
-- **Agent mode sessions:** ~X requests per module (to be measured in Test 1)
-- **Coding agent invocations:** ~Y requests per module (estimate; refined in Phase 2.5)
-- **Pilot team size:** Z developers
-- **Estimated modules per month:** Based on pilot project inventory
+- **Agent mode sessions:** 12-20 premium requests per module (provisional; calibrate with Test 1 and Test 3)
+- **Coding agent invocations:** 15-30 premium requests per module (provisional; refine in Phase 2.5)
+- **Pilot team size:** 3-5 developers (initial pilot assumption)
+- **Estimated modules per month:** 10-20 module runs/month during pilot onboarding
+- **Budget method:** Use GitHub Copilot Business dashboard + per-user seat cost + observed premium request usage to produce low/base/high monthly projection for management approval
 
 ### Monitoring Configuration
 
@@ -628,6 +876,7 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 - **Phase 1 authorization:** Standards lead sign-off to proceed
 - **Risk register updates:** Any new risks identified during tests
 - **Budget confirmation:** Approved monthly cost baseline documented
+- **Eval baseline published:** `benchmark.json` populated with Phase 0 pass rates for `claude-sonnet-4-6` and `gpt-4o`; `SKILL-COMPAT.md` rows populated; both committed to `core-akr-templates` before Phase 1 begins
 
 ---
 
@@ -638,7 +887,7 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 | Charter compression loses critical rules | 🔴 High | 🟡 Medium | Validate each condensed charter against `test_pipeline_e2e.py` acceptance test |
 | Test 5 (legal sign-off) delays entire timeline | 🔴 High | 🟡 Medium | Start legal request immediately; run Tests 1-4 in parallel |
 | Test 1 (code analysis) fails multiple runs | 🟡 Medium | 🟠 Low | Fallback to deterministic `CodeAnalyzer` + hosted MCP governance |
-| Test 2 (hosted MCP) unavailable at current tier | 🟡 Medium | 🟠 Low | Fallback to `.github/copilot-instructions.md` with condensed charter |
+| Test 2 (hosted MCP) unavailable at current tier | 🟡 Medium | 🟠 Low | Fallback to `.github/copilot-instructions.md` with condensed charter. Secondary long-term fallback: dynamic `@skill.resource` hydration via custom `SkillsProvider` (tracked in `SKILL-COMPAT.md` Future Enhancement Paths) |
 | Test 3 (large module) shows truncation | 🟡 Medium | 🟠 Low | Reduce `max_files` guidance to 5 for large-file modules |
 
 ---
@@ -648,14 +897,18 @@ Preserve validation baselines and tests currently located in `akr-mcp-server` be
 Phase 0 succeeds when:
 
 ✅ 3 condensed charters at ≤2,500 tokens each  
-✅ Agent Skill Mode A + Mode B authored and validated  
+✅ Agent Skill Mode A + Mode B + Mode C authored and validated  
 ✅ `modules.yaml` schema defined and examples created  
-✅ 5/5 pre-pilot tests PASS or have documented fallback  
+✅ 6/6 pre-pilot tests PASS or have documented fallback  
 ✅ Infrastructure audit complete with migration inventory  
+✅ `registered-repos.yaml` created with pilot repo entry  
 ✅ Cost model approved by management  
+✅ `SKILL.md` frontmatter includes `disable-model-invocation: true`, `optimized-for: claude-sonnet-4-6`, `tested-on` fields, and self-reporting CRITICAL block  
+✅ `evals/` directory with 3 eval cases and populated `benchmark.json` baseline committed to `core-akr-templates`  
+✅ `SKILL-COMPAT.md` skeleton includes "Future Enhancement Paths" table with dynamic resource upgrade path documented  
 ✅ Pilot feature tags added to `tag-registry.json`  
 
-**Exit gate:** Phase 0 retrospective complete; Phase 1 work authorized by standards lead.
+**Exit gate:** Phase 0 retrospective complete; Phase 1 work authorized by standards lead **in writing** (GitHub comment, email, or approval record) before Phase 1 begins.
 
 ---
 

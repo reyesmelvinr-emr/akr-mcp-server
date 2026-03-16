@@ -11,7 +11,7 @@
 
 Phase 1 delivers production-ready infrastructure: module-aware templates, a complete validation script, CI workflows, and schema definitions. This phase establishes the foundation that all subsequent phases depend on—no pilot onboarding can begin until v1.0.0 is tagged and released.
 
-**Critical Path:** `validate_documentation.py` → CI workflow adaptation → template adaptation → v1.0.0 release
+**Critical Path:** `validate_documentation.py` → CI workflow adaptation → skill distribution workflow → template adaptation → v1.0.0 release
 
 ---
 
@@ -20,18 +20,18 @@ Phase 1 delivers production-ready infrastructure: module-aware templates, a comp
 Phase 1 is complete when:
 
 1. ✅ `validate_documentation.py` v1.0 authored (~500-650 lines); all tests passing
-2. ✅ CI workflow adapted (8 targeted changes); **broken download URL fixed and verified working**; validates module docs without false positives
+2. ✅ CI workflow adapted (9 targeted changes); validates module docs without false positives
 3. ✅ 2 templates adapted for module architecture; acceptance criterion passed
-4. ✅ `copilot-instructions.md` rewritten with module-centric logic; **Copilot session test passed against CourseDomain example**
+4. ✅ `copilot-instructions.md` rewritten with module-centric logic
 5. ✅ `modules-schema.json` authored with complete validation rules
-6. ✅ `akr-config-schema.json` updated with `project_type` in required tags and `businessCapability` support; `priorityFilter` passthrough stub added
+6. ✅ `akr-config-schema.json` updated with `project_type` in required tags and `businessCapability` support
 7. ✅ HITL alignment documented; `humanInput` role mapping complete
-8. ✅ Full-Stack layer enum divergence documented in CHANGELOG/schema README
-9. ✅ `standard_service_template.md` and `minimal_service_template.md` consolidated or explicitly deferred (owned)
-10. ✅ Governance policies documented (compliance mode graduation, TEMPLATE_MANIFEST narrowing)
-11. ✅ Cross-platform testing passed (Ubuntu, macOS, Windows)
-12. ✅ Migration inventory from Phase 0 resolved (all `.akr/` path references documented or closed)
-13. ✅ `core-akr-templates` v1.0.0 tagged and release notes published
+8. ✅ Governance policies documented (compliance mode graduation, TEMPLATE_MANIFEST narrowing)
+9. ✅ Cross-platform testing passed (Ubuntu, macOS, Windows)
+10. ✅ `core-akr-templates` v1.0.0 tagged and release notes published
+11. ✅ Skill distribution workflow (`distribute-skill.yml`) operational for registered repos
+12. ✅ `DEVELOPER_REFERENCE.md` created/updated with HITL alignment, role mapping, and three-mode skill guidance
+13. ✅ `VALIDATION_GUIDE.md` created/updated with compliance mode graduation and emergency rollback procedure
 
 **Exit Gate:** All items above checked; Phase 1 retrospective complete; Phase 2 pilot onboarding authorized.
 
@@ -84,7 +84,8 @@ Create validation script from scratch that distinguishes module docs from databa
    - Architecture Overview (full-stack text diagram)
    - Business Rules (with "Why It Exists" + "Since When" columns)
    - Data Operations (all reads and writes)
-  - YAML front matter: `businessCapability`, `feature` (work-item), `layer`, `project_type`, `status`
+  - YAML front matter: `businessCapability`, `feature` (work-item), `layer`, `project_type`, `status`, `compliance_mode`
+  - `<!-- akr-generated -->` metadata header block (presence check; fail with `"AKR metadata header missing — skill may not have been properly invoked"` if absent)
    
    **DB_OBJECT docs require:**
    - Object Definition (schema, columns/parameters)
@@ -139,6 +140,8 @@ Create validation script from scratch that distinguishes module docs from databa
 | Write unit tests | Standards author | Port assertions from `test_validation_library.py`; ≥85% coverage | Day 4-5 (8 hours) |
 | Test cross-platform | Standards author | Ubuntu (GitHub Actions), macOS, Windows PowerShell | Day 5 (3 hours) |
 | Document CLI usage | Standards author | `--file`, `--changed-files`, `--module-name`, `--fail-on`, `--output` flags documented in README | Day 5 (1 hour) |
+| Add `pyyaml` to `requirements.txt` | Standards author | `pyyaml` listed as explicit dependency; `pip install -r requirements.txt` installs cleanly on all platforms | 15 min |
+| Implement `<!-- akr-generated -->` metadata header check | Standards author | Validator checks for header presence in MODULE docs; fails with exact message: `"AKR metadata header missing — skill may not have been properly invoked"` | 2 hours |
 
 ### Test Cases (Port from `test_validation_library.py`)
 
@@ -196,30 +199,14 @@ core-akr-templates/
 
 ### Objective
 
-Adapt existing `.akr/workflows/validate-documentation.yml` to work with new `validate_documentation.py` script; **fix broken download URL as FIRST critical task**.
-
-### ⚠️ CRITICAL: Broken Download URL
-
-**Issue:** The workflow currently attempts to download `validate_documentation.py` from a URL that returns 404. This blocks all Phase 2 pilot CI runs.
-
-**Status:** Current broken URL in `.akr/workflows/validate-documentation.yml`:
-```
-https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/scripts/validate_documentation.py
-```
-
-**Correct URL (after v1.0 implementation):**
-```
-https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/.akr/scripts/validate_documentation.py
-```
-
-**Action:** Change 2 (below) includes this URL fix. It must be completed **immediately after** `validate_documentation.py` is committed to the repository, before any Phase 2 pilot project attempts to run CI.
+Adapt existing `.akr/workflows/validate-documentation.yml` to work with new `validate_documentation.py` script; fix broken download URL.
 
 ### Context
 
 **From analysis:** This workflow already exists and already attempts to call `validate_documentation.py`. It is not a rebuild—it is an adaptation with 8 targeted changes plus compatibility verification.
 
 **Current workflow capabilities:**
-- Downloads `validate_documentation.py` from remote URL (currently 404—**must fix before Phase 2**)
+- Downloads `validate_documentation.py` from remote URL (currently 404—must fix)
 - Installs Vale v2.29.0
 - Runs changed-files detection (`tj-actions/changed-files@v41`)
 - Has Checks API permissions configured
@@ -237,10 +224,14 @@ https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/.akr/
 | **Change 6:** Remove or replace `validate_traceability.py` download | Standards author | No downloads from `akr-mcp-server` remain | 10 min |
 | **Change 7:** Remove or replace `analyze_doc_impact.py` download | Standards author | No downloads from `akr-mcp-server` remain | 10 min |
 | **Change 8:** Remove MCP branding from PR comment footer | Standards author | Footer does not mention MCP server | 5 min |
+| **Change 9:** Add SKILL file CODEOWNERS guidance | Standards author | Workflow example/docs include `.github/skills/akr-docs/SKILL.md @org/standards-team` | 10 min |
 | **Verification:** Confirm JSON output compatibility | Standards author | Workflow's `jq` queries work with v1.0 output schema | 30 min |
 | **Verification:** Update action versions and changed-files action | Standards author | `actions/checkout@v4`, `actions/setup-python@v5`, `tj-actions/changed-files@v44` or latest | 15 min |
+| **Verification:** Confirm/deny Copilot hook execution in VS Code agent mode | Standards author | Hook support status documented in `SKILL-COMPAT.md` with evidence (`postToolUse`/`agentStop` logs or absence); if unsupported, Phase 2 onboarding checklist explicitly marks `.akr/logs/session-*.jsonl` as non-gating known gap | 45 min |
 | Test workflow on draft PR | Standards author | Workflow runs successfully; validation results appear in PR checks | 1 hour |
 | Document workflow customization | Standards author | README explains how projects adapt workflow for their structure | 1 hour |
+| Copy adapted workflow to `examples/workflows/` | Standards author | `examples/workflows/validate-documentation.yml` present; matches production workflow; referenced in onboarding docs | 15 min |
+| Add `agentStop` hook invocation documentation to workflow README | Standards author | README section explains that `.github/hooks/` directory should also be copied to application repos; notes that `agentStop` hook auto-runs `validate_documentation.py` at session end as local enforcement before CI | 30 min |
 
 ### Change Details
 
@@ -356,6 +347,15 @@ Reads space-separated file paths compatible with `tj-actions/changed-files@v41` 
 
 - Remove or replace `<sub>Powered by AKR MCP Documentation Server</sub>` in PR comments.
 
+#### Change 9: Add SKILL.md to CODEOWNERS in Application Repos
+
+Include this guidance in onboarding and workflow examples so automated skill update PRs always require standards-team review:
+
+```text
+# Add to CODEOWNERS in application repos during onboarding
+.github/skills/akr-docs/SKILL.md   @org/standards-team
+```
+
 #### Verification: JSON Output Compatibility
 
 **Existing workflow expects these fields:**
@@ -383,10 +383,65 @@ jq -r '.summary.average_completeness' validation_results.json
 core-akr-templates/
   .akr/
     workflows/
-      validate-documentation.yml   (ADAPTED; 8 changes)
+      validate-documentation.yml   (ADAPTED; 9 changes)
   examples/
     workflows/
       validate-documentation.yml   (Copy for projects to deploy)
+```
+
+---
+
+## Deliverable 2A: Skill Distribution Workflow
+
+### Objective
+
+Build `.github/workflows/distribute-skill.yml` in `core-akr-templates` to open PRs in all registered application repositories whenever `SKILL.md` is released via tag.
+
+### Why in Phase 1
+
+Phase 2 begins copying skill files into application repositories. Without distribution in place before onboarding, those copies drift as soon as the next skill release occurs.
+
+### Trigger Conditions
+
+1. Tag push matching `v*` (primary release trigger)
+2. `workflow_dispatch` (manual re-run or single-repo targeting)
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Author `distribute-skill.yml` | Standards author | Workflow present; syntax valid; tag and manual triggers configured | 3 hours |
+| Create `AKR_DISTRIBUTION_PAT` secret | Infrastructure lead | Fine-grained PAT configured in repo secrets | 1 hour |
+| Document PAT scope requirements | Infrastructure lead | Security/deployment docs list minimum required permissions | 30 min |
+| Test workflow on `TrainingTracker.Api` | Standards author + infrastructure | PR opens with expected skill diff and title | 1 hour |
+| Test `workflow_dispatch` with `target_repo` | Standards author | Only selected repo is updated | 30 min |
+| Test `fail-fast: false` matrix behavior | Standards author | One failing repo does not block successful repos | 30 min |
+| Add per-repo distribution status summary and failure follow-up | Standards author | Workflow summary lists success/failure for each repo; failures create or link tracking issue for stale-skill follow-up | 45 min |
+| Add distribution checks to release checklist | Standards author | v1.0.0 release checklist includes distribution validation | 10 min |
+| Include `.github/hooks/` in distribution bundle | Standards author | `distribute-skill.yml` copies `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` to registered repos alongside `SKILL.md`; PR body notes that hook files must be merged to activate local validation | 1 hour |
+
+### Required Secret
+
+`AKR_DISTRIBUTION_PAT` (fine-grained PAT)
+
+- `contents: write`
+- `pull-requests: write`
+- `metadata: read`
+
+### Output Locations
+
+```
+core-akr-templates/
+  .github/
+    workflows/
+      distribute-skill.yml                         (NEW)
+    skills/
+      akr-docs/
+        SKILL.md                                   (EXISTING — source of truth)
+        SKILL-COMPAT.md                            (NEW — model compatibility matrix)
+    hooks/
+      postToolUse.json                             (NEW — logs file writes to .akr/logs/)
+      agentStop.json                               (NEW — auto-runs validate_documentation.py)
 ```
 
 ---
@@ -411,7 +466,6 @@ Adapt `lean_baseline_service_template.md` and `ui_component_template.md` for mod
 | **Update all YAML front matter examples to PascalCase** | Standards author | All `businessCapability` examples use PascalCase matching `tag-registry.json` (e.g., `CourseCatalogManagement` not `course-catalogmanagement`) | 1 hour |
 | Test backend template on CourseDomain | Standards author | Output matches `courses_service_doc.md` structure | 2 hours |
 | Test UI template on sample UI module | Standards author | Component grouping logic works; hierarchy clear | 2 hours |
-| **Consolidate template variants** | Standards author | `standard_service_template.md` and `minimal_service_template.md` reviewed and consolidated into `lean_baseline` module variant; OR explicitly deferred with owner assigned to a later phase | 2 hours |
 | Document template selection logic | Standards author | `project_type` → template mapping table in README | 1 hour |
 
 **Critical:** YAML front matter `businessCapability` values must use PascalCase (e.g., `CourseCatalogManagement`) to match `tag-registry.json` keys. Otherwise Phase 4's `consolidate.py` will fail to match module docs by feature tag.
@@ -550,11 +604,18 @@ Full document replacement with module-centric template selection logic; remove a
    
 3. **`project_type` → condensed charter → template mapping**
 
-4. **Two-mode Agent Skill invocation guidance**
+4. **Three-mode Agent Skill invocation guidance**
    - When to use Mode A (grouping proposal)
    - When to use Mode B (documentation generation)
+   - When to use Mode C (interactive HITL completion for existing drafts with unresolved `❓` markers — replaces `/docs.interview`)
    
 5. **`modules.yaml` front matter field reference**
+
+6. **Copilot-specific invocation guidance and model compatibility note**
+  - Instruction to always use `/akr-docs mode-a`, `/akr-docs mode-b`, `/akr-docs mode-c` explicitly (never rely on auto-discovery)
+  - What to expect at the start of every response: `✅ akr-docs INVOKED AND STEPS EXECUTED` self-reporting block
+  - What to do if the self-reporting block is absent: check `/skills` to confirm `akr-docs` is enabled; retry with explicit slash command
+  - Note: skill is optimised for Claude Sonnet 4.6; Copilot (GPT-4o) users should expect ~75% first-run pass rate on large modules; CI gate validates output regardless of model
 
 ### Target Document Length
 
@@ -569,11 +630,11 @@ Goal: concise Copilot-native reference that a developer reads once during onboar
 | Remove MCP-specific sections | Standards author | 6 sections removed cleanly | 1 hour |
 | Author module grouping principles | Standards author | Domain noun, dependency graph, DTO alignment, interface/impl pairs documented | 1 hour |
 | Add template selection table | Standards author | All 7 `project_type` values mapped to templates | 30 min |
-| Add Agent Skill invocation guidance | Standards author | Mode A vs. Mode B triggers clear | 1 hour |
+| Add Agent Skill invocation guidance | Standards author | Mode A, Mode B, and Mode C triggers clear; Mode C noted as `/docs.interview` replacement | 1 hour |
 | Add `modules.yaml` front matter reference | Standards author | Required fields per doc type documented | 30 min |
 | Validate document length | Standards author | ≤200 lines; concise and scannable | 15 min |
-| **Test copilot-instructions.md with Copilot** | Pilot rep | Run CourseDomain example against rewritten instructions; verify module boundaries identified correctly in Copilot session | 1 hour |
 | Test with Copilot in VS Code | Pilot rep | Instructions load correctly; no broken references | 30 min |
+| Add Copilot-specific invocation and model compat note | Standards author | Section present covering: (a) always use `/akr-docs` slash command, (b) self-reporting confirmation block, (c) what to do if block is absent, (d) model compatibility note referencing `SKILL-COMPAT.md` for full detail | 45 min |
 
 ### Output Location
 
@@ -586,32 +647,16 @@ core-akr-templates/
 Per-project deployment:
   .github/
     copilot-instructions.md     (copy of canonical source or condensed charter fallback)
+
+Documentation outputs:
+  docs/
+    DEVELOPER_REFERENCE.md      (UPDATED in Phase 1 — HITL alignment + role mapping)
+    VALIDATION_GUIDE.md         (UPDATED in Phase 1 — compliance mode graduation + rollback)
 ```
 
 ---
 
-## Deliverable 6.5: Migration Inventory Resolution (From Phase 0)
-
-### Objective
-
-Resolve findings from Phase 0 infrastructure audit: all `.akr/` path references documented or closed.
-
-### Context
-
-Phase 0 included a task: "Run `git grep -l '.akr/'` to find all references across CI/CD configs, scripts, and `.gitmodules`." The inventory was created but no task consumed its findings. Phase 1 must close this loop.
-
-### Tasks
-
-| Task | Owner | Acceptance Criteria | Estimated Time |
-|---|---|---|---|
-| Review migration inventory from Phase 0 | Standards author | List all `.akr/` references found in grep output | 30 min |
-| Resolve all external references | Standards author | Each reference either: (a) updated to new `.akr/` structure, (b) documented as no-longer-valid, or (c) deleted | 2 hours |
-| Update `.gitmodules` (if present) | Standards author | No references to `akr-mcp-server` submodule; confirm `core-akr-templates` pinned at v1.0.0 | 30 min |
-| Document resolution in CHANGELOG | Standards author | Entry listing all path changes and corrections | 1 hour |
-
-### Output
-
-Phase 1 completion checklist: "Migration inventory fully resolved; zero open `.akr/` path questions"
+## Deliverable 5: Schema Deliverables
 
 ### Objective
 
@@ -749,9 +794,8 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Add `modules-schema.json` | Standards author | Complete schema per Part 4 specification | 3 hours |
-| Update `akr-config-schema.json` | Standards author | `project_type` added to `requiredTags`; conditionality documented; `priorityFilter` passthrough field added (v1.1 hook) | 1.5 hours |
-| **Document Full-Stack layer divergence** | Standards author | CHANGELOG entry explaining intentional exclusion of `Full-Stack` from `tag-registry-schema.json` and retention in `modules-schema.json`; cross-reference in schema README | 1 hour |
+| Author `modules-schema.json` | Standards author | Complete schema per Part 4 specification | 3 hours |
+| Update `akr-config-schema.json` | Standards author | `project_type` added to `requiredTags`; conditionality documented | 1 hour |
 | Update `tag-registry-schema.json` layers | Standards author | Decide whether to add `Full-Stack` or document exclusion | 1 hour |
 | Validate schemas with test YAML | Standards author | Example `modules.yaml` validates without errors | 1 hour |
 | Document schema versioning | Standards author | Schema version tied to `core-akr-templates` release tag | 30 min |
@@ -865,6 +909,99 @@ Document compliance mode graduation criteria and `TEMPLATE_MANIFEST.json` narrow
 
 ---
 
+## Deliverable 7A: Agent Session Hooks
+
+### Objective
+
+Create two hook configuration files that provide local enforcement of the skill execution contract before CI runs. These hooks are distributed to all registered application repositories via `distribute-skill.yml`.
+
+### Why Phase 1
+
+Hooks enforce the in-session contract (Layer 2 of the three-layer reliability stack). Without hooks, the developer has no local feedback if a skill step was skipped - they discover this only when CI fails after PR submission. Hooks close this gap by running `validate_documentation.py` automatically at session end.
+
+### Hook Files
+
+**`.github/hooks/postToolUse.json` - Audit Logger**
+
+Logs every file write during the session to a local JSONL file, providing a session-level audit trail. CI can reference this log to confirm expected output files were written.
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "mkdir -p .akr/logs && echo \"{\\\"timestamp\\\": \\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\", \\\"tool\\\": \\\"$TOOL_NAME\\\", \\\"file\\\": \\\"$TOOL_INPUT_FILE_PATH\\\"}\" >> .akr/logs/session-$(date +%Y%m%d).jsonl",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}
+```
+
+**`.github/hooks/agentStop.json` - Auto-Validation Gate**
+
+Runs `validate_documentation.py` automatically when the agent session ends. Results written to `.akr/logs/last-validation.json`. If validation fails, the developer sees the error immediately in their terminal before opening a PR.
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "if [ -f modules.yaml ]; then python .akr/scripts/validate_documentation.py --changed-files --output json --fail-on needs | tee .akr/logs/last-validation.json; else echo '{\"summary\": {\"note\": \"modules.yaml not found — skipping module-aware validation\"}}'; fi",
+        "timeoutSec": 60
+      }
+    ]
+  }
+}
+```
+
+### Scope and Limitations
+
+- Hooks run in Claude Code sessions. Availability in GitHub Copilot depends on Copilot's hook support at the time of Phase 1 execution.
+- If hooks are not supported by Copilot at Phase 1 time, document this as a known gap and surface the issue in `SKILL-COMPAT.md`. The CI gate (`agentStop` equivalent) remains the enforcement fallback.
+- Hook files are in `.github/hooks/` to keep them with other GitHub-managed skill files and to allow CODEOWNERS control.
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Author `postToolUse.json` audit logger hook | Standards author | File present at `.github/hooks/postToolUse.json`; bash command writes valid JSONL to `.akr/logs/session-YYYYMMDD.jsonl` | 1 hour |
+| Author `agentStop.json` auto-validation hook | Standards author | File present at `.github/hooks/agentStop.json`; hook runs `validate_documentation.py` and writes output to `.akr/logs/last-validation.json`; handles missing `modules.yaml` gracefully | 1 hour |
+| Add `.akr/logs/` to `.gitignore` | Standards author | Log files not committed; `session-*.jsonl` pattern in `.gitignore` | 10 min |
+| Test `postToolUse` hook in Claude Code session | Standards author | File write events appear in `.akr/logs/session-YYYYMMDD.jsonl` after Mode B run | 30 min |
+| Test `agentStop` hook in Claude Code session | Standards author | Validation output appears in `.akr/logs/last-validation.json`; errors surfaced before PR opened | 30 min |
+| Verify hook JSON syntax against Agent Skills spec | Standards author | Both JSON files validate without errors | 15 min |
+| Add hooks note to onboarding checklist | Standards author | Onboarding checklist (Phase 2 Deliverable 9) includes step to confirm `.github/hooks/` directory present and both files present | 10 min |
+| Document hook unavailability fallback | Standards author | `SKILL-COMPAT.md` includes row noting if hooks are unsupported in Copilot at time of Phase 1; workaround = run `validate_documentation.py --changed-files --fail-on needs` manually before opening PR | 30 min |
+
+### Output Locations
+
+```
+core-akr-templates/
+  .github/
+    hooks/
+      postToolUse.json     (NEW)
+      agentStop.json       (NEW)
+```
+
+Per-project (delivered via `distribute-skill.yml`):
+
+```
+[application-repo]/
+  .github/
+    hooks/
+      postToolUse.json     (distributed copy)
+      agentStop.json       (distributed copy)
+  .akr/
+    logs/                  (created at first hook run; gitignored)
+```
+
+---
+
 ## Deliverable 8: Cross-Platform Testing
 
 ### Objective
@@ -913,6 +1050,17 @@ Tag `core-akr-templates` v1.0.0 and publish release notes.
 - [ ] `copilot-instructions.md` rewrite complete
 - [ ] `modules-schema.json` authored and validated
 - [ ] Cross-platform testing passed
+- [ ] `SKILL_VERSION: v1.0.0` header present in `.github/skills/akr-docs/SKILL.md`
+- [ ] `registered-repos.yaml` present with pilot project entry
+- [ ] `distribute-skill.yml` present and tested against pilot project
+- [ ] `SKILL.md` frontmatter includes `disable-model-invocation: true`, `optimized-for: claude-sonnet-4-6`, `tested-on` fields, and self-reporting CRITICAL block
+- [ ] `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` present and tested
+- [ ] `evals/benchmark.json` Phase 1 baseline populated; `SKILL-COMPAT.md` v1.0 complete with model matrix values
+- [ ] `AKR_DISTRIBUTION_PAT` secret configured by infrastructure lead
+- [ ] PR body template `automated-skill-update.md` present
+- [ ] Distribution workflow fires successfully on v1.0.0 tag push
+- [ ] `docs/DEVELOPER_REFERENCE.md` updated with HITL alignment and role mapping
+- [ ] `docs/VALIDATION_GUIDE.md` updated with compliance mode graduation and rollback procedure
 - [ ] **`minimum_standards_version` initial value decided** (see Critical Decision below)
 - [ ] CHANGELOG updated with breaking changes
 - [ ] Migration guide written (`.akr/` → `validation/` paths)
@@ -944,7 +1092,7 @@ Tag `core-akr-templates` v1.0.0 and publish release notes.
 ## New Features
 
 - **Module-aware validation:** `validate_documentation.py` distinguishes MODULE vs. DB_OBJECT docs
-- **Agent Skill dual-mode:** Mode A (grouping) + Mode B (generation)
+- **Agent Skill three-mode:** Mode A (grouping proposal) + Mode B (documentation generation) + Mode C (interactive HITL completion for existing drafts)
 - **Condensed charters:** ~22% of original token count; prevents context saturation
 - **Schema-driven validation:** `modules-schema.json` defines complete module manifest contract
 
@@ -1010,17 +1158,24 @@ Tag `core-akr-templates` v1.0.0 and publish release notes.
 Phase 1 succeeds when:
 
 ✅ `validate_documentation.py` v1.0: 500-650 lines; all tests passing; cross-platform validated  
-✅ CI workflow: 8 changes applied; validates module docs without false positives  
+✅ `pyyaml` added to `requirements.txt` as explicit dependency  
+✅ CI workflow: 9 changes applied; validates module docs without false positives; `examples/workflows/` copy published  
+✅ Skill distribution workflow: `distribute-skill.yml` operational with PAT and registered repo targets  
 ✅ Templates: 2 adapted; acceptance criterion passed (CourseDomain output matches `courses_service_doc.md`)  
-✅ `copilot-instructions.md`: Full rewrite complete (~150-200 lines); module-centric logic  
-✅ `modules-schema.json`: Complete schema authored; validates example YAML  
+✅ `copilot-instructions.md`: Full rewrite complete (~150-200 lines); module-centric logic; three-mode Agent Skill guidance included  
+✅ `modules-schema.json`: Complete schema authored at `.akr/schemas/`; validates example YAML  
 ✅ `akr-config-schema.json`: `project_type` added to required tags  
 ✅ HITL alignment: Role mapping documented; templates updated  
 ✅ Governance policies: Compliance graduation + TEMPLATE_MANIFEST narrowing documented  
 ✅ Cross-platform: Ubuntu + macOS + Windows all passing  
 ✅ v1.0.0 release: Tagged, release notes published, team announced  
+✅ `SKILL.md` frontmatter: `disable-model-invocation: true` + self-reporting CRITICAL block + `<!-- akr-generated -->` Mode B final step all present  
+✅ `.github/hooks/`: `postToolUse.json` and `agentStop.json` distributed to pilot repo via `distribute-skill.yml`  
+✅ `evals/benchmark.json` v1.0 baseline and `SKILL-COMPAT.md` v1.0 both committed before pilot begins  
+✅ `docs/DEVELOPER_REFERENCE.md` updated with HITL alignment and role mapping  
+✅ `docs/VALIDATION_GUIDE.md` updated with compliance mode graduation and rollback procedure  
 
-**Exit gate:** Phase 1 retrospective complete; Phase 2 pilot onboarding authorized by standards lead.
+**Exit gate:** Phase 1 retrospective complete; Phase 2 pilot onboarding authorized by standards lead **in writing** (GitHub comment, email, or approval record) before Phase 2 begins.
 
 ---
 
@@ -1029,4 +1184,6 @@ Phase 1 succeeds when:
 **Related Documents:**
 - [Phase 0: Prerequisites](PHASE_0_PREREQUISITES.md)
 - [Implementation Plan Overview](IMPLEMENTATION_PLAN_OVERVIEW.md)
+- [Developer Reference](../DEVELOPER_REFERENCE.md)
+- [Validation Guide](../VALIDATION_GUIDE.md)
 - [Implementation-Ready Analysis](../akr_implementation_ready_analysis.md) — Parts 2, 6, 7, 12

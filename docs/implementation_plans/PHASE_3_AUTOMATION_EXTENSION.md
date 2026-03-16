@@ -19,7 +19,15 @@
 
 **If Phase 2.5 result is PASS:** This phase is **skipped entirely**. Proceed directly to Phase 4.
 
+**Decision deadline after Phase 2.5 FAIL:** Path selection (A, B, or C) must be documented within 2 weeks of the published Phase 2.5 retrospective. If no path is selected within that window, default to Path C (no custom automation) with written rationale by standards lead.
+
 ---
+
+> **📖 Agent Skills SDK Update (March 2026):** The Microsoft Agent Framework Python SDK now supports
+> code-defined skills (`@skill.script` decorator) that run **in-process** with zero external hosting.
+> This directly impacts the Phase 3 Path B deployment decision. See the updated
+> **Deployment Options** table in Deliverable 2B and the new **Deployment Option D** below before
+> committing to Azure Functions or GitHub Actions.
 
 ## Overview
 
@@ -163,6 +171,7 @@ PR merge unblocked
 | Implement approval tracking | Infrastructure | Tracks all required approvals; triggers GitHub API | 1 day |
 | Test end-to-end workflow | Standards author + pilot team | Label applied → approvals collected → PR unblocked | 1 day |
 | Document admin setup | Infrastructure | README for deploying to new Teams channels | 1 day |
+| Import `evals/copilot-studio/eval-set.xlsx` into Agent Evaluation | Standards author | Test set imported into Agent Evaluation (public preview) before deployment; test cases cover: document completeness summary, section presence check, reviewer routing logic; at least 10 test cases with expected outputs defined | 1 day |
 
 ### Cost Model
 
@@ -211,61 +220,96 @@ Build minimal custom agent addressing **only** documented Phase 2.5 failure mode
 | **No Agent Skill duplication** | Agent uses Agent Skills for workflow; adds only missing functionality |
 | **No validator duplication** | Agent calls `validate_documentation.py`; does not re-implement checks |
 | **No template duplication** | Agent loads templates from `core-akr-templates`; does not embed them |
-| **Minimal dependencies** | Python stdlib + `pyyaml` + GitHub API only; no ML frameworks. **If Path B (Azure Function):** May include `flask`/`fastapi` for HTTP trigger |
+| **Minimal dependencies** | Python stdlib + `pyyaml` + GitHub API only; no ML frameworks. **If code-defined scripts (`@skill.script`):** `agent-framework` Python package required. **If Azure Function:** May include `flask`/`fastapi` for HTTP trigger |
+| **Prefer in-process scripts** | Evaluate `@skill.script` code-defined scripts before committing to external hosting; see Deployment Options |
 
 ### Implementation Pattern
+
+**Option A — Code-Defined Scripts via `@skill.script` (Preferred; evaluate first)**
+
+```python
+"""
+Custom @doc-agent — Failure mode handlers as code-defined Agent Skills
+Design: Register each failure mode handler as an @skill.script; agent calls run_skill_script.
+No external hosting required — scripts run in-process.
+"""
+
+from agent_framework import Skill, SkillsProvider
+
+doc_agent_skill = Skill(
+  name="akr-doc-agent",
+  description="Handles AKR documentation failure modes not addressed by the coding agent.",
+  content="Use this skill for deterministic extraction and chunked processing tasks.",
+)
+
+# ── Failure Mode 1: Deterministic Operation Extraction (if authorized) ──
+@doc_agent_skill.script(
+  name="extract-operations",
+  description="Extracts ALL operations (public + private + async) via AST parsing."
+)
+def extract_operations(file_paths: str) -> str:
+  """Run AST-based operation extraction; returns JSON list of operations."""
+  import ast, json
+  # Reuse CodeAnalyzer logic from akr-mcp-server/src/tools/
+  # ~150 lines
+  return json.dumps({"operations": []})  # placeholder
+
+# ── Failure Mode 2: Chunked Context Processing (if authorized) ──
+@doc_agent_skill.script(
+  name="generate-chunked",
+  description="Multi-pass doc generation for large modules (>6 files or >15,000 tokens)."
+)
+def generate_chunked(module_path: str, output_path: str) -> str:
+  """Pass 1: extract structure. Pass 2: generate per-section. Pass 3: assemble."""
+  # ~200 lines
+  return '{"status": "assembled"}'  # placeholder
+
+# ── Failure Mode 3: Project Type Detection (if authorized) ──
+@doc_agent_skill.script(
+  name="detect-project-type",
+  description="Deterministic project_type assignment: api-backend / ui-component / microservice."
+)
+def detect_project_type(file_tree_json: str) -> str:
+  """Pattern-match file tree to project type."""
+  import json
+  # Controller + Service + Repository → api-backend
+  # Page + Components + Hooks → ui-component
+  # Service-to-service calls, no controllers → microservice
+  # ~100 lines
+  return json.dumps({"project_type": "api-backend"})  # placeholder
+
+skills_provider = SkillsProvider(
+  skills=[doc_agent_skill],
+  require_script_approval=True,   # See Script Approval section below
+)
+```
+
+**Option B — Webhook Handler (Azure Functions / GitHub Actions; fallback if in-process insufficient)**
 
 ```python
 """
 Custom @doc-agent — Minimal automation for Phase 2.5 failure modes
-Design: Supplement coding agent with deterministic extraction; use Agent Skills for governance
+Use this pattern only if code-defined @skill.script cannot handle the failure mode
+(e.g., failure mode requires subprocess isolation or external system access).
 """
-
-# ── Failure Mode 1: Deterministic Operation Extraction (if authorized) ──
-class OperationExtractor:
-    """Extracts ALL operations (public + private + async) using AST parsing"""
-    def extract_operations(self, file_paths: list) -> dict:
-        # Reuse CodeAnalyzer from akr-mcp-server/src/tools/
-        pass  # ~150 lines
-
-# ── Failure Mode 2: Chunked Context Processing (if authorized) ──
-class ChunkedDocGenerator:
-    """Multi-pass doc generation for large modules (>6 files or >15,000 tokens)"""
-    def generate_chunked(self, module: dict) -> str:
-        # Pass 1: Extract structure (files, operations, data ops)
-        # Pass 2: Generate per-section with bounded context
-        # Pass 3: Assemble with full-module references
-        pass  # ~200 lines
-
-# ── Failure Mode 3: Project Type Detection (if authorized) ──
-class ProjectTypeDetector:
-    """Deterministic project_type assignment based on file structure patterns"""
-    def detect_type(self, file_tree: dict) -> str:
-        # Pattern match: Controller + Service + Repository → api-backend
-        #                Page + Components + Hooks → ui-component
-        #                Service-to-service calls, no controllers → microservice
-        pass  # ~100 lines
 
 # ── GitHub Issue Webhook Handler ──
 @app.route('/webhook/issue', methods=['POST'])
 def handle_issue_assignment():
-    """Invoked when issue assigned to @doc-agent"""
-    issue_data = request.json
-    
-    # Determine which failure mode this issue needs
-    if requires_operation_extraction(issue_data):
-        extractor = OperationExtractor()
-        operations = extractor.extract_operations(...)
-        # Invoke coding agent with pre-extracted operations as context
-    
-    elif requires_chunked_processing(issue_data):
-        generator = ChunkedDocGenerator()
-        doc = generator.generate_chunked(...)
-        # Open PR directly (coding agent bypassed for this case)
-    
-    # ... etc. for other failure modes
-    
-    return {'status': 'processing'}
+  """Invoked when issue assigned to @doc-agent"""
+  issue_data = request.json
+
+  if requires_operation_extraction(issue_data):
+    extractor = OperationExtractor()
+    operations = extractor.extract_operations(...)
+    # Invoke coding agent with pre-extracted operations as context
+
+  elif requires_chunked_processing(issue_data):
+    generator = ChunkedDocGenerator()
+    doc = generator.generate_chunked(...)
+    # Open PR directly (coding agent bypassed for this case)
+
+  return {'status': 'processing'}
 ```
 
 ### Line Count Enforcement (CI Check)
@@ -283,7 +327,7 @@ jobs:
   check-lines:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Count lines (exclude comments and blank lines)
         id: count
@@ -331,15 +375,145 @@ jobs:
 | Test end-to-end | Standards author + pilot team | Issue assigned → agent acts → PR opened | 1 day |
 | Document usage | Standards author | README explains when to use @doc-agent vs. coding agent | 1 day |
 
+---
+
+## Deliverable 2C: Skill Reliability in Custom Agent Context
+
+### Objective
+
+Ensure that any custom agent built in Phase 3 (Path A or Path B) preserves the three-layer reliability contract established in Phase 1.
+
+### Requirements
+
+These requirements apply to **all custom agents** built in Phase 3, regardless of path (Copilot Studio or custom `@doc-agent`):
+
+| Requirement | How to Implement | Verification |
+|---|---|---|
+| **Metadata header in output** | Custom agent must include `<!-- akr-generated -->` block as final step of document generation — same as Mode B | CI `validate_documentation.py` check; any PR from the custom agent without the header fails CI |
+| **Model compatibility note in agent instructions** | Custom agent instructions must note: "This agent calls Agent Skill `akr-docs`. Output quality depends on the underlying model. Refer to `SKILL-COMPAT.md` for known failure modes." | Code review of agent instructions |
+| **`SKILL-COMPAT.md` updated for custom agent** | After Phase 3 deployment, add a `custom-agent` row to `SKILL-COMPAT.md` with observed pass rates | Standards author post-deployment review |
+| **`benchmark.json` `custom-agent` key** | Record custom agent pass rates in `benchmark.json` alongside `coding-agent` from Phase 2.5 | Same benchmark format as Phase 2.5 |
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Embed `<!-- akr-generated -->` header requirement in custom agent instructions | Standards author | Agent instructions include final step writing metadata header; same fields as Mode B definition | 30 min |
+| Add CI assertion: custom agent PRs must contain metadata header | Standards author | `validate_documentation.py` already enforces this; confirm no exemption was added for custom agent PRs | 15 min |
+| Add `custom-agent` row to `SKILL-COMPAT.md` post-deployment | Standards author | Row populated with observed pass rate after first 5 real-world runs | 1 hour |
+| Populate `benchmark.json` `custom-agent` key | Standards author | Pass rates and average token counts recorded for at least 3 test cases | 1 hour |
+
+---
+
 ### Deployment Options
 
 | Option | Pros | Cons | Est. Cost |
 |---|---|---|---|
-| **Azure Functions** | Serverless; pay-per-use; auto-scale | Requires Azure subscription; cold start latency | ~$5-10/month pilot scale |
-| **GitHub Actions** | No external hosting; native CI/CD | Consumes Actions minutes; no persistent state | Free tier sufficient for pilot |
-| **Fly.io / Render** | Simple deployment; free tier | External dependency; less enterprise-friendly | Free tier for pilot |
+| **D — Code-defined `@skill.script`** ⭐ | No external hosting; in-process; no cold starts; no infra; maps directly to Agent Skills `run_skill_script` tool | Scripts share agent process permissions; requires `agent-framework` Python package; not suitable if subprocess isolation is required | **Zero** (no infra) |
+| **A — Azure Functions** | Serverless; pay-per-use; auto-scale | Requires Azure subscription; cold start latency | ~$5-10/month pilot scale |
+| **B — GitHub Actions** | No external hosting; native CI/CD | Consumes Actions minutes; no persistent state | Free tier sufficient for pilot |
+| **C — Fly.io / Render** | Simple deployment; free tier | External dependency; less enterprise-friendly | Free tier for pilot |
 
-**Recommended:** Azure Functions if infrastructure team available; GitHub Actions otherwise.
+**Evaluation order (required):** Evaluate **Option D first**. Only proceed to Azure Functions (Option A) if the failure mode requires subprocess isolation, external network access, or is incompatible with in-process execution.
+
+**Decision gate:** Standards author must document in writing why Option D is insufficient before Option A is authorized. This decision is recorded in `ARCHITECTURE.md` (Deliverable 4).
+
+---
+
+## Deliverable 2D: Script Approval Configuration
+
+### Objective
+
+Wire the `require_script_approval` flag from the Microsoft Agent Framework Python SDK into the AKR
+compliance mode model so script execution in the custom `@doc-agent` is gated by human approval
+in production environments, consistent with the HITL contract established in Phases 0-2.
+
+### Background
+
+The Agent Framework `SkillsProvider` now supports `require_script_approval=True`, which pauses
+script execution and returns an approval request to the calling application before any side effects
+occur. This maps directly onto the AKR compliance mode progression:
+
+| AKR `compliance_mode` | `require_script_approval` | Rationale |
+|---|---|---|
+| `pilot` | `False` (default) | Fast iteration; PR-level review is sufficient HITL gate |
+| `production` | `True` | Script side effects (file writes, extractions) require explicit human sign-off before they occur |
+
+### Implementation
+
+**1. Add `script_approval_required` to `.akr-config.json` schema:**
+
+```json
+{
+  "compliance_mode": "production",
+  "script_approval_required": true
+}
+```
+
+**2. Wire to `SkillsProvider` in the custom agent:**
+
+```python
+from agent_framework import SkillsProvider
+import json
+
+with open('.akr-config.json') as f:
+  akr_config = json.load(f)
+
+skills_provider = SkillsProvider(
+  skills=[doc_agent_skill],
+  require_script_approval=akr_config.get("script_approval_required", False),
+)
+```
+
+**3. Handle approval requests in the agent invocation loop:**
+
+```python
+result = await agent.run("Generate documentation for CourseDomain module", session=session)
+
+while result.user_input_requests:
+  for request in result.user_input_requests:
+    script_name = request.function_call.name
+    script_args = request.function_call.arguments
+
+    # Log for audit trail
+    print(f"[AKR APPROVAL REQUIRED] Script: {script_name}")
+    print(f"  Args: {script_args}")
+
+    # Present to developer/reviewer for approval
+    approved = prompt_developer_for_approval(script_name, script_args)
+
+    approval_response = request.to_function_approval_response(approved=approved)
+    result = await agent.run(approval_response, session=session)
+```
+
+### Audit Trail Requirement
+
+When `script_approval_required: true`, the agent **must** log the following for each script
+execution attempt:
+
+- Script name
+- Arguments passed
+- Approved / rejected (with reviewer identity if available)
+- ISO 8601 timestamp
+
+Log format (append to `.akr/logs/script-approvals.jsonl`):
+
+```json
+{"timestamp": "2026-03-16T10:00:00Z", "script": "extract-operations", "args": {"file_paths": "..."}, "approved": true, "reviewer": "developer@org.com"}
+```
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Add `script_approval_required` field to `akr-config-schema.json` | Standards author | Field present; type `boolean`; default `false`; description references compliance mode | 30 min |
+| Implement `SkillsProvider` wiring from `.akr-config.json` | Standards author | `require_script_approval` reads from config; not hardcoded | 1 hour |
+| Implement approval loop in agent invocation | Standards author | Loop handles all `user_input_requests`; rejected scripts produce informational message | 2 hours |
+| Implement audit log writer | Standards author | `.akr/logs/script-approvals.jsonl` created; each approval/rejection appended | 1 hour |
+| Test: pilot mode — no approval prompt | Developer | `compliance_mode: pilot` + `script_approval_required: false` → scripts run without prompt | 30 min |
+| Test: production mode — approval required | Developer | `compliance_mode: production` + `script_approval_required: true` → prompt appears before script runs | 30 min |
+| Test: rejection path | Developer | Rejected script → agent reports limitation and suggests alternative approach | 30 min |
+| Document in `VALIDATION_GUIDE.md` | Standards author | Section added: "Script Approval in Production Mode" | 1 hour |
 
 ---
 
@@ -358,6 +532,8 @@ Validate that custom automation addresses Phase 2.5 failure modes without introd
 | **Agent Skills integration:** Custom agent calls skills | Workflow logic not duplicated | Agent invokes Agent Skills; does not re-implement |
 | **Validator integration:** Custom agent calls validator | Validation logic not duplicated | Agent runs `validate_documentation.py`; does not re-check |
 | **Template integration:** Custom agent loads templates | Templates not embedded in agent code | Agent reads from `core-akr-templates`; no hardcoded templates |
+| **Script Approval: pilot mode** | `compliance_mode: pilot` → no approval prompt | Scripts run immediately without prompt |
+| **Script Approval: production mode** | `compliance_mode: production` → approval prompt before script execution | Prompt shown; audit log entry written |
 
 ### Tasks
 
@@ -426,6 +602,7 @@ Document custom agent design, deployment, and maintenance for long-term ownershi
 | Custom agent becomes maintenance burden | 🔴 High | 🟡 Medium | Minimize complexity; document thoroughly; consider sunsetting if coding agent improves |
 | Azure Function cold starts cause delays | 🟠 Low | 🟡 Medium | Use Azure Functions Premium Plan if latency critical |
 | Custom agent diverges from Agent Skills | 🔴 High | 🟡 Medium | CI checks enforce no logic duplication; integration tests validate |
+| `@skill.script` in-process permission scope too broad | 🟡 Medium | 🟠 Low | Review script function permissions; use `require_script_approval=True` in production; document accepted scope in `ARCHITECTURE.md` |
 
 ---
 
@@ -441,14 +618,16 @@ Phase 3 succeeds when:
 ✅ Integration tests: Agent Skills, validator, templates all called correctly  
 ✅ Documentation complete: ARCHITECTURE, DEPLOYMENT, USAGE, MAINTENANCE  
 ✅ Phase 3 retrospective complete; Phase 4 authorized  
+✅ Deployment option evaluated in required order (D → A → B → C); rationale documented if D rejected
+✅ `script_approval_required` flag in `akr-config-schema.json`; wired to `SkillsProvider`; pilot=false / production=true
 
-**Exit gate:** Custom automation deployed and validated; Phase 4 work authorized by standards lead.
+**Exit gate:** Custom automation deployed and validated; Phase 4 work authorized by standards lead **in writing** (GitHub comment, email, or approval record) before Phase 4 begins.
 
 ---
 
 **Next Phase:** [Phase 4: Feature Consolidation](PHASE_4_FEATURE_CONSOLIDATION.md)
 
 **Related Documents:**
-- [Phase 2.5: Coding Agent Spike](PHASE_2.5_CODING_AGENT_SPIKE.md) — Authorization criteria
+- [Phase 2.5: Coding Agent Spike](PHASE_2_5_CODING_AGENT_SPIKE.md) — Authorization criteria
 - [Implementation Plan Overview](IMPLEMENTATION_PLAN_OVERVIEW.md)
 - [Implementation-Ready Analysis](../akr_implementation_ready_analysis.md) — Part 10, Part 13

@@ -27,6 +27,8 @@ Phase 2.5 is complete when:
 6. ✅ Premium request consumption measured
 7. ✅ Go/no-go recommendation documented
 8. ✅ Phase 3 authorization (if FAIL) or Phase 3 skip (if PASS)
+9. ✅ `<!-- akr-generated -->` metadata header present in all coding agent PR outputs (confirms skill ran to completion in async context)
+10. ✅ `.akr/logs/session-*.jsonl` hook log handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 
 **Exit Gate:** Binary decision documented; management approves recommendation; proceed to Phase 3 (if authorized) or Phase 4 (if skipped).
 
@@ -40,7 +42,7 @@ Phase 2.5 is complete when:
 **Strategic rationale:**
 - Coding agent is **free** (included in Copilot Business/Enterprise)
 - No infrastructure to maintain
-- Auto-loads Agent Skills
+- Can follow `akr-docs` skill workflow instructions embedded in issue templates and repository skill files
 - Multi-turn conversation model may handle large modules better than single-shot agent mode
 - If it works, Phase 3 is unnecessary
 
@@ -67,7 +69,7 @@ assignees: ''
 
 - **Module Name:** [e.g., CourseDomain]
 - **Project Type:** [api-backend | ui-component | microservice | general]
-- **Business Capability:** [e.g., CourseCatalogManagement] (maps to `businessCapability` field in `modules.yaml`; PascalCase from tag-registry.json)
+- **Business Capability:** [e.g., CourseCatalogManagement] (PascalCase from tag-registry.json)
 - **Files in Module:** [List all files, or reference modules.yaml entry]
 
 ## Documentation Requirements
@@ -169,21 +171,21 @@ Create 3 test issues covering different module types and complexity levels; assi
 **Module:** `CourseDomain` (5 files, ~800 LOC total) — **reused from Phase 2 Deliverable 2**  
 **Project Type:** `api-backend`  
 **Expected Behavior:** Agent generates complete documentation with all sections; passes validation  
-**Acceptance Criteria:** All 8 acceptance criteria met
+**Acceptance Criteria:** Criteria 1-9 pass; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 
 #### Test Case 2: UI Component Module
 
 **Module:** `CourseManagementUI` (Page + components + hook + types) — **reused from Phase 2 UI pilot**  
 **Project Type:** `ui-component`  
 **Expected Behavior:** Agent generates complete documentation using the UI module variant; passes validation  
-**Acceptance Criteria:** All 8 acceptance criteria met (UI path)
+**Acceptance Criteria:** Criteria 1-9 pass; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue." (UI path)
 
 #### Test Case 3: Large Backend Module (Stress Test)
 
 **Module:** `EnrollmentDomain` (5 files, ~1,000 LOC total) — **reused from Phase 2 Deliverable 6**  
 **Project Type:** `api-backend`  
 **Expected Behavior:** Agent handles larger module; no section truncation  
-**Acceptance Criteria:** All 8 acceptance criteria met + no truncation
+**Acceptance Criteria:** Criteria 1-9 pass + no truncation; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 
 ### Execution Process
 
@@ -199,12 +201,11 @@ Create 3 test issues covering different module types and complexity levels; assi
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| **Confirm Test Case 2 source module** | Standards author | UI module from Phase 2 pilot identified (e.g., CourseManagementUI); confirmed present in codebase; listed in task table | 30 min |
 | Create Test Case 1 issue | Standards author | Issue created with all fields | 15 min |
 | Assign to coding agent | Standards author | Agent accepts issue; begins work | 5 min |
-| **Wait for draft PR (timeout: 8 hours)** | N/A | Agent opens PR autonomously within 8-hour window; if timeout exceeded, record as FAIL with failure mode "Agent did not complete task within time limit" | Timed (8 hours max) |
+| Wait for draft PR | N/A | Agent opens PR autonomously | Variable (agent) |
 | Validate Test Case 1 output | Developer | All acceptance criteria checked | 30 min |
-| Create Test Case 2 issue | Standards author | Issue created with all fields; source module confirmed to exist | 15 min |
+| Create Test Case 2 issue | Standards author | Issue created with all fields | 15 min |
 | Assign to coding agent | Standards author | Agent accepts issue; begins work | 5 min |
 | Validate Test Case 2 output | Developer | All acceptance criteria checked | 30 min |
 | Create Test Case 3 issue | Standards author | Issue created with all fields | 15 min |
@@ -234,6 +235,8 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | 6. **Data Operations coverage** | All reads and writes across all files covered | ≥95% of data operations listed |
 | 7. **Validation passes** | `validate_documentation.py --fail-on needs` exits 0 | Exit code 0 |
 | 8. **No truncation** | No "..." or "[content omitted]" artifacts in output | Zero truncation markers |
+| 9. **Metadata header present** | `<!-- akr-generated -->` block present at top of output file | Header present with all required fields |
+| 10. **Hook log present** | `.akr/logs/session-*.jsonl` contains file write entry for the output doc path | Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue |
 
 ### Testing Matrix
 
@@ -247,24 +250,45 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | Criterion 6: Data Operations | ⬜ | ⬜ | ⬜ |
 | Criterion 7: Validation | ⬜ | ⬜ | ⬜ |
 | Criterion 8: No truncation | ⬜ | ⬜ | ⬜ |
+| Criterion 9: Metadata header | ⬜ | ⬜ | ⬜ |
+| Criterion 10: Hook log | ⬜ | ⬜ | ⬜ |
 | **Overall** | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL |
 
 ### Pass/Fail Decision Logic
 
-**PASS:** All 3 test cases meet all 8 acceptance criteria  
-**FAIL:** Any test case fails any acceptance criterion
+**PASS:** All 3 test cases meet Criteria 1-9 and Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."  
+**FAIL:** Any test case fails Criteria 1-9, or Criterion 10 fails when Copilot hook support is confirmed in Phase 1
 
 **Partial failures are still FAIL:** If Test Case 1 and 2 pass but Test Case 3 (large module) fails due to truncation, Phase 2.5 result is FAIL with documented failure mode: "Context ceiling at 8 files".
+
+### Decision Rule (Reviewer PR Checklist)
+
+Apply this rule exactly in PR review to avoid interpretation drift:
+
+1. Verify Criteria 1-9 for each test case.
+2. If any Criterion 1-9 fails in any test case, mark Phase 2.5 as FAIL.
+3. Check whether Copilot hook support was confirmed in Phase 1 Deliverable 7A.
+4. Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
+5. If a known gap is recorded, include evidence in `SKILL-COMPAT.md` before final decision.
+6. Final PASS requires all three test cases passing Criteria 1-9 and cost/recommendation sections completed.
+
+Reviewer output format:
+- `Phase 2.5 Decision: PASS|FAIL`
+- `Criteria 1-9: PASS|FAIL`
+- `Criterion 10 Mode: HARD-GATE|KNOWN-GAP`
+- `Criterion 10 Result: PASS|FAIL|N/A`
+- `Evidence Links: [PRs, logs, SKILL-COMPAT.md entry]`
 
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Test Criterion 1-8 on Test Case 1 | Developer | All checks completed; results in matrix | 30 min |
-| Test Criterion 1-8 on Test Case 2 | Developer | All checks completed; results in matrix | 30 min |
-| Test Criterion 1-8 on Test Case 3 | Developer | All checks completed; results in matrix | 30 min |
+| Test Criterion 1-10 on Test Case 1 | Developer | All checks completed; results in matrix | 30 min |
+| Test Criterion 1-10 on Test Case 2 | Developer | All checks completed; results in matrix | 30 min |
+| Test Criterion 1-10 on Test Case 3 | Developer | All checks completed; results in matrix | 30 min |
 | Document specific failures | Standards author | For each FAIL, note which section/criterion | 1 hour |
 | Analyze failure patterns | Standards author | Identify root cause (e.g., context limit, template parsing) | 1 hour |
+| Classify failures against `SKILL-COMPAT.md` model-specific failure modes | Standards author | For each FAIL, determine if root cause matches a known GPT-4o pattern (e.g., truncation at 8 files) or is a new fixable skill instruction gap; classification documented | 1 hour |
 
 ---
 
@@ -282,6 +306,7 @@ Measure premium request consumption per module to model monthly cost at team sca
 | **Time to generate** | [minutes] | [minutes] | [minutes] |
 | **Number of agent turns** | [count] | [count] | [count] |
 | **Final PR quality** | [PASS/FAIL] | [PASS/FAIL] | [PASS/FAIL] |
+| **Criteria 9 & 10 result** | [metadata header: ✅/❌, hook log: ✅/❌] | [metadata header: ✅/❌, hook log: ✅/❌] | [metadata header: ✅/❌, hook log: ✅/❌] |
 
 ### Cost Model
 
@@ -323,7 +348,8 @@ Document binary decision: proceed to Phase 3 (if FAIL) or skip to Phase 4 (if PA
 
 ```
 Phase 2.5 Result: PASS
-  ├─ All 3 test cases passed all 8 acceptance criteria
+   ├─ All 3 test cases passed Criteria 1-9
+   ├─ Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
   ├─ Premium request cost acceptable at team scale
   ├─ Recommendation: SKIP Phase 3
   └─ Next: Proceed directly to Phase 4
@@ -350,9 +376,9 @@ Phase 2.5 Result: FAIL
 
 | Test Case | Result | Acceptance Criteria Met | Notes |
 |---|---|---|---|
-| 1: Standard Backend | [PASS/FAIL] | [X/8] | [specific failures if any] |
-| 2: UI Component | [PASS/FAIL] | [X/8] | [specific failures if any] |
-| 3: Large Module | [PASS/FAIL] | [X/8] | [specific failures if any] |
+| 1: Standard Backend | [PASS/FAIL] | [X/10] | [specific failures if any] |
+| 2: UI Component | [PASS/FAIL] | [X/10] | [specific failures if any] |
+| 3: Large Module | [PASS/FAIL] | [X/10] | [specific failures if any] |
 
 ## Failure Modes (if FAIL)
 
@@ -362,6 +388,18 @@ Phase 2.5 Result: FAIL
 - **Root Cause:** [e.g., Agent did not read all files in module]
 - **Frequency:** [X/3 test cases affected]
 - **Impact:** [Blocks production use]
+
+## Skill Reliability Results
+
+| Check | Test Case 1 | Test Case 2 | Test Case 3 |
+|---|---|---|---|
+| `<!-- akr-generated -->` header present | ✅/❌ | ✅/❌ | ✅/❌ |
+| Hook log `.akr/logs/session-*.jsonl` present | ✅/❌ | ✅/❌ | ✅/❌ |
+| Self-reporting block in Copilot Chat | N/A (async) | N/A (async) | N/A (async) |
+
+**Interpretation:**
+- Metadata header absent → skill did not complete Mode B; document as FAIL on Criterion 9
+- Hook log absent → coding agent does not trigger hooks in async context; document as known gap; does not cause Phase 3 authorization unless metadata header also absent
 
 ## Cost Analysis
 
@@ -444,6 +482,7 @@ Phase 2.5 Result: FAIL
 | Premium request cost exceeds budget | 🟡 Medium | 🟠 Low | Model cost before execution; compare to Azure Function hosting |
 | Coding agent unavailable or rate-limited | 🟠 Low | 🟠 Low | Test during low-usage period; document rate limits if encountered |
 | Test cases not representative of real modules | 🟡 Medium | 🟠 Low | Select test modules from pilot project (real production code) |
+| Skill reliability drops in async coding agent context | 🟡 Medium | 🟡 Medium | Criteria 9 (metadata header) and 10 (hook log) explicitly test this. Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue." |
 
 ---
 
@@ -453,14 +492,17 @@ Phase 2.5 succeeds when:
 
 ✅ GitHub Issue template created and tested  
 ✅ 3 test issues executed (standard, UI, large)  
-✅ All acceptance criteria tested (8 criteria × 3 test cases = 24 checks)  
+✅ All acceptance criteria tested (10 criteria × 3 test cases = 30 checks)  
 ✅ Results documented: PASS/FAIL per criterion  
 ✅ Premium request consumption measured and modeled  
 ✅ Go/no-go recommendation documented  
 ✅ Management approves recommendation  
 ✅ Phase 3 authorized (if FAIL) or skipped (if PASS)  
+✅ Skill reliability results documented: Criteria 9 (metadata header) and 10 (hook log) recorded for all 3 test cases; `benchmark.json` `coding-agent` key populated  
 
-**Exit gate:** Binary decision approved; proceed to Phase 3 (if authorized) or Phase 4 (if skipped).
+**Gate rule note:** Criteria 1-9 are hard gates. Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
+
+**Exit gate:** Binary decision approved by management **in writing** (approval record or email); next phase explicitly authorized before work begins.
 
 ---
 

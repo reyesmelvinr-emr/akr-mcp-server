@@ -21,6 +21,8 @@ This is the definitive pre-implementation analysis for the AKR Documentation Gov
 | Review 6 — GitHub Copilot (Schema Audit) | Full inspection of `akr-config-schema.json` + `consolidation-config-schema.json` | Four corrections: `modules-schema.json` is a new artifact; `consolidation-config-schema.json` needs `modulesManifestPath`; dual cross-repo config overlap; `project_type` not in existing `requiredTags`. Three additions: `humanInput` schema maps to HITL model; `warnOnMissingLayers` already defined; `monitoring` schema feeds cost baseline |
 | Review 7 — GitHub Copilot (Final File Inspection) | Direct read of `copilot-instructions.md`, `.akr/workflows/`, `tag-registry.json` | Confirmed `copilot-instructions.md` is a full replacement (not partial edit); confirmed two existing workflows (`validate-documentation.yml` already calls the script); confirmed `tag-registry.json` PascalCase format incompatible with free-text `feature` field examples |
 | Module Architecture Clarification | Owner-provided | `courses_service_doc.md` confirmed as Level 1 spec; module grouping rules; database object separation; template adaptation requirements |
+| Workflow Clarifications (Owner-provided) | Owner-provided | `/docs.interview` original purpose clarified as HITL completion for `❓` sections in existing docs; Agent Skill Mode C added for interactive HITL; zero-cloud/no-incremental-cost constraint made explicit; original `core-akr-templates` ↔ `akr-mcp-server` design intent documented |
+| Review 9 — Skill Optimization Analysis | Post-implementation planning conversation | Three failure modes of Copilot skill non-invocation identified; three-layer reliability stack specified (`disable-model-invocation` frontmatter + session hooks + in-document metadata contract); LLM execution quality variance quantified (Claude Sonnet 4.6 ≥90% vs. GPT-4o ~75%); eval framework and `benchmark.json` schema defined; `SKILL-COMPAT.md` as companion model compatibility matrix introduced; hooks (`postToolUse` + `agentStop`) specified as Layer 2 enforcement |
 
 ---
 
@@ -98,9 +100,10 @@ A module is a **logical grouping of source files that together implement a singl
 | Mode A — Grouping validation | Developer who knows the codebase | Reviews groupings; reassigns misplaced files; names modules correctly; splits over-large groups | 5–10 min per project |
 | Mode B — Documentation generation | Copilot coding agent | Reads approved `modules.yaml`; loads condensed charter; reads source files; generates doc; opens draft PR | Automated |
 | Mode B — Content review | Developer + tech lead | Fills `❓` sections; validates business rules; confirms data operations accuracy | 20–30 min per module |
+| Mode C — Interactive HITL completion | Copilot agent mode + developer | Guides developer through unresolved `❓` one section at a time in existing documents; records accepted edits and deferred items | 10–20 min per document |
 | CI gate | `validate_documentation.py` + Vale | Validates required sections, markers, `project_type`, `feature_tag` format | Automated at PR merge |
 
-This is the correct HITL model: **validate the grouping** (fast, developer-present, before generation), then **validate the content** (PR review, before merge).
+This is the correct HITL model: **validate the grouping** (Mode A), **generate and review module content** (Mode B), then **interactively resolve remaining `❓` markers in the editor** (Mode C) before merge.
 
 ---
 
@@ -128,6 +131,17 @@ Evidence summary:
 - Tool-layer tests: `test_context_builder.py`, `test_validation_library.py`, `test_workflow_enforcement.py` — define the quality bar for generated documentation
 
 **M365 analysis conflict resolved:** The M365 recommendation to "complete Sprint 2 first" was based on README-only analysis. Repository-grounded evidence overrules it. Archive immediately.
+
+### 2.1A Original Design Intent: `core-akr-templates` and `akr-mcp-server` Relationship
+
+The historical relationship between the two repositories was under-documented and should be explicit for decision traceability.
+
+- `core-akr-templates` was intended as the remote canonical standards source on GitHub, not as a local developer dependency.
+- The original PoC flow was: `core-akr-templates` (remote authority) → startup/CI sync pull → local `akr-mcp-server` context → slash-command workflow in VS Code.
+- That sync mechanism was a planned Sprint 2 deliverable and was never implemented, so the repositories never became operationally connected in production.
+- The Hosted MCP Context Source model replaces exactly this planned-but-unbuilt sync layer while preserving the same architectural intent (centralized remote standards, local authoring workflow).
+
+**Consequence:** The current strategy is architectural continuity, not architectural reversal. The intermediary changed; the source-of-truth model did not.
 
 ### 2.2 `core-akr-templates` — Asset Inventory
 
@@ -165,6 +179,13 @@ Evidence summary:
 - `tag-registry.json` — `feature` field in `modules.yaml` must match an approved entry here
 - `akr-config-schema.json` — `layer` enum: `["UI", "API", "Database", "Integration", "Infrastructure", "Full-Stack"]` — used at project level in `modules.yaml`
 - `consolidation-config-schema.json` — cross-repository configuration contract for `consolidate.py`; valid for repo-level config; document-to-section mapping must account for module docs as atomic units
+
+**Additional assets (newly confirmed):**
+- `tag-registry-schema.json` (3,847 bytes) — JSON Schema for `tag-registry.json` validation; enforces structure for feature enumeration
+- `COST_MONITORING.md` (8,296 bytes) — GitHub Actions cost baseline and tracking guidance; references Jan 2026 pricing model ($0.005/min Ubuntu); critical for Phase 0 budgeting
+- `workflows/distribute-tag-registry.yml` — Automation for syncing tag-registry across repositories
+- `workflows/validate-documentation.yml` — CI pipeline for documentation validation; calls `validate_documentation.py`
+- `vale-rules/AKR/` — Nested directory structure with organization-specific Vale quality rules (path different from earlier `vale-rules/` reference; no migration needed)
 
 ---
 
@@ -303,9 +324,13 @@ database_objects:
 
 ---
 
-## Part 5: The Agent Skill — Two-Mode Specification
+## Part 5: The Agent Skill — Three-Mode Specification
 
-The Agent Skill is the primary workflow encoding mechanism. A single `SKILL.md` works across VS Code agent mode, the Copilot coding agent, and the Copilot CLI. Mode A must precede Mode B — this sequencing is enforced by the skill's explicit prerequisite check.
+The Agent Skill is the primary workflow encoding mechanism. A single `SKILL.md` works across VS Code agent mode, the Copilot coding agent, and the Copilot CLI. Mode A (also referred to as the **DocumentPlanner** step) must precede Mode B, and Mode C handles interactive HITL completion for unresolved `❓` sections in existing drafts.
+
+**Reliability context (Review 9):** Agent Skills are invoked by the LLM on an intent-matching basis. Copilot (GPT-4o) can respond to a documentation request *without* loading the skill, and can execute the skill *without* completing all steps - both silently, with no error. The three-layer reliability stack documented in Part 16 addresses this directly. The `SKILL.md` specification in this section should be read alongside Part 16, which defines the required frontmatter properties, invocation contract, and in-document proof-of-execution that together make the skill enforceable rather than advisory.
+
+**LLM-dependent execution quality (Review 9):** Skill execution quality varies by underlying model. The `akr-docs` skill is optimized for and benchmarked against **Claude Sonnet 4.6**. When running through GitHub Copilot (GPT-4o default), expect lower first-run pass rates, particularly for Mode B on large modules (>6 files). See `SKILL-COMPAT.md` for the full model compatibility matrix and per-model workarounds. The CI gate (`validate_documentation.py`) validates output regardless of which model ran the skill - it is the model-agnostic enforcement layer.
 
 ```markdown
 # .github/skills/akr-docs/SKILL.md
@@ -313,8 +338,9 @@ The Agent Skill is the primary workflow encoding mechanism. A single `SKILL.md` 
 ---
 name: akr-docs
 description: Propose module groupings and generate module documentation following
-             AKR templates, charters, and validation rules. Two modes: Mode A
-             (grouping proposal) must complete before Mode B (documentation generation).
+             AKR templates, charters, and validation rules. Three modes: Mode A
+             (DocumentPlanner grouping proposal), Mode B (documentation generation),
+             and Mode C (interactive HITL completion for unresolved ❓ sections).
 ---
 
 # AKR Documentation Workflow
@@ -422,8 +448,108 @@ When asked to "generate documentation for [ModuleName]" or
    - [ ] Data Operations section covers all reads and writes
    - [ ] Questions & Gaps populated with open items
    - [ ] validate_documentation.py passes with zero errors
+  - [ ] akr-generated metadata header present at top of document
    - [ ] CODEOWNERS notified for review
+
+8. Write the akr-generated metadata header block to the TOP of the output file
+  (this step is required - do not skip; validate_documentation.py checks for it):
+  <!-- akr-generated
+  skill: akr-docs
+  skill-version: {SKILL_VERSION from header}
+  mode: B
+  template: {template used}
+  charter: {condensed charter filename}
+  modules-yaml-status: approved
+  steps-completed: 1,2,3,4,5,6,7,8
+  generated-at: {ISO 8601 timestamp}
+  -->
+
+---
+
+## Mode C — Interactive HITL Completion for Existing Drafts
+## (Run when a document already exists and has unresolved ❓ sections)
+
+When asked to "review unresolved questions", "walk me through ❓ sections", or
+"finish HITL review for [DocName]":
+
+1. Read the existing documentation file and enumerate unresolved `❓` markers.
+  Group them by section and priority (critical first when in `production` mode).
+
+2. Start an interactive pass in-editor:
+  - Present one `❓` item at a time with local section context
+  - Ask targeted clarification questions
+  - Propose replacement text options grounded in code evidence
+
+3. Apply accepted edits immediately to the document.
+  - Replace resolved `❓` markers with finalized content
+  - Keep unresolved items marked as `DEFERRED` with rationale and owner
+
+4. Re-run validation checks after each section or batch:
+  - `validate_documentation.py` for structural and marker policy
+  - Vale checks for prose quality (if configured in repo)
+
+5. Summarize completion status at the end:
+  - Total `❓` resolved
+  - Remaining `DEFERRED` items
+  - Any blockers requiring domain-owner input
+
+6. Open/update draft PR with a HITL completion checklist:
+  - [ ] All critical `❓` resolved or explicitly `DEFERRED`
+  - [ ] Deferred items have owner + follow-up trigger
+  - [ ] Validator passes for current compliance mode
+  - [ ] Reviewer sign-off requested
 ```
+
+### Skill Reliability Requirements (Review 9)
+
+The SKILL.md specification above encodes the *workflow*. The following requirements ensure the workflow is **actually executed** - not silently bypassed or incompletely run. These requirements are Part 16 items translated into authoring obligations.
+
+#### Required SKILL.md Frontmatter
+
+The frontmatter block must appear *above* the `<!-- SKILL_VERSION -->` comment as the first content in the file:
+
+```yaml
+---
+name: akr-docs
+description: >
+  Generate AKR module documentation following charters and templates.
+  Invoke explicitly via /akr-docs [mode-a | mode-b | mode-c] [target].
+disable-model-invocation: true
+optimized-for: claude-sonnet-4-6
+tested-on:
+  - claude-sonnet-4-6   # ✅ pass rate ≥90%
+  - gpt-4o              # ⚠️ ~75%, Mode B truncation on large modules
+user-invocable: true
+skill-version: 1.0.0
+---
+```
+
+**`disable-model-invocation: true`** prevents Copilot from auto-loading the skill based on intent matching. Without this, the skill may not load at all on ambiguous requests, producing responses that look correct but were generated entirely from the model's training data - with no charter, no template, and no compliance with the AKR governance contract.
+
+#### Required Self-Reporting Block (First SKILL Body Instruction)
+
+The first instruction in the SKILL body (after the frontmatter and version comment) must be:
+
+```
+CRITICAL: When this skill is loaded, begin EVERY response with the following
+confirmation block. Do not skip this under any circumstances.
+
+✅ akr-docs INVOKED AND STEPS EXECUTED
+Steps followed: 1. [first step description] — completed | 2. [second step] — completed | ...
+```
+
+This gives the developer immediate in-session confirmation that the skill loaded and ran. Its absence in a response is an early warning that the skill was not invoked - allowing the developer to retry with an explicit `/akr-docs` command before a PR is opened.
+
+#### Companion File: `SKILL-COMPAT.md`
+
+A companion `SKILL-COMPAT.md` must be maintained alongside `SKILL.md` at `.github/skills/akr-docs/SKILL-COMPAT.md`. It records:
+
+- Model compatibility matrix (pass rates per eval case per model, updated from `evals/benchmark.json` after each eval run)
+- Known model-specific failure modes with descriptions
+- Recommended workaround prompts per model
+- Re-evaluation policy: *"Re-run evals after any SKILL.md change or Copilot model update."*
+
+This file is distributed to registered repositories alongside `SKILL.md` via `distribute-skill.yml`.
 
 ---
 
@@ -465,6 +591,9 @@ Execution flow:
      - Business Rules (with Why It Exists + Since When columns)
      - Data Operations (all reads and writes)
      - YAML front matter with: feature, layer, project_type, status
+     - <!-- akr-generated --> metadata header block at document top
+       (absence → FAIL with: "AKR metadata header missing — skill may not
+       have been properly invoked. Re-run using /akr-docs mode-b [module].")
 
    DB_OBJECT docs require:
      - Object Definition (schema, columns/parameters)
@@ -507,6 +636,9 @@ Execution flow:
 | `--tier` completeness scoring | Threshold logic can be added after v1.0 section checks are stable |
 | `feature-registry.yaml` cross-repo validation | Phase 4 dependency; `tag-registry.json` local validation is sufficient for v1.0 |
 | Full Vale subprocess integration | Vale can run as a separate CI step in v1.0; tight integration in v1.1 |
+| Model-specific pass-rate adaptive logic | Detecting which model ran the skill and adjusting validation thresholds accordingly - `benchmark.json` data provides the inputs but the logic is v1.1 scope; v1.0 applies uniform rules regardless of model |
+
+The `<!-- akr-generated -->` metadata header check is explicitly **v1.0 scope** - it is not deferred. It is the in-document enforcement contract for the three-layer reliability stack and must be present before the pilot begins.
 
 ### Realistic Scope
 
@@ -533,6 +665,8 @@ The existing `.akr/standards/copilot-instructions.md` is not a partial update. D
 
 **1. Slash-Commands section (~52 lines):** Every slash command is an MCP server invocation:
 `/docs.generate`, `/docs.interview`, `/docs.update`, `/docs.update.api`, `/docs.update.architecture`, `/docs.my-role`, `/docs.set-role`, `/docs.health-check`, `/docs.update-templates`. All broken after archive. Remove the entire section.
+
+**Purpose correction for `/docs.interview`:** its intended purpose was not pre-generation module confirmation. It was an interactive HITL flow to guide developers through filling `❓` sections in existing documents. In the new architecture, that capability is replaced by Agent Skill **Mode C**.
 
 **2. Code Analysis Capabilities section (lines 183–205):** Explicitly instructs Copilot to "leverage Tree-sitter AST parsing" for all project types. Replace wholesale with Copilot-native code analysis guidance (read source files, follow dependency graph, infer from naming conventions).
 
@@ -571,7 +705,7 @@ The existing `.akr/standards/copilot-instructions.md` is not a partial update. D
 - Module grouping principles (domain noun, dependency graph, DTO alignment, interface/implementation pairs)
 - `project_type` → condensed charter → template mapping table (below)
 - `modules.yaml` front matter field reference
-- Two-mode Agent Skill invocation guidance (when to use Mode A vs. Mode B)
+- Three-mode Agent Skill invocation guidance (when to use Mode A, Mode B, and Mode C)
 
 ### Authoring Note
 
@@ -692,6 +826,10 @@ The diagram also shows the three documentation levels as outputs, not as system 
 
 The diagram shows the ideal end-state. Two components are conditional and explicitly noted in the footer: hosted MCP context source availability is subject to pre-pilot Test 2 validation, and the Copilot Studio layer requires M365 licensing confirmation. If hosted MCP is unavailable, `.github/copilot-instructions.md` with the condensed charter substitutes at zero additional cost. If Copilot Studio is unavailable, the HITL model operates with three levels rather than four — the CI gate and PR review remain fully effective without the Teams layer.
 
+**Named Architectural Constraint: Zero Cloud Infrastructure, No Incremental Cost**
+
+This program assumes no new cloud infrastructure and no incremental platform cost beyond existing Copilot seat entitlements and premium request consumption. Architecture decisions in all phases must be evaluated against this constraint; any proposal that introduces net-new cloud runtime must be justified by a documented failure at Phase 2.5.
+
 
 ### Tooling Architecture (Confirmed Across All Five Reviews)
 
@@ -700,10 +838,20 @@ The diagram shows the ideal end-state. Two components are conditional and explic
 │  DEVELOPER WORKFLOW (IDE surface)                             │
 │                                                               │
 │  Agent Skills (SKILL.md)                                      │
-│  → Encodes AKR procedure (Mode A + Mode B)                    │
-│  → Auto-loads across: VS Code agent mode +                    │
-│    Copilot coding agent + Copilot CLI                         │
+│  → Encodes AKR procedure (Mode A + Mode B + Mode C)           │
+│  → Invoked via /akr-docs slash command (not auto-discovery)   │
+│  → disable-model-invocation: true in frontmatter (Review 9)   │
+│  → Self-reporting block confirms invocation per response       │
+│  → Mode B writes akr-generated metadata header (proof of       │
+│    execution; checked by validate_documentation.py)            │
+│  → Optimized for Claude Sonnet 4.6; GPT-4o ~75% pass rate     │
+│  → SKILL-COMPAT.md tracks model compatibility matrix           │
 │  → Free; no infrastructure; runs on existing Copilot seats   │
+│                                                               │
+│  Agent Session Hooks (.github/hooks/)                         │
+│  → postToolUse: logs file writes to .akr/logs/ (audit trail)  │
+│  → agentStop: auto-runs validate_documentation.py at end      │
+│  → Layer 2 of three-layer reliability stack (Review 9)        │
 │                                                               │
 │  Copilot Agent Mode (interactive)                             │
 │  → Developer-present confirm → generate flow                  │
@@ -761,11 +909,13 @@ The diagram shows the ideal end-state. Two components are conditional and explic
 | Archive `akr-mcp-server` immediately | ✅ Final | Zero server tests, zero adoption, Windows-only, version drift |
 | Agent Skills as primary workflow encoding | ✅ Final | Cross-surface, free, single authoring effort |
 | Copilot coding agent as Phase 2.5 | ✅ Final | Zero infrastructure; test-based acceptance criteria available |
+| Zero cloud infrastructure / no incremental cost is a design constraint | ✅ Final | Existing tooling surfaces are sufficient for pilot and foundation phases; net-new cloud runtime requires explicit Phase 2.5 failure evidence |
 | Charter compression before pre-pilot spike | ✅ Final | Guaranteed failure without it; not a risk to test |
 | Phase 4 as deterministic Python + human refinement | ✅ Final | Eliminates unverified Assumption 4 |
 | `project_type` and `layer` as separate fields | ✅ Final | Different concepts; different validation rules |
 | `TEMPLATE_MANIFEST.json` narrowed to version registry | ✅ Final | Skill-template version coupling requires it; other roles deprecated |
 | Phase 3 conditional on Phase 2.5 failure | ✅ Final | Cannot justify Azure Function without evidence coding agent is insufficient |
+| Agent Skill reliability requires explicit enforcement, not intent-matching alone | ✅ Final (Review 9) | Three failure modes confirmed: silent non-invocation, partial execution, context saturation. Three-layer stack (frontmatter gate + session hooks + metadata header contract) is the resolution. CI gate is the model-agnostic backstop regardless of which surface ran the skill |
 
 ### Tooling Decisions Still Requiring Input
 
@@ -784,7 +934,7 @@ All five tests must pass (or have documented fallback architectures) before Phas
 
 | Test | What It Validates | Updated Acceptance Criteria | Fail Fallback |
 |---|---|---|---|
-| 1 — Code Analysis Capability | Copilot + condensed charter extracts module-level content correctly | Agent correctly groups 5 files into one CourseDomain doc; covers Controller + Service + Repository + DTOs in a single output; ≥90% section match across 3 runs | Hybrid: retain `CodeAnalyzer` from `akr-mcp-server` for deterministic extraction; hosted MCP for governance |
+| 1 — Code Analysis Capability | Copilot + condensed charter extracts module-level content correctly; skill invocation confirmed | Agent correctly groups 5 files into one CourseDomain doc; covers Controller + Service + Repository + DTOs in a single output; ≥90% section match across 3 runs; **self-reporting block present in all 3 runs**; **`<!-- akr-generated -->` metadata header present in output** (Review 9 additions — these are now required pass criteria, not optional observations) | Hybrid: retain `CodeAnalyzer` from `akr-mcp-server` for deterministic extraction; hosted MCP for governance |
 | 2 — Context Source Configuration | `core-akr-templates` available as hosted MCP context source at current plan tier | Context source appears in Settings → Copilot → MCP; available in VS Code + Visual Studio; context pulled on new sessions | Use `.github/copilot-instructions.md` with condensed charter as primary delivery |
 | 3 — Large Module Stress Test | Module with 8 files, 2,000+ LOC: no section truncation | All module-required sections present (Module Files, Operations Map, full-stack diagram, Business Rules, Data Operations); validate_documentation.py passes | `max_files: 8` enforced as governance ceiling; provide `max_files: 5` guidance for large-file modules |
 | 4 — GitHub Actions Invocability | Whether Copilot can be invoked from Actions (Phase 4 automation) | Either: working Copilot-from-Actions mechanism documented, or Phase 4 deterministic aggregation design confirmed as sufficient | Phase 4 deterministic aggregation (already designed; this test confirms the fallback is the plan) |
@@ -860,7 +1010,7 @@ Phase 1 should cross-reference `humanInput.defaultRole` against the "who provide
 | `copilot-instructions.md` needs module-centric rewrite | Module architecture | 🔴 Blocking | Not a text update — conceptual rewrite of template selection logic |
 | `layer` vs. `project_type` conflation | Module architecture | 🟡 High | Separate fields; separate validation rules |
 | `consolidate.py` input contract change | Module architecture | 🟡 High | Module docs as atomic units for API/UI layers |
-| Agent Skill has two modes (not one) | Module architecture | 🟡 High | Mode A (grouping) must precede Mode B (generation) |
+| Agent Skill has three modes (not one) | Workflow clarification + module architecture | 🟡 High | Mode A (DocumentPlanner grouping) must precede Mode B (generation); Mode C handles interactive `❓` completion for existing drafts |
 | Mode A sequencing not enforced | Module architecture | 🟡 High | Skill checks `modules.yaml` status before Mode B |
 | Pre-pilot assumptions are load-bearing | Review 1 + all | 🟡 High | Blocking gate before Phase 1 |
 | Charter selection logic undefined | Review 3 + Module arch | 🟡 High | `project_type` field + Agent Skill step 2 |
@@ -887,9 +1037,13 @@ Phase 1 should cross-reference `humanInput.defaultRole` against the "who provide
 | `humanInput` schema not aligned with ❓ HITL model | Review 6 (Schema Audit) | 🟠 Medium | Cross-reference `defaultRole` enum against template "who provides it" column in Phase 1 |
 | `warnOnMissingLayers` not recognized as existing logic | Review 6 (Schema Audit) | 🟠 Medium | `consolidate.py` reads existing flag; document as read-not-implement |
 | `monitoring` schema unused during pilot | Review 6 (Schema Audit) | 🟠 Medium | Enable in pilot `.akr-config.json` for Phase 0 generation-time baseline |
+| `/docs.interview` original purpose not preserved in migration narrative | Workflow clarification | 🟠 Medium | Document as historical HITL command for unresolved `❓`; map replacement to Agent Skill Mode C |
 | `copilot-instructions.md` rewrite scope underestimated | Review 7 (File Inspection) | 🔴 Blocking for Phase 1 | Full document replacement (~3–4 hours); only Core Principles, completeness scoring, and Vale gate reference are retained |
 | `validate-documentation.yml` already exists and calls `validate_documentation.py` | Review 7 (File Inspection) | 🟡 High | Phase 1 CI task is ADAPT not BUILD; four targeted changes only |
 | `tag-registry.json` PascalCase vs. free-text `feature` field mismatch | Review 7 (File Inspection) | 🔴 Blocking for pilot | Fix `feature` field to PascalCase in `modules.yaml`; add `CourseCatalogManagement` entry in Phase 0 |
+| Agent Skill may not invoke in Copilot (GPT-4o): silent non-invocation, partial execution, context bypass | Review 9 (Skill Optimization) | 🔴 Blocking — skill is the primary workflow encoding; ungoverned invocation means governance contracts are unenforced | Three-layer stack: (1) `disable-model-invocation: true` frontmatter + `/akr-docs` slash-command only; (2) session hooks (`postToolUse` + `agentStop`); (3) `<!-- akr-generated -->` metadata header as in-document proof-of-execution checked by validator |
+| Agent Skill execution quality varies by LLM: GPT-4o ~75% pass rate vs. Claude Sonnet ≥90%; Mode B truncation on large modules under GPT-4o | Review 9 (Skill Optimization) | 🟡 High — affects output completeness; CI gate catches gaps but developers need early warning | `SKILL-COMPAT.md` companion file documents model-specific failure modes; `evals/benchmark.json` tracks pass rates; `copilot-instructions.md` includes model compat note; CI gate is model-agnostic backstop |
+| No pre-production skill eval framework: no baseline pass rates, no regression detection after model updates | Review 9 (Skill Optimization) | 🟡 High — without baseline, model updates silently degrade skill performance between phases | `evals/` directory with `cases/` (3 YAML assertion files) + `benchmark.json`; eval cases run during pre-pilot Tests 1 and 3; results populate Phase 1 baseline; re-run before Phase 4 |
 
 ---
 
@@ -913,9 +1067,33 @@ Charter Compression (prerequisite for Pre-Pilot Test 1):
   □ Full charters remain in charters/ — reference only.
 
 Agent Skill Authoring (prerequisite for Phase 2.5):
-  □ Create .github/skills/akr-docs/SKILL.md with Mode A + Mode B.
-    Use the two-mode specification from Part 5 of this document.
+  □ Create .github/skills/akr-docs/SKILL.md with Mode A + Mode B + Mode C.
+    Use the three-mode specification from Part 5 of this document.
     Reference condensed charters (not full charters) in Mode B step 2.
+  □ Add YAML frontmatter block above <!-- SKILL_VERSION --> comment:
+    - disable-model-invocation: true (prevents silent auto-invocation)
+    - optimized-for: claude-sonnet-4-6
+    - tested-on: [claude-sonnet-4-6, gpt-4o] with pass-rate annotations
+    (See Part 16 for rationale and failure modes this prevents.)
+  □ Add self-reporting CRITICAL block as first SKILL body instruction.
+    Required text: "CRITICAL: When this skill is loaded, begin EVERY response
+    with: ✅ akr-docs INVOKED AND STEPS EXECUTED — Steps followed: ..."
+  □ Add <!-- akr-generated --> metadata header write as final step of Mode B.
+    See Part 5 Mode B step 8 for required field list.
+  □ Create SKILL-COMPAT.md skeleton at .github/skills/akr-docs/SKILL-COMPAT.md.
+    Model compatibility matrix rows; populate with Phase 0 eval results.
+
+Skill Evaluation Framework (prerequisite for Phase 1 baseline):
+  □ Create evals/ directory structure in core-akr-templates:
+    evals/cases/mode-a-standard.yaml      (assertions matching Test 1 criteria)
+    evals/cases/mode-b-coursedomain.yaml  (assertions vs. courses_service_doc.md)
+    evals/cases/mode-b-large-module.yaml  (8-file stress test; no truncation)
+    evals/datasets/coursedomain-files/    (input files for eval cases)
+    evals/benchmark.json                  (null baseline; populated after Tests 1+3)
+  □ Run eval cases during Pre-pilot Tests 1 and 3 (no additional time cost).
+    Record pass rates and token counts for claude-sonnet-4-6 and gpt-4o.
+  □ Populate SKILL-COMPAT.md v1.0 skeleton with Phase 0 eval results.
+  Gate: mode-b-coursedomain.yaml requires condensed backend charter first.
 
 modules.yaml Schema Definition:
   □ Define complete schema per Part 4 of this document.
@@ -993,6 +1171,10 @@ validate_documentation.py v1.0:
   □ Implement full v1.0 scope per Part 6 of this document.
     Realistic estimate: 500–650 lines.
     Declared dependency: pyyaml.
+  □ Add <!-- akr-generated --> metadata header check to validate_documentation.py.
+    MODULE docs fail with: "AKR metadata header missing — skill may not have
+    been properly invoked. Re-run using /akr-docs mode-b [module]."
+    (Part 6 addition — this is v1.0 scope, not deferred.)
   □ Module-type-aware validation (reads modules.yaml).
   □ modules.yaml schema validation (9 validation rules).
   □ MODULE vs. DB_OBJECT vs. UNKNOWN doc classification.
@@ -1003,6 +1185,18 @@ validate_documentation.py v1.0:
   □ Fallback: modules.yaml absent → warn + generic rules only.
   □ Port test assertions from test_validation_library.py as unit tests.
   □ Cross-platform testing: Ubuntu (Actions), macOS, Windows.
+  □ Author .github/hooks/postToolUse.json (audit logger).
+    Logs file writes to .akr/logs/session-YYYYMMDD.jsonl during agent sessions.
+  □ Author .github/hooks/agentStop.json (auto-validation gate).
+    Runs validate_documentation.py automatically when agent session ends.
+    Handles missing modules.yaml gracefully (skip, do not fail).
+  □ Add .akr/logs/ to .gitignore.
+  □ Include .github/hooks/ in distribute-skill.yml distribution bundle
+    alongside SKILL.md and SKILL-COMPAT.md.
+  □ Run Phase 1 eval suite after SKILL.md is authored:
+    Execute evals/cases/ against current model versions.
+    Populate benchmark.json v1.0 baseline.
+    Update SKILL-COMPAT.md v1.0 with model matrix values.
 
 CI Workflow (adapt existing — do not rebuild the workflow; create the missing script):
   □ Author .akr/scripts/validate_documentation.py in core-akr-templates (Phase 1 deliverable).
@@ -1103,6 +1297,11 @@ Target: One project end-to-end; CI gate live; retrospective complete.
     - Validation pass rate on first PR
     - Grouping proposal accuracy (% of groups requiring reassignment)
     - Specific friction points
+    - Self-reporting block present rate (target: 100% of Mode B responses)
+    - akr-generated metadata header present rate (target: 100% of merged docs)
+  □ Document GPT-4o-specific failure modes observed during pilot in SKILL-COMPAT.md v1.1.
+    Classify per Part 16 failure mode taxonomy before Phase 2.5 begins.
+  □ Update benchmark.json with pilot real-world pass rates alongside Phase 1 baseline.
   □ Update templates and validate_documentation.py based on findings.
   □ Tag v1.1.0 if breaking changes; update pilot project's standards_version pin.
   □ Expand to second project using updated onboarding checklist.
@@ -1122,6 +1321,17 @@ Gate: Run after Phase 2 retrospective. Go/no-go for Phase 3.
     - Operations Map covers all operations in all files
     - validate_documentation.py passes with zero errors
     - No section truncation or omission
+    - Criterion 9: <!-- akr-generated --> metadata header present in PR output
+      (confirms skill completed Mode B in async coding agent context)
+    - Criterion 10: .akr/logs/session-*.jsonl hook log present in PR
+      (hard gate only if Copilot hook support is confirmed in Phase 1;
+      otherwise classify as KNOWN-GAP telemetry, document evidence in
+      SKILL-COMPAT.md, and do not authorize Phase 3 on Criterion 10 alone)
+  □ Classify Phase 2.5 failures against SKILL-COMPAT.md model-specific failure modes.
+    Distinguish: GPT-4o model limitation (cannot fix with SKILL.md edits) vs.
+    fixable skill instruction gap (can address with SKILL.md update).
+    Only model-limitation failures authorize Phase 3 scope.
+  □ Populate benchmark.json coding-agent key with Phase 2.5 pass rates.
   □ Pass → coding agent is the Phase 3 automation layer.
             Document: "Phase 3 custom agent not required."
   □ Fail → Document specific failure modes by section and module type.
@@ -1201,7 +1411,7 @@ Gate: Phase 2 stable ≥6 weeks; zero bypass events; all docs tagged.
 | `validate_documentation.py` must be authored from scratch; download URL must be corrected | Final file inspection: script does not exist; workflow attempts 404 download. New canonical location: `.akr/scripts/validate_documentation.py` in core-akr-templates |
 | Charter compression is Phase 0 blocking precondition | AKR_CHARTER_BACKEND.md at ~11,000 tokens; math is unambiguous |
 | `modules.yaml` separates `modules[]` from `database_objects[]` | Module architecture clarification; required for validator and consolidate.py |
-| Agent Skill has Mode A (grouping) + Mode B (generation) | Module architecture; sequencing enforced by skill |
+| Agent Skill has Mode A (DocumentPlanner grouping) + Mode B (generation) + Mode C (interactive HITL completion) | Workflow clarification + module architecture; sequencing enforced by skill |
 | `validate_documentation.py` must be module-type-aware in v1.0 | Module architecture; cannot defer without false positives on module docs |
 | `copilot-instructions.md` requires module-centric rewrite | Module architecture; file-centric logic is structurally wrong |
 | `layer` (project-level) ≠ `project_type` (module-level) | Module architecture; separate fields, separate validation |
@@ -1214,6 +1424,9 @@ Gate: Phase 2 stable ≥6 weeks; zero bypass events; all docs tagged.
 | `consolidation-config-schema.json` needs `modulesManifestPath` evolution in Phase 4 | Review 6 schema audit |
 | Cross-repo config split: participation (`akr-config-schema.json`) vs. execution (`consolidation-config-schema.json`) | Review 6 schema audit |
 | `warnOnMissingLayers` is an existing config flag — read, do not re-implement | Review 6 schema audit |
+| Agent Skill must use `disable-model-invocation: true` frontmatter; explicit `/akr-docs` slash command is the supported path for interactive use, while coding-agent runs are initiated through issue assignment with Mode B instructions and validated via metadata header checks | Review 9 (Skill Optimization) — three failure modes of auto-invocation confirmed |
+| Mode B final step must write `<!-- akr-generated -->` metadata header; `validate_documentation.py` must check for its presence; absence is a CI failure | Review 9 (Skill Optimization) — in-document proof-of-execution contract |
+| Agent Skill execution quality is LLM-dependent; `SKILL-COMPAT.md` and `evals/benchmark.json` are required governance artifacts, not optional tooling | Review 9 (Skill Optimization) — GPT-4o vs. Claude Sonnet variance confirmed; eval framework required before pilot |
 
 ### Still Open — Requires Input or Testing
 
@@ -1225,6 +1438,7 @@ Gate: Phase 2 stable ≥6 weeks; zero bypass events; all docs tagged.
 | `allowWorkflowBypass` default value in `config.json` | Does the dev config ship with bypass enabled? | Code inspection; confirms whether config gate is nominal |
 | `copilot-instructions.md` character limit | Is ~4,000 characters sufficient for condensed backend charter? | Test during charter compression |
 | Template adaptation acceptance | Does adapted `lean_baseline_service_template.md` produce output matching `courses_service_doc.md`? | Phase 1 deliverable; `courses_service_doc.md` is the spec |
+| Agent Skills hooks support in GitHub Copilot | Do `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` trigger in Copilot agent mode (not just Claude Code)? | Test during Phase 1 Deliverable 7A; if not supported, document as known gap in `SKILL-COMPAT.md`; CI gate remains the enforcement backstop |
 
 ---
 
@@ -1236,14 +1450,245 @@ Gate: Phase 2 stable ≥6 weeks; zero bypass events; all docs tagged.
 | Review 2 (GH Copilot R1) | Context saturation identified; coding agent as Phase 2.5; `test_pipeline_e2e.py` as acceptance criteria baseline |
 | Review 3 (GH Copilot R2) | Charter sizes quantified → compression becomes Phase 0 blocking; `force_workflow_bypass` corrected; template count corrected to 10; `.akr/workflows/` asset identified |
 | Review 4 (M365 Copilot) | Agent Skills as primary cross-surface workflow primitive; Copilot Studio for non-developer HITL; premium request metering; `TEMPLATE_MANIFEST.json` retention (narrowed) |
-| Review 5 (Module Architecture) | Three-tier hierarchy defined; two-mode Agent Skill specified; `modules.yaml` full schema; `validate_documentation.py` scope upgraded; `layer` vs. `project_type` distinction; `consolidate.py` input contract revised; `copilot-instructions.md` rewrite scope elevated |
+| Review 5 (Module Architecture) | Three-tier hierarchy defined; Agent Skill baseline specified (Mode A + Mode B); `modules.yaml` full schema; `validate_documentation.py` scope upgraded; `layer` vs. `project_type` distinction; `consolidate.py` input contract revised; `copilot-instructions.md` rewrite scope elevated |
+| Workflow Clarifications (Owner-provided) | Corrected `/docs.interview` purpose as HITL completion for `❓` markers; added Agent Skill Mode C for interactive in-editor completion; made zero-cloud/no-incremental-cost a named architectural constraint; documented original `core-akr-templates` → sync → `akr-mcp-server` design intent continuity |
 | Review 6 (Schema Audit) | Four corrections: `modules-schema.json` is new; `consolidation-config-schema.json` needs `modulesManifestPath`; dual cross-repo config split documented; `project_type` not in existing `requiredTags`. Three additions: `humanInput` schema aligns with HITL model; `warnOnMissingLayers` is existing logic; `monitoring` schema enables Phase 0 cost baseline |
 | Review 7 (Final File Inspection) | `copilot-instructions.md` is a full replacement (52-line slash-commands section, Tree-sitter section, YAML front matter, directory structure, troubleshooting — all removed); `validate-documentation.yml` already exists and calls the script (Phase 1 CI = adapt, not build; five adaptations including URL fix); `tag-registry.json` uses PascalCase keys incompatible with free-text `feature` field examples |
 | Review 8 (Final File Inspection 2) | CRITICAL: `validate_documentation.py` does not exist anywhere; must be created from scratch as Phase 1 deliverable at `.akr/scripts/validate_documentation.py`. Workflow download URL currently 404 and must be corrected. This is separate from workflow adaptation task. Also confirmed: `tag-registry-schema.json` `layers` array and `consolidation-config-schema.json` `repositories[].layer` both omit `Full-Stack` intentionally (separate from `modules-schema.json` which will include it) |
 | Module Architecture Clarification | `courses_service_doc.md` confirmed as Level 1 acceptance criterion; module grouping rules; database object separation invariant; template adaptation is multi-file scope, not new sections |
+| Review 9 (Skill Optimization) | Three Agent Skill failure modes confirmed and resolved: (1) silent non-invocation → `disable-model-invocation: true` + `/akr-docs` slash command only; (2) partial execution → self-reporting block + `<!-- akr-generated -->` metadata header contract; (3) LLM execution variance → `SKILL-COMPAT.md` + `evals/benchmark.json` eval framework. Hooks (`postToolUse` + `agentStop`) specified as Layer 2 enforcement. GPT-4o vs. Claude Sonnet 4.6 pass rate delta quantified (~75% vs. ≥90%). Phase plan impact: Phase 0 adds eval framework + SKILL.md frontmatter; Phase 1 adds metadata header validator check + hooks + `SKILL-COMPAT.md` v1.0; Phase 2 adds reliability retrospective metrics; Phase 2.5 adds Criteria 9 and 10 |
 
 ---
 
+## Part 16: Agent Skill Reliability — Three-Layer Enforcement Stack
+
+*Source: Review 9 (Post-implementation planning conversation, March 2026)*
+
+This part documents the rationale, failure modes, and resolution for a class of reliability risk that was not visible during the initial seven-review synthesis: **Agent Skills can be invoked without executing, and executed without completing.** Both failures are silent. This section is the authoritative reference for all skill reliability decisions in the phase plan files.
+
+---
+
+### 16.1 The Problem: Three Failure Modes of Skill Non-Invocation
+
+Agent Skills are not enforced execution contracts - they are suggestions the LLM follows when it chooses to. Copilot (GPT-4o) can respond to a documentation request *without* loading `SKILL.md`. Even when loaded, it can skip or compress steps under context pressure. Four failure modes are confirmed:
+
+| Failure Mode | What Happens | Governance Impact |
+|---|---|---|
+| **Silent non-invocation** | Copilot's intent matcher does not load the skill; Copilot responds from general training data | Full AKR workflow bypassed; output looks plausible but has no charter, no template, no compliance markers |
+| **Partial execution** | Skill loads but steps are skipped or compressed, especially on large modules | Missing sections; CI gate catches it, but only after PR submission - no local warning |
+| **Context saturation skip** | Skill instructions deprioritised when context window is near capacity with source files | Unpredictable step omissions; worsens above 6 files per module on GPT-4o |
+| **Bypass gate risk** | `allowWorkflowBypass` configuration allows workflow circumvention without notification | Skill pipeline bypassed entirely; confirmed in `akr-mcp-server` `force_workflow_bypass` config gate |
+
+**Why this matters for AKR governance specifically:** The charter, template, transparency marker rules, and `modules.yaml` status checks are all encoded in the skill. If the skill does not run, none of these governance contracts are applied. A developer or coding agent can produce a complete-looking document that passes a casual review but violates every AKR standard. The CI gate catches this - but only if `validate_documentation.py` knows what to look for.
+
+---
+
+### 16.2 LLM-Dependent Execution Quality
+
+The same `SKILL.md` file is portable across Claude Code, GitHub Copilot, Cursor, and Codex CLI (open standard, December 2025). However, **execution quality varies significantly by underlying model**.
+
+| Model | Expected Pass Rate | Primary Failure Pattern | Notes |
+|---|---|---|---|
+| Claude Sonnet 4.6 | ≥90% | None confirmed | Primary benchmark model; skill optimized and tested against this model |
+| GPT-4o (Copilot default) | ~75% | Mode B truncation on large modules (>6 files); Operations Map most affected | Context window budget handled less efficiently; charter compression critical |
+| Coding agent (async) | TBD - Phase 2.5 | Hooks may not trigger in async context | `benchmark.json` `coding-agent` key populated in Phase 2.5 |
+
+**Pass rate source:** Phase 0 eval baseline (see section 16.4). Values are populated after pre-pilot Tests 1 and 3; the figures above are initial targets, not confirmed measurements.
+
+**Consequence for teams:** Most AKR developers will use GitHub Copilot (GPT-4o). The ~75% pass rate means approximately 1 in 4 Mode B runs will require re-invocation or CI-guided correction. This is acceptable for an interactive workflow - it is not acceptable for an unattended coding agent workflow where the failure is not discovered until PR review. Criteria 9 and 10 in Phase 2.5 directly test this distinction.
+
+**Model updates:** GitHub Copilot's underlying model is updated by Microsoft without announcement. A skill that passes at 90% today may degrade silently after a model update. The re-evaluation requirement before Phase 4 (PHASE_4_FEATURE_CONSOLIDATION.md, Skill Re-Evaluation Prerequisite section) exists specifically for this risk.
+
+---
+
+### 16.3 The Three-Layer Reliability Stack
+
+The resolution is three complementary enforcement layers. Each layer catches failures the previous layer misses:
+
+| Layer | Mechanism | What It Catches | Where Configured |
+|---|---|---|---|
+| **Layer 1 - Force Invocation** | `disable-model-invocation: true` in SKILL.md frontmatter; interactive runs use explicit `/akr-docs mode-b [module]`, while coding-agent runs use explicit Mode B instructions in issue templates and are verified by metadata headers | Silent non-invocation; Copilot acting without loading skill | SKILL.md frontmatter + issue template contract |
+| **Layer 2 - Enforce Execution** | `agentStop` hook auto-runs `validate_documentation.py` at session end; `postToolUse` hook logs file writes to `.akr/logs/` | Silent step skipping; no local feedback before PR opens | `.github/hooks/*.json` - distributed to all registered repos |
+| **Layer 3 - In-Document Contract** | `<!-- akr-generated -->` metadata header as Mode B final step; `validate_documentation.py` checks for presence | No proof that skill ran; unclear which mode/version/steps completed | SKILL.md Mode B step 8; `validate_documentation.py` MODULE check |
+
+**Layer 1 alone** prevents the most common failure mode (auto-invocation mismatch) but does not help if the skill loads and then skips steps under context pressure.
+
+**Layer 2 alone** provides a local feedback loop but depends on hook support in the execution surface (confirmed in Claude Code; Copilot hook support subject to Phase 1 verification - see Part 14 Still Open).
+
+**Layer 3 alone** is the CI backstop - model-agnostic, surface-agnostic, always runs. But it catches failures *after* PR submission. Layers 1 and 2 move this detection earlier.
+
+**The CI gate is the guarantee. Layers 1 and 2 are early warning.**
+
+---
+
+### 16.4 Skill Evaluation Framework
+
+Before Phase 1 pilot begins, a baseline eval suite must establish what "passing" looks like for both supported models. Without a baseline, there is no way to detect regressions after model updates or SKILL.md changes.
+
+#### Directory Structure
+
+```
+core-akr-templates/
+  evals/
+    cases/
+      mode-a-standard.yaml         # Mode A grouping assertions
+      mode-b-coursedomain.yaml     # Mode B vs. courses_service_doc.md structure
+      mode-b-large-module.yaml     # Mode B 8-file stress test; no truncation
+    datasets/
+      coursedomain-files/          # Real input files; reuse from pre-pilot Test 1
+    benchmark.json                 # Pass rates + token counts per model version
+  .github/
+    skills/
+      akr-docs/
+        SKILL.md
+        SKILL-COMPAT.md            # Model compatibility matrix
+```
+
+#### `benchmark.json` Schema
+
+```json
+{
+  "last-updated": "YYYY-MM-DD",
+  "schema-version": "1.0",
+  "models": {
+    "claude-sonnet-4-6": {
+      "mode-a-standard":     { "pass-rate": null, "avg-tokens": null },
+      "mode-b-coursedomain": { "pass-rate": null, "avg-tokens": null },
+      "mode-b-large-module": { "pass-rate": null, "avg-tokens": null, "known-issue": null }
+    },
+    "gpt-4o": {
+      "mode-a-standard":     { "pass-rate": null, "avg-tokens": null },
+      "mode-b-coursedomain": { "pass-rate": null, "avg-tokens": null },
+      "mode-b-large-module": { "pass-rate": null, "avg-tokens": null, "known-issue": null }
+    },
+    "coding-agent": {}
+  }
+}
+```
+
+`null` values are populated after each eval run. The `coding-agent` key is populated in Phase 2.5.
+
+#### Eval Cadence
+
+| When | Action |
+|---|---|
+| Phase 0 (during pre-pilot Tests 1 and 3) | Run eval cases; populate baseline; no additional time cost |
+| Phase 1 (after SKILL.md is authored) | Re-run suite; confirm baseline holds with new frontmatter |
+| Phase 2 (after pilot retrospective) | Update with real-world pilot pass rates; note delta from synthetic baseline |
+| Phase 2.5 (after coding agent test cases) | Populate `coding-agent` key |
+| Phase 4 (before documentation runs begin) | Re-run full suite; check for model update regressions |
+
+---
+
+### 16.5 `SKILL-COMPAT.md` - Model Compatibility Matrix
+
+`SKILL-COMPAT.md` is a companion governance file maintained alongside `SKILL.md`. It is distributed to all registered repositories via `distribute-skill.yml`. Its purpose is to give developers the information they need to invoke the skill correctly and to diagnose failures without filing support tickets.
+
+#### Content Requirements
+
+- **Model compatibility matrix:** Pass rates per eval case per model; sourced from `benchmark.json`
+- **Known failure modes per model:** Specific failure patterns with descriptions (e.g., "GPT-4o truncates Operations Map on modules with >6 files")
+- **Recommended workarounds:** Per-model prompt adjustments (e.g., "For large modules on Copilot, invoke Mode B twice - first for Module Files + Operations Map, second for Business Rules + Data Operations")
+- **Re-evaluation policy:** *"Re-run evals/cases/ after any SKILL.md change or after a GitHub Copilot model update notification."*
+
+#### Version Correspondence
+
+`SKILL-COMPAT.md` version must correspond to the `SKILL_VERSION` in `SKILL.md`. When a new skill version is distributed, `SKILL-COMPAT.md` is also updated (or noted as unchanged if no model compatibility changes occurred).
+
+---
+
+### 16.6 Developer Quick Reference - Correct Invocation in Copilot
+
+| Action | Command | Notes |
+|---|---|---|
+| Start Mode A (grouping proposal) | `/akr-docs mode-a [project path]` | Always use explicit command; never rely on natural language auto-discovery |
+| Start Mode B (doc generation) | `/akr-docs mode-b [module name]` | Same |
+| Start Mode C (HITL completion) | `/akr-docs mode-c [doc path]` | Same |
+| Verify skill is discovered | `/skills` in Copilot Chat | Confirms `akr-docs` is in the Configure Skills menu |
+| Confirm invocation | First response line: `✅ akr-docs INVOKED AND STEPS EXECUTED` | If missing, retry with explicit `/akr-docs` command before proceeding |
+| Check local validation | `.akr/logs/last-validation.json` | Written by `agentStop` hook at session end; check before opening PR |
+| Confirm proof-of-execution | `<!-- akr-generated -->` block at top of output document | Required; CI fails if absent |
+
+**If the self-reporting block is absent from a response:**
+1. Check `/skills` to confirm `akr-docs` is enabled and not disabled
+2. Retry with explicit: `/akr-docs mode-b [module name]`
+3. If still absent: note as skill reliability event; check `SKILL-COMPAT.md` for known model-specific workarounds
+4. CI `validate_documentation.py` will catch any output structure gaps regardless - do not merge without CI passing
+
+---
+
+### 16.7 Relationship to Existing Architecture Decisions
+
+This part does not change any existing architecture decision. It adds an enforcement layer *on top of* the existing design:
+
+| Existing Decision | Review 9 Addition |
+|---|---|
+| Agent Skills as primary workflow encoding (Part 10) | Three-layer enforcement stack ensures the encoding is *actually executed* |
+| `validate_documentation.py` as CI gate (Part 6) | Metadata header check added to MODULE doc rules; catches skill non-completion |
+| Charter compression as Phase 0 blocking precondition (Part 3) | GPT-4o context budget is the reason this is even more critical - less context headroom means more truncation risk |
+| Pre-pilot Tests 1 and 3 (Part 11) | Eval cases run during these tests; self-reporting block and metadata header are now pass criteria |
+| Phase 2.5 binary coding agent test (PHASE_2_5) | Criteria 9 and 10 added; async context is where Layer 2 (hooks) may not function |
+| Zero cloud infrastructure constraint (Part 10) | Hooks are JSON config files in `.github/`; eval cases are YAML files; `benchmark.json` is a text file - zero infrastructure cost |
+
+---
+
+## Part 17: Agent Skills SDK Update - Validated Addendum (March 2026)
+
+**Date reviewed:** March 2026  
+**Source reviewed:** *What's New in Agent Skills: Code Skills, Script Execution, and Approval for Python* (March 13, 2026)  
+**Review type:** Post-initial-analysis addendum, validated against current repository state
+
+### 17.1 Why This Was Reviewed Now
+
+This SDK release introduced primitives that align directly with Phase 3 conditional design decisions (custom `@doc-agent` path) and Phase 4 governance concerns (side-effect gating). Because these phases are decision-gated and not yet locked by infrastructure deployment, evaluating this release now has low cost and high downside prevention value.
+
+### 17.2 Relevance to AKR (Validated)
+
+| SDK Capability | AKR Relevance | Validated Impact |
+|---|---|---|
+| Code-defined scripts via `@skill.script` + `run_skill_script` | High (Phase 3 Path B) | Adds a no-hosting execution option for deterministic handlers (operation extraction, chunked generation, project type detection) before committing to Azure Functions |
+| Script approval via `require_script_approval` | High (Phase 3/4 compliance) | Adds pre-side-effect HITL gate that complements existing PR-level review; maps naturally to `pilot` vs `production` compliance behavior |
+| Code-defined skills + `@skill.resource` dynamic resources | Medium (future path) | Strong option for live standards/version hydration if static charter snapshots prove stale in production |
+| File-based + code-defined mixed provider model | Conditional only | Relevant only if a custom Python SkillsProvider is authorized in Phase 3 Path B |
+
+### 17.3 What This Changes in This Analysis (and What It Does Not)
+
+**Changes adopted here:**
+
+1. Phase 3 option space is formally expanded to include code-defined script execution as a first-class candidate (not just Azure Functions/GitHub Actions).
+2. Script-level approval is recognized as an additional HITL checkpoint for write-side effects, especially for production mode.
+3. Dynamic resources are documented as an intentional future enhancement path, not an immediate architecture pivot.
+
+**No change to locked decisions:**
+
+- Phases 0-2.5 remain valid as written.
+- File-based `SKILL.md` remains the primary delivery mechanism for GitHub Copilot built-in agent mode.
+- Phase 3 remains conditional on Phase 2.5 FAIL.
+
+### 17.4 Validation Outcome Against Current Plan Files
+
+The addendum recommendation set is directionally correct, but one statement required correction after repository validation:
+
+| Addendum Claim | Validation Result |
+|---|---|
+| "Four targeted updates were made to phase documents" | **Not yet fully reflected in current phase-plan files** at time of this analysis update; treat as a recommended update set pending explicit implementation in those files |
+| Add `@skill.script` to Phase 3 decision options | **Validated as needed** |
+| Add script-approval configuration alignment with compliance mode | **Validated as needed** |
+| Track dynamic resources in compatibility planning (`SKILL-COMPAT.md`) | **Validated as needed** |
+
+### 17.5 Recommended Plan-Level Follow-Through (Next Editing Pass)
+
+When phase-plan files are next revised, apply the following in order:
+
+1. `PHASE_3_AUTOMATION_EXTENSION.md`: add a deployment option for code-defined `@skill.script` and evaluate it before Azure Functions.
+2. `PHASE_3_AUTOMATION_EXTENSION.md`: add configurable script-approval wiring (`script_approval_required`) tied to compliance mode.
+3. `PHASE_0_PREREQUISITES.md`: extend `SKILL-COMPAT.md` skeleton with a "Future Enhancement Paths" table including dynamic-resource hydration.
+4. `IMPLEMENTATION_PLAN_OVERVIEW.md` and `PHASE_4_FEATURE_CONSOLIDATION.md`: align risk/stack language with the above additions.
+
+### 17.6 Bottom Line
+
+This SDK update does not invalidate current AKR architecture. It improves the conditional Phase 3 decision tree and strengthens the compliance model with a low-effort, high-leverage addition: script-level approval for side effects. Capturing it now preserves optionality and reduces the risk of committing infrastructure before evaluating lower-cost in-process alternatives.
+
 *Implementation-Ready Analysis — March 2026 — Engineering Standards — Confidential*
 
-*Synthesizes: Review 1 (Claude, structural); Review 2 (GH Copilot Round 1, repository inspection); Review 3 (GH Copilot Round 2, charter size quantification); Review 4 (M365 Copilot, tooling evaluation); Review 5 (GH Copilot, module architecture response); Review 6 (GH Copilot, full schema audit of `akr-config-schema.json` and `consolidation-config-schema.json`); Review 7 (GH Copilot, final file inspection of `copilot-instructions.md`, `.akr/workflows/`, `tag-registry.json`); Module-Based Documentation Architecture clarification and `courses_service_doc.md` sample.*
+*Synthesizes: Review 1 (Claude, structural); Review 2 (GH Copilot Round 1, repository inspection); Review 3 (GH Copilot Round 2, charter size quantification); Review 4 (M365 Copilot, tooling evaluation); Review 5 (GH Copilot, module architecture response); Review 6 (GH Copilot, full schema audit of `akr-config-schema.json` and `consolidation-config-schema.json`); Review 7 (GH Copilot, final file inspection of `copilot-instructions.md`, `.akr/workflows/`, `tag-registry.json`); Module-Based Documentation Architecture clarification and `courses_service_doc.md` sample; Review 9 (Skill Optimization — three-layer reliability stack; LLM execution quality variance; `SKILL-COMPAT.md` + eval framework; `postToolUse` + `agentStop` hooks; `<!-- akr-generated -->` in-document contract); Review 10 (Agent Skills SDK update validation — `@skill.script`, script approval gating, dynamic resource enhancement path).*

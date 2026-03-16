@@ -13,6 +13,46 @@ Phase 4 aggregates Level 1 (module docs) and Level 2 (database object docs) acro
 
 **Key Design Decision:** `consolidate.py` is **deterministic Python**—no AI invocation from GitHub Actions. The non-deterministic part (synthesizing coherent business narrative) is done by the Product Owner with Copilot agent mode assistance on the structured draft.
 
+> **Phase 4 + Agent Skills SDK:** If `consolidate.py` is ever invoked by a custom agent (not the
+> current GitHub Actions path), the `script_approval_required` flag from `.akr-config.json` should
+> gate execution before file writes occur. See **Deliverable 2D** in Phase 3 for the reference
+> implementation pattern. For the current Phase 4 deterministic GitHub Actions path, no approval
+> mechanism is needed — the PR itself is the HITL checkpoint.
+
+---
+
+## Skill Re-Evaluation Prerequisite
+
+### Why Required Before Phase 4
+
+At least 6 weeks will have elapsed since the Phase 1 `benchmark.json` baseline was recorded. Model updates to GitHub Copilot (GPT-4o) or Claude may have occurred silently during this period. Phase 4 documentation runs on multiple repositories - a skill regression discovered mid-Phase 4 is far more disruptive than one caught before it begins.
+
+### Re-Evaluation Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Re-run `evals/cases/` full suite on baseline-pinned model versions | Standards author | All three eval cases run against the same model version strings recorded in Phase 1 `benchmark.json` baseline; results recorded | 4 hours |
+| Compare results to Phase 1 `benchmark.json` baseline | Standards author | Pass rate delta documented; any regression >10% flagged for team review | 1 hour |
+| Update `benchmark.json` with Phase 4 pre-run results | Standards author | New entries added alongside Phase 1 and pilot entries; `last-updated` field current | 30 min |
+| Run supplemental eval on newer model versions (if available) | Standards author | New model versions recorded as separate entries; not used to replace baseline comparison rows | 1 hour |
+| Update `SKILL-COMPAT.md` if pass rates changed | Standards author | Matrix rows updated; any new GPT-4o failure modes documented with workaround | 1 hour |
+| Communicate regressions before Phase 4 documentation runs begin | Standards lead | If pass rate dropped >10%, team briefed; `SKILL.md` updated and re-distributed before Phase 4 runs | External |
+| Review Agent Framework SDK release notes for dynamic resource capabilities | Standards author | Check if `@skill.resource` dynamic resources can replace static `benchmark.json` and `standards_version` reads; document finding in `SKILL-COMPAT.md` | 30 min |
+
+> **Dynamic Resources (future enhancement path):** The Agent Framework SDK supports `@skill.resource`
+> decorated functions that execute at read time, returning live data from repos, APIs, or config
+> files rather than static snapshots. If charter staleness or stale `benchmark.json` thresholds
+> become an observed problem during Phase 4 multi-repo runs, migrating these to dynamic resources
+> is the recommended upgrade path. This requires building a custom Python `SkillsProvider` to
+> replace the file-based `SKILL.md` delivery mechanism — evaluate scope before committing.
+> Track in `SKILL-COMPAT.md` under "Future Enhancement Paths."
+
+### Gate: Phase 4 Documentation Runs Must Not Begin Until
+
+- Re-evaluation complete
+- `benchmark.json` updated
+- Any regressions >10% resolved or explicitly accepted with documented rationale
+
 ---
 
 ## Acceptance Criteria
@@ -21,7 +61,7 @@ Phase 4 is complete when:
 
 1. ✅ Tag registry assessed: evolve `tag-registry.json` or create new `feature-registry.yaml`
 2. ✅ `consolidation-config-schema.json` updated with `modulesManifestPath` field
-3. ✅ `consolidate.py` implemented as deterministic aggregator (~300-400 lines)
+3. ✅ `consolidate.py` implemented as deterministic aggregator (~300-400 lines); `script_approval_required` flag read from `.akr-config.json` if consolidation is invoked via a custom agent with script execution
 4. ✅ Workflow deployed: `.github/workflows/consolidate-feature.yml` in Feature repo
 5. ✅ Dual config reading: `akr-config-schema.json` (participation) + `consolidation-config-schema.json` (execution)
 6. ✅ Input contract tested: module docs as atomic units for API/UI; individual DB objects
@@ -29,6 +69,7 @@ Phase 4 is complete when:
 8. ✅ Consolidation completes in <2 minutes (sparse checkout verified)
 9. ✅ Product Owner refinement workflow tested
 10. ✅ `warnOnMissingLayers` reads existing config flag (not re-implemented)
+11. ✅ Skill re-evaluation complete: `evals/` suite re-run; `benchmark.json` updated; any pass-rate regressions resolved before Phase 4 documentation runs begin
 
 **Exit Gate:** Phase 4 retrospective complete; feature consolidation workflow operational.
 
@@ -51,6 +92,8 @@ Phase 4 depends on **stable, tagged Level 1 and Level 2 documentation** across m
 | **Module doc coverage** | ≥80% of services documented | Ensures consolidation has input |
 | **Business capability tagging consistency** | All docs have valid `businessCapability` field in YAML metadata | Enables cross-repo matching |
 | **Validation pass rate** | ≥95% on first PR | Proves validator accuracy |
+
+**Gate ceiling and override path:** If the zero-bypass threshold is not met within 12 weeks after Phase 2 completion, standards lead may authorize Phase 4 with documented bypass trend analysis, mitigations, and explicit written risk acceptance.
 
 ### Tasks
 
@@ -81,6 +124,7 @@ Create and configure the centralized feature documentation repository (`feature-
 | Add CODEOWNERS | Standards author | Product Owners + Standards team own `docs/features/**` | 15 min |
 | Create directory structure | Standards author | `docs/features/` directory created | 5 min |
 | Configure GitHub Actions permissions | Infrastructure lead | Workflow can read from other repos (use PAT), write to this repo | 30 min |
+| Define consolidation PAT and SSO requirements | Infrastructure lead | PAT scopes documented (`contents:read` on source repos, `contents:write` + `pull-requests:write` on `feature-docs`, `metadata:read`); SAML/SSO authorization steps documented for org repos | 30 min |
 
 ### Directory Structure
 
@@ -295,9 +339,7 @@ Update `consolidation-config-schema.json` to support `modulesManifestPath`; docu
 | Document dual config split | Standards author | ARCHITECTURE.md explains which config drives which decision | 2 hours |
 | Create example configs | Standards author | Both schemas populated with pilot project examples | 1 hour |
 | Validate schema changes | Standards author | JSON Schema validation passes | 30 min |
-| **Document field rename decision** | Standards author | Add entry to CHANGELOG documenting: original source analysis uses `feature` field name; Phase 1+ implementation uses `businessCapability` field name; intentional divergence for clarity; Phase 4 consolidate.py uses `businessCapability` as matching key | 1 hour |
-| **Resolve Full-Stack layer enum decision** | Standards lead | Decision: either (A) add `Full-Stack` to `consolidation-config-schema.json`'s `layer` enum, OR (B) document requirement that Full-Stack repos self-identify primary layer in `modules.yaml`; document decision in Deliverable 2 acceptance criteria | 1 hour |
-| **Document PAT authentication plan** | Infrastructure lead | Explain `GH_MULTI_REPO_PAT` secret setup for cross-repo sparse checkout; specify required permissions: (1) `contents:read` on source repos (UI/API/DB), (2) `contents:write` + `pull_requests:write` on feature-docs repo for PR creation; include expiration rotation procedure (90-day cycle recommended) | 1.5 hours |
+| **Document PAT authentication plan** | Infrastructure lead | Explain `GH_MULTI_REPO_PAT` secret setup for cross-repo sparse checkout; include required permissions (Contents: Read) | 1 hour |
 
 ---
 
@@ -307,18 +349,13 @@ Update `consolidation-config-schema.json` to support `modulesManifestPath`; docu
 
 Build deterministic Python aggregator that matches module docs by `businessCapability` (feature tag) and fills `feature-consolidated.md` template.
 
-### Critical Input Contract: `sectionMapping` from Existing Schema
-
-**IMPORTANT:** Do not re-design document-to-section mapping. The contract already exists in `akr-config-schema.json` under `crossRepository.outputs[].sectionMapping`. Phase 4 implementation **must** read and honour this existing field. Reference it explicitly in any code comments and Phase 4 testing.
-
 ### Design Principles
 
 1. **Deterministic:** No AI invocation from GitHub Actions
-2. **Contract-driven:** Read `sectionMapping` from `akr-config-schema.json`; do not invent mapping logic
-3. **Config-driven:** Reads both config schemas for participation and execution
-4. **Module-aware:** Treats module docs as atomic units (not individual component files)
-5. **Sparse checkout:** Clones only `docs/` and `modules.yaml` per repo (performance)
-6. **Fail-safe:** Warns on missing layers; does not block if one layer absent
+2. **Config-driven:** Reads both config schemas for participation and execution
+3. **Module-aware:** Treats module docs as atomic units (not individual component files)
+4. **Sparse checkout:** Clones only `docs/` and `modules.yaml` per repo (performance)
+5. **Fail-safe:** Warns on missing layers; does not block if one layer absent
 
 ### High-Level Algorithm
 
@@ -340,31 +377,15 @@ def consolidate_feature(feature_tag: str):
     
     # Step 4: For each participating repo, read modules.yaml
     #         Extract modules[] where businessCapability == feature_tag
-    #         Handle absent modules.yaml with fallback
     api_modules = []
     ui_modules = []
     db_objects = []
     
     for repo in participating_repos:
-        modules_yaml_path = os.path.join(repo, config['modulesManifestPath'])
-        
-        # Handle case where modules.yaml is missing (repo hasn't completed Phase 1 onboarding)
-        if not os.path.exists(modules_yaml_path):
-            # Warn and fall back to docsPath glob scan for this repo only
-            print(f"⚠️ Warning: {repo} has no {config['modulesManifestPath']}");
-            print(f"   Falling back to docsPath glob scan for doc discovery")
-            # Fall back logic: scan docsPath for *_doc.md files; attempt to parse businessCapability from YAML front matter
-            for doc_file in glob.glob(os.path.join(repo, config['docsPath'], config['includePatterns'][0])):
-                doc_front_matter = extract_yaml_front_matter(doc_file)
-                if doc_front_matter.get('businessCapability') == feature_tag:
-                    # Can't determine module vs. db object from glob alone; try to infer from content
-                    api_modules.append({'repo': repo, 'doc_path': doc_file, 'inferred': True})
-            continue
-        
-        modules_yaml = read_modules_yaml(repo, modules_yaml_path)
+        modules_yaml = read_modules_yaml(repo, config['modulesManifestPath'])
         
         for module in modules_yaml['modules']:
-            if module.get('businessCapability') == feature_tag:
+          if module.get('businessCapability') == feature_tag:
                 if module['project_type'] in ['api-backend', 'microservice']:
                     api_modules.append({
                         'repo': repo,
@@ -501,10 +522,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout feature-docs repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
@@ -728,6 +749,7 @@ Confirm `consolidate.py` reads existing `warnOnMissingLayers` flag; does not re-
 | Feature tagging inconsistent across repos | 🔴 High | 🟡 Medium | Validate all pilot repos have consistent `businessCapability` tags before Phase 4 |
 | PO workflow too complex | 🟡 Medium | 🟠 Low | Test with real PO in Deliverable 6; simplify if friction high |
 | `modules.yaml` schema drift | 🟡 Medium | 🟠 Low | `minimum_standards_version` enforcement prevents drift |
+| `consolidate.py` invoked via future custom agent without approval gate | 🟡 Medium | 🟠 Low | Document in `ARCHITECTURE.md`: if Phase 4 consolidation is ever wired to an agent, `script_approval_required: true` must be set in production `.akr-config.json` before Phase 4 runs begin |
 
 ---
 
@@ -746,7 +768,7 @@ Phase 4 succeeds when:
 ✅ `warnOnMissingLayers` reads existing flag (not re-implemented)  
 ✅ Phase 4 retrospective complete  
 
-**Exit gate:** Feature consolidation operational; governance system complete end-to-end.
+**Exit gate:** Feature consolidation operational; governance system complete end-to-end. Standards lead documents final sign-off **in writing** (GitHub comment, email, or approval record) to formally close the implementation program.
 
 ---
 

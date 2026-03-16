@@ -18,6 +18,7 @@ This implementation plan transforms the AKR Documentation Governance system from
 | **Charter compression** as Phase 0 blocker | Backend charter at ~11,000 tokens guarantees failure without compression |
 | **Binary Phase 2.5 gate** | Coding agent must be tested before custom Azure Function is justified |
 | **Deterministic Phase 4** | No AI in GitHub Actions; human-refined structured output |
+| **`@skill.script` before Azure Functions** | Code-defined in-process scripts evaluated first for Phase 3 Path B; Azure Functions authorized only if subprocess isolation required (see Phase 3 Deployment Options) |
 
 ---
 
@@ -43,12 +44,12 @@ Phase 4 (Feature Consolidation)
 
 | Phase | Duration | Deliverables | Blocking Criteria |
 |---|---|---|---|
-| **Phase 0: Prerequisites** | 1-2 weeks | Condensed charters (3), Agent Skill, modules.yaml schema, pre-pilot tests (5) | All 5 pre-pilot tests PASS or have fallback |
-| **Phase 1: Foundation** | 3-5 weeks | Templates (2 adapted), validate_documentation.py, CI workflow, schemas (1 new) | CI validation working; pilot-ready release tag v1.0.0 |
+| **Phase 0: Prerequisites** | 1-2 weeks | Condensed charters (3), Agent Skill (3 modes + frontmatter + self-reporting block), `modules.yaml` schema, pre-pilot tests (6), eval framework (`evals/` directory + `benchmark.json` baseline), `SKILL-COMPAT.md` skeleton | All 6 pre-pilot tests PASS or have fallback; `benchmark.json` baseline populated |
+| **Phase 1: Foundation** | 3-5 weeks | Templates (2 adapted), `validate_documentation.py` (with metadata header check), CI workflow, schemas (1 new), hooks (`postToolUse` + `agentStop`), `SKILL-COMPAT.md` v1.0 | CI validation working; hooks distributed; pilot-ready release tag v1.0.0 |
 | **Phase 2: Pilot Onboarding** | 1-2 weeks per project | Pilot project complete end-to-end, retrospective, onboarding checklist | Zero validation failures; <15 min grouping time |
 | **Phase 2.5: Coding Agent Spike** | 1 week | Acceptance test results; go/no-go recommendation | PASS → Phase 3 skipped; FAIL → Phase 3 authorized |
 | **Phase 3: Automation Extension** | 2-4 weeks (conditional) | Custom @doc-agent or Copilot Studio agent | Only if Phase 2.5 documents specific failure modes |
-| **Phase 4: Feature Consolidation** | 3-4 weeks | consolidate.py, feature-registry, cross-repo workflows | 6 weeks zero bypass + ≥80% module coverage (hard gate) |
+| **Phase 4: Feature Consolidation** | 3-4 weeks | consolidate.py, feature-registry, cross-repo workflows | 3-component feature consolidated in <2 min |
 
 ---
 
@@ -58,7 +59,7 @@ Phase 4 (Feature Consolidation)
 
 | Phase | Success Metric | Target |
 |---|---|---|
-| Phase 0 | Pre-pilot test pass rate | 5/5 or documented fallback for each |
+| Phase 0 | Pre-pilot test pass rate | 6/6 or documented fallback for each |
 | Phase 1 | validate_documentation.py accuracy | Zero false positives on module docs |
 | Phase 2 | Time-to-first-documented-PR | ≤45 minutes (grouping + generation + review) |
 | Phase 2.5 | Coding agent section completeness | 100% required sections, zero truncations |
@@ -88,12 +89,12 @@ Phase 4 (Feature Consolidation)
 | Risk | Impact | Mitigation | Contingency |
 |---|---|---|---|
 | **Context saturation on large modules** | 🔴 High | Charter compression to ~2,500 tokens; `max_files: 8` governance constraint | Provide `max_files: 5` guidance for large-file modules; stress-test boundary is 8 files |
-| **Hosted MCP context unavailable** | 🟡 Medium | Pre-pilot Test 2 validates availability | Use `.github/copilot-instructions.md` with condensed charter that stays within the 2,500-token budget |
+| **Hosted MCP context unavailable** | 🟡 Medium | Pre-pilot Test 2 validates availability | Primary: Use `.github/copilot-instructions.md` with condensed charter within the 2,500-token budget. Secondary (long-term): migrate to dynamic `@skill.resource` hydration via custom `SkillsProvider`; tracked in `SKILL-COMPAT.md` Future Enhancement Paths |
 | **Coding agent fails acceptance criteria** | 🟡 Medium | Phase 2.5 binary test with fallback | Phase 3 custom agent authorized only for documented failure modes |
 | **Premium request overage** | 🟡 Medium | Model cost in Phase 0; establish budget baseline | Set billing alerts; monthly review with management |
 | **Legal/compliance blocks AI processing** | 🔴 High | Pre-pilot Test 5 (legal sign-off) | Manual documentation with templates only; no AI generation |
 | **Cross-platform validator failures** | 🟠 Low | Test Ubuntu + macOS + Windows in Phase 1 | Fix platform-specific file path or YAML parsing issues |
-| **Tag-registry distribution lag** | 🟠 Low | Verify `tag-registry.json` is distributed (not just committed) before Phase 2 workflows reference it | Implement pre-flight check in Phase 2 tag verification; use `git lfs` if needed for large registries |
+| **Copilot (GPT-4o) skill non-invocation** | 🟡 Medium | `disable-model-invocation: true` frontmatter; interactive runs use explicit `/akr-docs` commands, coding-agent runs use issue-template Mode B instructions; CI metadata header check enforces completion | Document in `SKILL-COMPAT.md`; treat as known limitation, not blocker |
 
 ### Deferred Risks (Post-Pilot)
 
@@ -128,6 +129,9 @@ Phase 4 (Feature Consolidation)
         └───────────────────────────────┘
               Agent Skill Mode A
               (proposes groupings)
+
+Agent Skill Mode C — Interactive HITL completion for existing
+drafts with unresolved ❓ markers (replaces /docs.interview)
 ```
 
 ### Technology Stack
@@ -141,6 +145,7 @@ Phase 4 (Feature Consolidation)
 | **Prose quality** | Vale | Open source |
 | **Standards distribution** | GitHub Hosted MCP Context Sources | Copilot Business (tier-dependent) |
 | **Cross-functional review (Phase 3+)** | Copilot Studio (Teams) | M365 Copilot (premium) |
+| **In-process script execution (Phase 3, conditional)** | Agent Framework `@skill.script` (Python SDK) | Included with `agent-framework` package; zero additional infra cost |
 
 ---
 
@@ -154,7 +159,6 @@ Before Phase 0 begins, confirm:
 - [ ] Pilot project identified (recommended: TrainingTracker.Api)
 - [ ] Standards team capacity allocated (Phase 0: 1 FTE; Phase 1: 1-2 FTE)
 - [ ] Development team representative assigned for pilot (grouping validation + retrospective)
-- [ ] Default `allowWorkflowBypass: false` verified in all module configs (governance gate)
 
 ---
 
@@ -165,7 +169,7 @@ Each phase has a dedicated implementation plan document:
 1. [Phase 0: Prerequisites](PHASE_0_PREREQUISITES.md) — Charter compression, Agent Skill, pre-pilot tests
 2. [Phase 1: Foundation](PHASE_1_FOUNDATION.md) — Templates, validator, CI, schemas
 3. [Phase 2: Pilot Onboarding](PHASE_2_PILOT_ONBOARDING.md) — End-to-end pilot, retrospective, onboarding checklist
-4. [Phase 2.5: Coding Agent Spike](PHASE_2.5_CODING_AGENT_SPIKE.md) — Binary test with acceptance criteria
+4. [Phase 2.5: Coding Agent Spike](PHASE_2_5_CODING_AGENT_SPIKE.md) — Binary test with acceptance criteria
 5. [Phase 3: Automation Extension](PHASE_3_AUTOMATION_EXTENSION.md) — Conditional custom agent or Copilot Studio
 6. [Phase 4: Feature Consolidation](PHASE_4_FEATURE_CONSOLIDATION.md) — Cross-repository deterministic aggregation
 
@@ -195,53 +199,12 @@ Each phase has a dedicated implementation plan document:
 
 ---
 
-## Realistic Timeline Estimate
-
-### Total Duration
-
-**estimate: 14-20 weeks (3.5-5 months) from Phase 0 start to Phase 4 completion**
-
-### Detailed Breakdown
-
-| Phase | Duration | Real-World Notes | Cumulative |
-|---|---|---|---|
-| **Phase 0** | 1-2 weeks | Charter compression + pre-pilot tests may take longer if legal review (Test 5) is slow; recommend parallel initiation | Week 2 |
-| **Phase 1** | 3-5 weeks | `validate_documentation.py` implementation ~2 weeks; CI workflow + schema updates ~1-2 weeks; contingency for cross-platform issues | Week 7 |
-| **Phase 2** | 3-6 weeks | 1-2 week pilot onboarding + 2-4 week pilot execution + 1 week retrospective/analysis = 4-7 weeks minimum. **Note:** Phase 2.5 **cannot start** until retrospective is complete | Week 14 |
-| **Phase 2.5** | 1-2 weeks | Depends on Phase 2 completion; binary spike with fixed acceptance criteria | Week 16 |
-| **Phase 3** | 2-4 weeks (conditional) | Only if Phase 2.5 FAIL; skipped if PASS | Week 20 (if needed) |
-| **Phase 4** | 3-4 weeks | Starts after Phase 2 stability plateau (6+ weeks zero bypass); Phase 3 prereq if FAIL | Week 24 (best case) / Week 28 (with Phase 3) |
-
-### Sequencing Notes
-
-1. **Phase 2 retrospective lag:** The biggest timeline risk is Phase 2 running for 4 weeks, retrospective adding 1 week. Phase 2.5 start is blocked until this completes.
-   - **Mitigation:** Run pre-retrospective synthesis weekly; compile final retrospective incrementally
-   - **Early start allowance:** If Phase 2 completes faster, Phase 2.5 can start within days
-
-2. **Phase 4 prerequisites:** Requires 6 weeks post-Phase-2 stability (zero bypass events, ≥80% module coverage). This is a **hard gate**, not a duration estimate.
-   - **Timing:** If Phase 2 ends week 6, Phase 4 starts week 12 (6-week wait) → ends week 16
-   - **Early win:** Stabilit metrics earned Week 3 of Phase 2 → Phase 4 can start Week 9
-
-3. **Phase 3 contingency:** If Phase 2.5 FAIL, adds 2-4 week delay to Phase 4. Plan for this in communication.
-
-### Compressed Timeline (If All Conditions Optimal)
-
-- Phase 0 (2 weeks) + Phase 1 (5 weeks) + Phase 2 (3 weeks + 1 week retro) + 2-week stability wait + Phase 2.5 (1 week) + Phase 4 (3 weeks) = **17 weeks**
-
-### Extended Timeline (With Typical Slowdowns)
-
-- Phase 0 (2 weeks, legal delay +2) + Phase 1 (5 weeks) + Phase 2 (6 weeks pilot + 1 retro) + 6-week stability wait + Phase 2.5 (2 weeks) + Phase 3 (3 weeks if FAIL) + Phase 4 (4 weeks) = **31 weeks**
-
-**Recommended planning baseline: 20-22 weeks (5-5.5 months)**
-
----
-
 ## Monitoring and Reporting
 
 ### Phase 0-2 Metrics
 
 - **Charter compression ratio:** Target ~22% of original (11,000 → 2,500 tokens)
-- **Pre-pilot test results:** 5/5 pass or documented fallback
+- **Pre-pilot test results:** 6/6 pass or documented fallback
 - **Pilot time-to-doc:** Track per module; target ≤30 minutes
 - **Grouping accuracy:** % of Mode A proposals requiring reassignment
 - **CI validation accuracy:** False positive rate on module docs
@@ -261,6 +224,22 @@ Each phase has a dedicated implementation plan document:
 - **Phase 2:** Post-pilot retrospective report
 - **Phase 2.5:** Binary pass/fail report + go/no-go recommendation
 - **Phase 3+:** Monthly usage + cost report
+
+---
+
+## Cross-Phase Owners Reference
+
+| Role | Phase 0 | Phase 1 | Phase 2 | Phase 2.5 | Phase 3 (conditional) | Phase 4 |
+|---|---|---|---|---|---|---|
+| **Standards author** | Charter compression, SKILL.md (all 3 modes + frontmatter + self-reporting block + Mode B metadata header), schema, archive copy tasks, `evals/` directory + `benchmark.json` baseline, `SKILL-COMPAT.md` skeleton | `validate_documentation.py` (with metadata header check), templates, CI workflow, `copilot-instructions.md` rewrite, HITL alignment, hooks (`postToolUse` + `agentStop`), `SKILL-COMPAT.md` v1.0 | Onboarding checklist updates, mid-pilot template iterations, `SKILL-COMPAT.md` v1.1 (pilot findings) | Test case execution (Criteria 9 & 10), results documentation, `benchmark.json` `coding-agent` key, `SKILL-COMPAT.md` failure mode classification | Custom agent authoring (if authorized), `evals/copilot-studio/eval-set.xlsx`, `benchmark.json` custom-agent key | `consolidate.py`, feature registry, Phase 4 skill re-evaluation |
+| **Standards lead** | Exit gate sign-off, cost model approval, legal coordination | Exit gate sign-off | Retrospective facilitation, Phase 2.5 authorization | go/no-go recommendation approval | Phase 3 scope authorization | Exit gate sign-off |
+| **Infrastructure lead** | Secrets audit (`akr-mcp-server`), CI workflow validation | Cross-platform testing (Ubuntu/macOS/Windows) | CI deployment to pilot repos | Billing dashboard monitoring | Azure Function deployment (if authorized) | PAT setup, cross-repo Actions permissions |
+| **Pilot developer** | Pre-pilot Test 1 validation (code analysis) | CourseDomain acceptance test, Visual Studio testing | Mode A/B validation, independent module docs, retrospective input | Spike test case participation | — | `businessCapability` tag audit |
+| **Management** | Budget approval (P.3) | — | — | go/no-go decision | Phase 3 scope approval | — |
+| **Legal/security** | Pre-pilot Test 5 sign-off | — | — | — | — | — |
+| **Product owner** | — | — | Stakeholder briefing | — | Copilot Studio approval routing (if licensed) | Feature doc narrative refinement |
+
+> **Exit gate standard:** Each phase exit gate requires the standards lead to document authorization **in writing** (GitHub comment, email, or approval record) before the next phase begins. Verbal sign-off is not sufficient.
 
 ---
 
