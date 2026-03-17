@@ -468,6 +468,11 @@ Since the coding agent runs asynchronously, per-pass timing from within the agen
 | Pass timing data availability | `pass-timings-seconds` field value | If `unavailable`, record as KNOWN-GAP |
 | Total wall-clock time | PR open timestamp - issue assignment timestamp | GitHub API or manual observation |
 | Slow-generation events | Total wall-clock time > 45 minutes | Binary: yes/no per test case |
+| Premium requests consumed | GitHub billing dashboard Copilot usage view | Match session timestamp to test case; record per test case |
+| Required sections present | `validate_documentation.py` output `.summary` | Read from CI run output on coding agent PR |
+| ❓ marker count | Count in generated output file | Script or manual count before developer review |
+| Operations Map completeness (sampled) | Manual spot-check vs. source files | Standards author reviews 2-3 operations per test case |
+| Validator first-pass result | CI check status on coding agent PR | ✅/❌ per test case |
 
 ### Tasks
 
@@ -477,7 +482,11 @@ Since the coding agent runs asynchronously, per-pass timing from within the agen
 | Read `passes-completed` from each PR output | Standards author | All expected passes present; any missing passes documented as FAIL on Criterion 11 | 15 min per test |
 | Calculate wall-clock time per test case | Standards author | Time difference computed and recorded | 10 min per test |
 | Determine if `pass-timings-seconds` is available | Standards author | Binary determination; if unavailable, classify as KNOWN-GAP | 10 min total |
+| Record premium requests per test case | Standards author | Billing view evidence mapped to each test case | 15 min per test |
+| Record required sections and validator first-pass result | Standards author | `.summary` fields and CI pass/fail recorded for all test cases | 15 min per test |
+| Record ❓ marker count and sampled Operations Map completeness | Standards author | Marker count + sampled completeness captured for each test case | 15 min per test |
 | Populate `benchmark.json` coding-agent ssg key | Standards author | `avg-total-seconds` populated; `pass-timings-available` set to true/false | 30 min |
+| Populate `benchmark.json` quota-planning key | Standards author | Request averages and quota-derived max modules computed | 20 min |
 | Document finding in go/no-go recommendation | Standards author | SSG background execution result included in recommendation | 30 min |
 
 ### SSG-Specific Failure Modes
@@ -502,20 +511,55 @@ After Phase 2.5, update `benchmark.json` with the following for the `coding-agen
 "coding-agent": {
    "ssg": {
       "mode-b-coursedomain": {
-         "avg-total-seconds": [measured value or null],
-         "pass-timings-available": [true/false],
+         "avg-total-seconds": "[measured value or null]",
+         "pass-timings-available": "[true/false]",
          "avg-pass-seconds": {},
-         "slow-module-rate": [0.0 if no slow events; proportion if events occurred],
-         "developer-single-pass-rate": [proportion of runs using developer-elected-single-pass; 0.0 if none observed]
+         "slow-module-rate": "[0.0 if no slow events; proportion if events occurred]",
+         "premium-requests": {
+            "avg-per-module": "[average across 3 test cases or null]",
+            "min-observed": "[minimum across test cases]",
+            "max-observed": "[maximum across test cases]",
+            "with-pass2-split": "[average for large module test case with split]"
+         },
+         "quality": {
+            "avg-required-sections-present": "[proportion 0.0-1.0]",
+            "validation-first-pass-rate": "[proportion 0.0-1.0]",
+            "avg-cqs": "[calculated or null]",
+            "note": "operations-map-completeness and mode-c-resolution-minutes collected manually during Phase 2.5 review"
+         }
       },
       "mode-b-large-module": {
-         "avg-total-seconds": [measured value or null],
-         "pass-timings-available": [true/false],
+         "avg-total-seconds": "[measured value or null]",
+         "pass-timings-available": "[true/false]",
          "avg-pass-seconds": {},
-         "slow-module-rate": [0.0 if no slow events; proportion if events occurred],
-         "developer-single-pass-rate": [proportion of runs using developer-elected-single-pass; 0.0 if none observed]
+         "slow-module-rate": "[proportion]",
+         "premium-requests": {
+            "avg-per-module": "[average]",
+            "min-observed": "[minimum]",
+            "max-observed": "[maximum]",
+            "with-pass2-split": "[average with split]"
+         },
+         "quality": {
+            "avg-required-sections-present": "[proportion]",
+            "validation-first-pass-rate": "[proportion]",
+            "avg-cqs": "[calculated or null]"
+         }
       }
    }
+}
+```
+
+Also update the `quota-planning` top-level key:
+
+```json
+"quota-planning": {
+   "monthly-quota-per-developer": "[confirm from GitHub org settings]",
+   "avg-requests-ssg-per-module": "[average from Phase 2.5 test cases]",
+   "avg-requests-single-pass-per-module": "[from Phase 2 pilot if available; else null]",
+   "max-modules-per-month-ssg": "[floor(quota / avg-requests-ssg)]",
+   "max-modules-per-month-single-pass": "[floor(quota / avg-requests-single-pass) or null]",
+   "recommended-mix": "[e.g., '3 SSG + 2 single-pass for small modules' or null until Phase 2 data available]",
+   "notes": "Populated after Phase 2.5. Combine with Phase 2 pilot data for complete strategy decision table."
 }
 ```
 

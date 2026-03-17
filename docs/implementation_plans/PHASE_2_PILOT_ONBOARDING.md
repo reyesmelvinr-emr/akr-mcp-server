@@ -285,20 +285,28 @@ Draft `docs/modules/CourseDomain_doc.md` with:
 
 ### SSG Timing Data Collection
 
-During Mode B runs in the pilot, the following timing data must be recorded for every module documented. This data feeds `benchmark.json` and informs future planning.
+During Mode B runs in the pilot, the following data must be recorded for every module documented. This feeds `benchmark.json`, the strategy decision benchmark table, and quota planning guidance.
 
-Collection method: Read from `<!-- akr-generated -->` metadata header in each PR output. If `pass-timings-seconds: unavailable`, record the wall-clock time manually by noting when the session started and when the PR was opened.
+Collection method: Timing and strategy fields are read from the `<!-- akr-generated -->` metadata header in each PR output. Premium requests are read from the GitHub billing dashboard Copilot usage view (per-session or per-day export, matched to documentation PR timestamps). Quality metrics are derived from the validator output and a manual spot-check.
 
-| Module | Pass 1 (s) | Pass 2 (s) | Pass 2A (s) | Pass 2B (s) | Pass 3 (s) | Pass 4 (s) | Pass 5 (s) | Pass 6 (s) | Pass 7 (s) | Total (s) | Single-Pass? | Fallback? |
+| Module | Files | LOC Est. | Strategy | Premium Requests | Total Time (s) | Pass 2 Split? | Sections Present | ❓ Marker Count | Ops Map Complete (%) | Validator Pass? | Mode C Time (min) | CQS |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| [CourseDomain] | | | N/A | N/A | | | | | | | No | No |
-| [EnrollmentDomain] | | | | | | | | | | | | |
-| [UserDomain] | | | | | | | | | | | | |
+| [CourseDomain] | 5 | ~800 | SSG | | | No | | | | | | |
+| [EnrollmentDomain] | | | SSG | | | | | | | | | |
+| [UserDomain] | | | SSG | | | | | | | | | |
+| [SmallModule] | <=3 | <600 | Single-pass | | | N/A | | | | | | |
 
-After at least 3 modules are documented:
-- Calculate average total generation time
-- Identify the slowest pass across all modules (expected: Pass 2)
-- Record in `benchmark.json` under the `ssg` key for the model used
+Notes on collection:
+- "Ops Map Complete (%)" requires a 5-minute manual spot-check: open the source file, count public methods, compare to Operations Map entries. Record as a rough percentage (not exact).
+- "Mode C Time" is recorded by the developer using a stopwatch during their ❓ review session, starting when Mode C is invoked and ending when all items are resolved or DEFERRED.
+- Premium requests: if the billing dashboard does not provide per-module granularity, record the session-level count and note the session included this module only.
+- CQS is calculated post-collection using the formula in Part 18.6.3. Standards author calculates after all other fields are populated.
+
+After at least 3 SSG modules and 1 single-pass module are documented, calculate:
+- Average premium requests per strategy per module profile
+- Average CQS per strategy per module profile
+- Record in `benchmark.json` under the `ssg` -> `premium-requests` and `quality` keys
+- Record in `benchmark.json` -> `quota-planning` block
 
 ### Success Metrics
 
@@ -488,10 +496,24 @@ Conduct retrospective with quantitative metrics and qualitative feedback; decide
 | Modules requiring Pass 2 split (2A+2B) | <50% of modules | |
 | Average Pass 2 time (seconds) | ≤480 seconds (8 min) | |
 | Timing data availability (% of runs with pass-timings-seconds populated) | ≥80% | |
-| Modules documented via developer-elected single-pass | Informational (no target) - track proportion | |
+| Average premium requests - SSG multi-pass, standard module | Informational | |
+| Average premium requests - SSG multi-pass, large module | Informational | |
+| Average premium requests - single-pass (if any runs observed) | Informational | |
+| Average CQS - SSG multi-pass | ≥0.80 | |
+| Average CQS - single-pass (if any runs observed) | Informational | |
+| Average ❓ marker count at generation - SSG | ≤5 per document | |
+| Average ❓ marker count at generation - single-pass | Informational | |
+| Average Mode C resolution time - SSG | ≤10 minutes | |
+| Average Mode C resolution time - single-pass | Informational | |
+| Validator first-pass rate - SSG | ≥95% | |
+| Validator first-pass rate - single-pass | Informational | |
+| Modules documented via developer-elected single-pass | Informational (track proportion) | |
+| Monthly quota consumed by documentation (% of individual quota) | <25% of monthly quota | |
 
-- **Retrospective question to add:**
+- **Retrospective questions to add:**
   "For modules where generation took >20 minutes, did developers use the coding agent background execution model or wait interactively? What was the impact on developer experience?"
+  "For any single-pass runs: did the Mode C resolution time offset the premium request savings? Would the developer use single-pass again for that module profile?"
+  "At the current average premium request rate per module, how many modules can a developer document before exhausting their monthly quota? Is this sufficient for the team's documentation cadence?"
 - **Friction point log:** Issues encountered with priority ratings
 - **Template updates required:** Specific sections to add/modify/remove
 - **Validator updates required:** Rules that fired false positives or missed errors
