@@ -492,6 +492,7 @@ The following SSG-specific failures are distinct from the existing Criteria 1-10
 | Operations Map incomplete because SSG Pass 2 split was NOT attempted | Not a Phase 3 trigger | Require SSG retry with split before any Phase 3 consideration |
 | Total generation time >45 min on standard module | Slow-generation event | Do NOT authorize Phase 3 on time alone; document for future tracking |
 | `pass-timings-seconds: unavailable` | KNOWN-GAP telemetry | Does not authorize Phase 3 |
+| `generation-strategy: developer-elected-single-pass` with `passes-completed: single-pass` | Valid intentional state — not a failure | No Phase 3 implication; developer chose single-pass mode before generation began. This is not logged as a slow-module event and does not affect Criterion 11. |
 
 ### benchmark.json Population
 
@@ -504,13 +505,15 @@ After Phase 2.5, update `benchmark.json` with the following for the `coding-agen
          "avg-total-seconds": [measured value or null],
          "pass-timings-available": [true/false],
          "avg-pass-seconds": {},
-         "slow-module-rate": [0.0 if no slow events; proportion if events occurred]
+         "slow-module-rate": [0.0 if no slow events; proportion if events occurred],
+         "developer-single-pass-rate": [proportion of runs using developer-elected-single-pass; 0.0 if none observed]
       },
       "mode-b-large-module": {
          "avg-total-seconds": [measured value or null],
          "pass-timings-available": [true/false],
          "avg-pass-seconds": {},
-         "slow-module-rate": [0.0 if no slow events; proportion if events occurred]
+         "slow-module-rate": [0.0 if no slow events; proportion if events occurred],
+         "developer-single-pass-rate": [proportion of runs using developer-elected-single-pass; 0.0 if none observed]
       }
    }
 }
