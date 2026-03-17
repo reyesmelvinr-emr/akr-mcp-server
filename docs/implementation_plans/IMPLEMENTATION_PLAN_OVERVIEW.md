@@ -19,6 +19,7 @@ This implementation plan transforms the AKR Documentation Governance system from
 | **Binary Phase 2.5 gate** | Coding agent must be tested before custom Azure Function is justified |
 | **Deterministic Phase 4** | No AI in GitHub Actions; human-refined structured output |
 | **`@skill.script` before Azure Functions** | Code-defined in-process scripts evaluated first for Phase 3 Path B; Azure Functions authorized only if subprocess isolation required (see Phase 3 Deployment Options) |
+| **Section-Scoped Generation (SSG) as Mode B generation strategy** | Loads charter guidance and source files per section rather than all at once; reduces per-pass context load without requiring additional charter condensation; forward payload discipline prevents context re-expansion across passes; maps naturally to Copilot coding agent background execution |
 
 ---
 
@@ -70,6 +71,9 @@ Phase 4 (Feature Consolidation)
 
 **Quantitative:**
 - **Module documentation generation:** ≤30 minutes per module (developer time)
+- **SSG total generation time per module:** ≤30 minutes for Mode B generation only (SSG Passes 1-7). This is not the full Mode A -> Mode B -> review cycle. A compliant full workflow is: Mode A grouping validation (<=15 min) + Mode B SSG generation (<=30 min) + developer review setup (<=5 min) ≈ 50 minutes total. The existing Phase 2 success metric "Time-to-first-documented-PR: <=45 minutes" covers the full cycle and is unchanged - the SSG target is a sub-metric for generation only. Note: the <=45-minute metric measures active developer time (excludes coding agent background generation time). When Mode B runs asynchronously via the coding agent, the developer's active contribution is Mode A grouping (<=15 min) + review setup (<=5 min) = <=20 minutes active, well within the target.
+- **SSG per-pass timing data:** Collected from >=80% of Mode B runs by end of Phase 2 pilot (timing unavailable on some surfaces is acceptable; see Part 18.5)
+- **Slow-module rate:** <10% of modules trigger the 45-minute fallback threshold (tracked in `ssg-slow-module-events` monitoring metric)
 - **Grouping validation:** ≤15 minutes per project (developer time)
 - **CI validation pass rate:** ≥95% on first PR
 - **Unresolved ❓ marker rate:** <5% after developer review
@@ -95,12 +99,14 @@ Phase 4 (Feature Consolidation)
 | **Legal/compliance blocks AI processing** | 🔴 High | Pre-pilot Test 5 (legal sign-off) | Manual documentation with templates only; no AI generation |
 | **Cross-platform validator failures** | 🟠 Low | Test Ubuntu + macOS + Windows in Phase 1 | Fix platform-specific file path or YAML parsing issues |
 | **Copilot (GPT-4o) skill non-invocation** | 🟡 Medium | `disable-model-invocation: true` frontmatter; interactive runs use explicit `/akr-docs` commands, coding-agent runs use issue-template Mode B instructions; CI metadata header check enforces completion | Document in `SKILL-COMPAT.md`; treat as known limitation, not blocker |
+| **SSG generation time exceeds developer patience on large modules** | 🟡 Medium | Per-pass timing targets in Part 18.2; slow-generation fallback at 45-minute threshold; coding agent background execution eliminates active wait time | Module splitting into sub-modules (<=8 files each); single-pass fallback for remaining sections with additional `❓` markers expected |
 
 ### Deferred Risks (Post-Pilot)
 
 - **Standards version drift across teams:** Mitigated by `minimum_standards_version` validation
 - **Business capability tag collision across repos:** Mitigated by centralized `tag-registry.json` + distribution workflow
 - **Phase 4 repository permission issues:** Mitigated by sparse checkout + PAT with minimal scopes
+- **SSG pass timing data insufficient to guide AI tooling decisions:** Addressed in Phase 2 retrospective metrics; mitigated by `ssg-slow-module-events` monitoring even when per-pass timing is unavailable on a surface
 
 ---
 
@@ -146,6 +152,7 @@ drafts with unresolved ❓ markers (replaces /docs.interview)
 | **Standards distribution** | GitHub Hosted MCP Context Sources | Copilot Business (tier-dependent) |
 | **Cross-functional review (Phase 3+)** | Copilot Studio (Teams) | M365 Copilot (premium) |
 | **In-process script execution (Phase 3, conditional)** | Agent Framework `@skill.script` (Python SDK) | Included with `agent-framework` package; zero additional infra cost |
+| **Generation strategy** | Section-Scoped Generation (SSG) - structured Mode B pass sequence with forward payload discipline | Zero cost - encoded in SKILL.md; no new infrastructure |
 
 ---
 

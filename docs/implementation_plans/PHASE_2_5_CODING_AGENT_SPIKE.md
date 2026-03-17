@@ -29,6 +29,12 @@ Phase 2.5 is complete when:
 8. ✅ Phase 3 authorization (if FAIL) or Phase 3 skip (if PASS)
 9. ✅ `<!-- akr-generated -->` metadata header present in all coding agent PR outputs (confirms skill ran to completion in async context)
 10. ✅ `.akr/logs/session-*.jsonl` hook log handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
+11. ✅ SSG pass sequence completes in background execution context:
+   - All 7 (or 8 if split) passes complete without manual developer intervention
+   - `passes-completed` field in PR output `<!-- akr-generated -->` header contains all expected pass numbers
+   - If `pass-timings-seconds` is unavailable in the coding agent surface, this is recorded as a KNOWN-GAP (not a FAIL); wall-clock time is estimated from PR open timestamp minus issue assignment timestamp
+   - Total estimated generation time recorded in test results
+   - Slow-generation events (>45 min) documented if they occur
 
 **Exit Gate:** Binary decision documented; management approves recommendation; proceed to Phase 3 (if authorized) or Phase 4 (if skipped).
 
@@ -172,21 +178,21 @@ Create 3 test issues covering different module types and complexity levels; assi
 **Module:** `CourseDomain` (5 files, ~800 LOC total) — **reused from Phase 2 Deliverable 2**  
 **Project Type:** `api-backend`  
 **Expected Behavior:** Agent generates complete documentation with all sections; passes validation  
-**Acceptance Criteria:** Criteria 1-9 pass; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
+**Acceptance Criteria:** Criteria 1-9 and 11 pass; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 
 #### Test Case 2: UI Component Module
 
 **Module:** `CourseManagementUI` (Page + components + hook + types) — **reused from Phase 2 UI pilot**  
 **Project Type:** `ui-component`  
 **Expected Behavior:** Agent generates complete documentation using the UI module variant; passes validation  
-**Acceptance Criteria:** Criteria 1-9 pass; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue." (UI path)
+**Acceptance Criteria:** Criteria 1-9 and 11 pass; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue." (UI path)
 
 #### Test Case 3: Large Backend Module (Stress Test)
 
 **Module:** `EnrollmentDomain` (5 files, ~1,000 LOC total) — **reused from Phase 2 Deliverable 6**  
 **Project Type:** `api-backend`  
 **Expected Behavior:** Agent handles larger module; no section truncation  
-**Acceptance Criteria:** Criteria 1-9 pass + no truncation; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
+**Acceptance Criteria:** Criteria 1-9 and 11 pass + no truncation; Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 
 ### Execution Process
 
@@ -238,6 +244,7 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | 8. **No truncation** | No "..." or "[content omitted]" artifacts in output | Zero truncation markers |
 | 9. **Metadata header present** | `<!-- akr-generated -->` block present at top of output file | Header present with all required fields |
 | 10. **Hook log present** | `.akr/logs/session-*.jsonl` contains file write entry for the output doc path | Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue |
+| 11. **SSG background completion** | `passes-completed` present and complete; split info consistent; timing availability captured | All expected passes present; timing known-gap documented if unavailable |
 
 ### Testing Matrix
 
@@ -253,29 +260,31 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | Criterion 8: No truncation | ⬜ | ⬜ | ⬜ |
 | Criterion 9: Metadata header | ⬜ | ⬜ | ⬜ |
 | Criterion 10: Hook log | ⬜ | ⬜ | ⬜ |
+| Criterion 11: SSG completion | ⬜ | ⬜ | ⬜ |
 | **Overall** | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL |
 
 ### Pass/Fail Decision Logic
 
-**PASS:** All 3 test cases meet Criteria 1-9 and Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."  
-**FAIL:** Any test case fails Criteria 1-9, or Criterion 10 fails when Copilot hook support is confirmed in Phase 1
+**PASS:** All 3 test cases meet Criteria 1-9 and 11 and Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."  
+**FAIL:** Any test case fails Criteria 1-9 or 11, or Criterion 10 fails when Copilot hook support is confirmed in Phase 1
 
-**Partial failures are still FAIL:** If Test Case 1 and 2 pass but Test Case 3 (large module) fails due to truncation, Phase 2.5 result is FAIL with documented failure mode: "Context ceiling at 8 files".
+**Partial failures are still FAIL:** If Test Case 1 and 2 pass but Test Case 3 (large module) fails due to truncation, Phase 2.5 result is FAIL. Classify root cause as context overflow only if Pass 2 split was not attempted; if Pass 2 split executed correctly and incompleteness remains, classify as AST comprehension failure.
 
 ### Decision Rule (Reviewer PR Checklist)
 
 Apply this rule exactly in PR review to avoid interpretation drift:
 
-1. Verify Criteria 1-9 for each test case.
-2. If any Criterion 1-9 fails in any test case, mark Phase 2.5 as FAIL.
+1. Verify Criteria 1-9 and 11 for each test case.
+2. If any Criterion 1-9 or 11 fails in any test case, mark Phase 2.5 as FAIL.
 3. Check whether Copilot hook support was confirmed in Phase 1 Deliverable 7A.
 4. Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 5. If a known gap is recorded, include evidence in `SKILL-COMPAT.md` before final decision.
-6. Final PASS requires all three test cases passing Criteria 1-9 and cost/recommendation sections completed.
+6. Final PASS requires all three test cases passing Criteria 1-9 and 11 and cost/recommendation sections completed.
 
 Reviewer output format:
 - `Phase 2.5 Decision: PASS|FAIL`
 - `Criteria 1-9: PASS|FAIL`
+- `Criterion 11: PASS|FAIL`
 - `Criterion 10 Mode: HARD-GATE|KNOWN-GAP`
 - `Criterion 10 Result: PASS|FAIL|N/A`
 - `Evidence Links: [PRs, logs, SKILL-COMPAT.md entry]`
@@ -284,9 +293,9 @@ Reviewer output format:
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Test Criterion 1-10 on Test Case 1 | Developer | All checks completed; results in matrix | 30 min |
-| Test Criterion 1-10 on Test Case 2 | Developer | All checks completed; results in matrix | 30 min |
-| Test Criterion 1-10 on Test Case 3 | Developer | All checks completed; results in matrix | 30 min |
+| Test Criterion 1-11 on Test Case 1 | Developer | All checks completed; results in matrix | 30 min |
+| Test Criterion 1-11 on Test Case 2 | Developer | All checks completed; results in matrix | 30 min |
+| Test Criterion 1-11 on Test Case 3 | Developer | All checks completed; results in matrix | 30 min |
 | Document specific failures | Standards author | For each FAIL, note which section/criterion | 1 hour |
 | Analyze failure patterns | Standards author | Identify root cause (e.g., context limit, template parsing) | 1 hour |
 | Classify failures against `SKILL-COMPAT.md` model-specific failure modes | Standards author | For each FAIL, determine if root cause matches a known GPT-4o pattern (e.g., truncation at 8 files) or is a new fixable skill instruction gap; classification documented | 1 hour |
@@ -349,7 +358,7 @@ Document binary decision: proceed to Phase 3 (if FAIL) or skip to Phase 4 (if PA
 
 ```
 Phase 2.5 Result: PASS
-   ├─ All 3 test cases passed Criteria 1-9
+   ├─ All 3 test cases passed Criteria 1-9 and 11
    ├─ Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
   ├─ Premium request cost acceptable at team scale
   ├─ Recommendation: SKIP Phase 3
@@ -377,9 +386,9 @@ Phase 2.5 Result: FAIL
 
 | Test Case | Result | Acceptance Criteria Met | Notes |
 |---|---|---|---|
-| 1: Standard Backend | [PASS/FAIL] | [X/10] | [specific failures if any] |
-| 2: UI Component | [PASS/FAIL] | [X/10] | [specific failures if any] |
-| 3: Large Module | [PASS/FAIL] | [X/10] | [specific failures if any] |
+| 1: Standard Backend | [PASS/FAIL] | [X/11] | [specific failures if any] |
+| 2: UI Component | [PASS/FAIL] | [X/11] | [specific failures if any] |
+| 3: Large Module | [PASS/FAIL] | [X/11] | [specific failures if any] |
 
 ## Failure Modes (if FAIL)
 
@@ -396,6 +405,10 @@ Phase 2.5 Result: FAIL
 |---|---|---|---|
 | `<!-- akr-generated -->` header present | ✅/❌ | ✅/❌ | ✅/❌ |
 | Hook log `.akr/logs/session-*.jsonl` present | ✅/❌ | ✅/❌ | ✅/❌ |
+| `passes-completed` field present | ✅/❌ | ✅/❌ | ✅/❌ |
+| `pass-timings-seconds` available | ✅/KNOWN-GAP | ✅/KNOWN-GAP | ✅/KNOWN-GAP |
+| SSG total wall-clock time ≤30 min | ✅/❌ | ✅/❌ | ✅/❌ |
+| Pass 2 split handled correctly (large module only) | N/A | N/A | ✅/❌ |
 | Self-reporting block in Copilot Chat | N/A (async) | N/A (async) | N/A (async) |
 
 **Interpretation:**
@@ -438,6 +451,73 @@ Phase 2.5 Result: FAIL
 
 ---
 
+## Deliverable 6: SSG Background Execution Measurement
+
+### Objective
+
+Determine whether the Copilot coding agent executes SSG passes correctly and completely in async background mode, and collect timing data for `benchmark.json`.
+
+### Measurement Approach
+
+Since the coding agent runs asynchronously, per-pass timing from within the agent's execution context may not be available. Use the following measurement protocol:
+
+| Measurement | Source | Method |
+|---|---|---|
+| Pass sequence completion | `passes-completed` field in PR output header | Direct read from PR output |
+| Pass split occurrence | `passes-split` field in PR output header | Direct read from PR output |
+| Pass timing data availability | `pass-timings-seconds` field value | If `unavailable`, record as KNOWN-GAP |
+| Total wall-clock time | PR open timestamp - issue assignment timestamp | GitHub API or manual observation |
+| Slow-generation events | Total wall-clock time > 45 minutes | Binary: yes/no per test case |
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Record issue assignment timestamp for each test case | Standards author | Timestamp noted to nearest minute | 5 min per test |
+| Read `passes-completed` from each PR output | Standards author | All expected passes present; any missing passes documented as FAIL on Criterion 11 | 15 min per test |
+| Calculate wall-clock time per test case | Standards author | Time difference computed and recorded | 10 min per test |
+| Determine if `pass-timings-seconds` is available | Standards author | Binary determination; if unavailable, classify as KNOWN-GAP | 10 min total |
+| Populate `benchmark.json` coding-agent ssg key | Standards author | `avg-total-seconds` populated; `pass-timings-available` set to true/false | 30 min |
+| Document finding in go/no-go recommendation | Standards author | SSG background execution result included in recommendation | 30 min |
+
+### SSG-Specific Failure Modes
+
+The following SSG-specific failures are distinct from the existing Criteria 1-10 failures and must be classified separately. Note: Phase 3 authorization on Operations Map grounds requires evidence of an AST comprehension failure, not a context overflow - SSG handles context overflow via Pass 2 split.
+
+| SSG Failure | Classification | Phase 3 Authorization |
+|---|---|---|
+| `passes-completed` field absent from PR output | FAIL Criterion 11 | Only if metadata header is also absent (overlaps Criterion 9) |
+| Pass sequence out of order (e.g., Pass 4 before Pass 2) | FAIL Criterion 11 | Authorize Phase 3 for SSG orchestration support only |
+| Pass 2 split produces incomplete Operations Map after correct execution | FAIL Criterion 2 (Operations Map coverage) - AST comprehension failure | Authorize Phase 3 deterministic AST extractor (Scope Example 1). Require evidence that SSG Pass 2 split executed correctly before authorizing. Context overflow alone is NOT grounds for Phase 3 (SSG already addresses that). |
+| Operations Map incomplete because SSG Pass 2 split was NOT attempted | Not a Phase 3 trigger | Require SSG retry with split before any Phase 3 consideration |
+| Total generation time >45 min on standard module | Slow-generation event | Do NOT authorize Phase 3 on time alone; document for future tracking |
+| `pass-timings-seconds: unavailable` | KNOWN-GAP telemetry | Does not authorize Phase 3 |
+
+### benchmark.json Population
+
+After Phase 2.5, update `benchmark.json` with the following for the `coding-agent` -> `ssg` key:
+
+```json
+"coding-agent": {
+   "ssg": {
+      "mode-b-coursedomain": {
+         "avg-total-seconds": [measured value or null],
+         "pass-timings-available": [true/false],
+         "avg-pass-seconds": {},
+         "slow-module-rate": [0.0 if no slow events; proportion if events occurred]
+      },
+      "mode-b-large-module": {
+         "avg-total-seconds": [measured value or null],
+         "pass-timings-available": [true/false],
+         "avg-pass-seconds": {},
+         "slow-module-rate": [0.0 if no slow events; proportion if events occurred]
+      }
+   }
+}
+```
+
+---
+
 ## Decision Outcomes
 
 ### Outcome A: PASS → Skip Phase 3
@@ -465,7 +545,7 @@ Phase 2.5 Result: FAIL
 
 **Phase 3 scope examples (hypothetical):**
 - **If failure:** "Operations Map only 60% complete" → Custom extractor for deterministic operation listing
-- **If failure:** "Context ceiling at 8 files" → Chunked processing with multi-pass summarization
+- **If failure:** "Operations Map incomplete after SSG Pass 2 split executed correctly" → AST comprehension failure; authorize deterministic AST extractor (Scope Example 1)
 - **If failure:** "Template selection incorrect" → Deterministic `project_type` detector
 
 **What Phase 3 CANNOT do (even if Phase 2.5 fails):**
@@ -493,7 +573,7 @@ Phase 2.5 succeeds when:
 
 ✅ GitHub Issue template created and tested  
 ✅ 3 test issues executed (standard, UI, large)  
-✅ All acceptance criteria tested (10 criteria × 3 test cases = 30 checks)  
+✅ All acceptance criteria tested (11 criteria × 3 test cases = 33 checks)  
 ✅ Results documented: PASS/FAIL per criterion  
 ✅ Premium request consumption measured and modeled  
 ✅ Go/no-go recommendation documented  
@@ -501,7 +581,7 @@ Phase 2.5 succeeds when:
 ✅ Phase 3 authorized (if FAIL) or skipped (if PASS)  
 ✅ Skill reliability results documented: Criteria 9 (metadata header) and 10 (hook log) recorded for all 3 test cases; `benchmark.json` `coding-agent` key populated  
 
-**Gate rule note:** Criteria 1-9 are hard gates. Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
+**Gate rule note:** Criteria 1-9 and 11 are hard gates. Criterion 10 handling follows: "Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue."
 
 **Exit gate:** Binary decision approved by management **in writing** (approval record or email); next phase explicitly authorized before work begins.
 

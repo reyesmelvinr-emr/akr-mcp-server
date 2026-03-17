@@ -79,6 +79,16 @@ Backend charter at ~11,000 tokens + lean baseline template at ~7,000 tokens = ~1
 - Relationships and Dependencies section requirement
 - Usage Patterns section requirement
 
+### SSG Charter Slice Requirements
+
+Because SSG loads the condensed charter one section at a time (per pass), each condensed charter must be structurally navigable by section heading. The following requirements apply to all condensed charters:
+
+- Each section covered by an SSG pass must have its own distinct ATX heading (##)
+- Section headings must use the exact names that the SKILL.md Mode B pass instructions reference (e.g., "## Operations Map Rules", "## Business Rules Requirements")
+- No section's rules may depend on prose from another section being loaded simultaneously - each section must be self-contained at the rule level
+
+This does not require additional content; it requires that the condensed charter's existing sections are correctly headed so the SKILL.md pass sequence can target them by heading reference.
+
 ### What Gets Removed
 
 - Explanatory prose and rationale paragraphs
@@ -166,6 +176,10 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal), M
 | Add self-reporting block as first SKILL body instruction | Standards author | SKILL body begins with `CRITICAL: When this skill is loaded, begin EVERY response with: ✅ akr-docs INVOKED AND STEPS EXECUTED — Steps followed: 1. [step] — completed...` | 30 min |
 | Add `<!-- akr-generated -->` metadata header before validation/write steps in Mode B | Standards author | Mode B writes metadata header to draft output before validator run and before file write; block includes `skill`, `mode`, `template`, `steps-completed`, `generated-at` fields | 30 min |
 | Create `SKILL-COMPAT.md` skeleton | Standards author | File present at `.github/skills/akr-docs/SKILL-COMPAT.md`; contains: (1) model compatibility matrix with columns Model, Pass Rate, Known Issues, Workaround; rows for `claude-sonnet-4-6` and `gpt-4o` populated after Phase 0 eval runs; (2) invocation-surface matrix including `coding-agent`, `custom-agent`, and `code-skills` (`run_skill_script`) rows; (3) "Future Enhancement Paths" section with placeholder row for "Dynamic resource-based skill hydration" (see note below) | 1 hour |
+| Author SSG pass sequence (Pass 1-7) in SKILL.md Mode B | Standards author | All 7 passes specified with context loads, charter slices, outputs, and forward payload caps; Pass 2 split logic included; Pass 4 + Pass 5 operate on forward payloads only (no source re-reads) | 4 hours |
+| Author slow-generation escalation handler in SKILL.md | Standards author | 45-minute threshold logic present; three options documented (continue, split, fallback); `generation-strategy: single-pass-fallback` set on fallback | 1 hour |
+| Author 4 new SSG eval cases (`evals/cases/ssg-*.yaml`) | Standards author | All 4 cases from Deliverable 5B present; assertions cover pass sequence, split behavior, timing threshold, and forward payload discipline | 3 hours |
+| Validate SSG pass sequence against eval cases | Standards author | At least 3 runs per eval case; pass rates recorded in `benchmark.json` `ssg` key | 2 hours |
 
 > **`SKILL-COMPAT.md` — Future Enhancement Paths section:** Include a second table in the skeleton
 > with columns: Enhancement, Description, Trigger Condition, Estimated Effort. Add one placeholder
@@ -381,6 +395,10 @@ Validate seven foundational assumptions before Phase 1 investment. Each test mus
 - Architecture diagram shows full stack (Controller → Service → Repository → DB)
 - ≥90% consistency across 3 runs
 - Phase 0 completeness assessment recorded using manual checklist (validator integration begins in Phase 1)
+- SSG pass sequence executes in correct order (Pass 1 -> Pass 7); no pass skipped without documentation
+- `passes-completed` field present in `<!-- akr-generated -->` metadata header
+- `pass-timings-seconds` field present (or `unavailable` with justification if surface does not expose timing)
+- Total generation time recorded and logged to `ssg-slow-module-events` if it exceeds 30 minutes
 
 **Fail fallback:**
 - Retain `CodeAnalyzer` from `akr-mcp-server` for deterministic extraction
@@ -439,6 +457,10 @@ Validate seven foundational assumptions before Phase 1 investment. Each test mus
 - Data Operations section covers all reads and writes
 - No "..." or "[content omitted]" artifacts
 - Metadata header and required YAML front matter fields present (manual check in Phase 0)
+- Pass 2 split (2A + 2B) executes correctly for 8-file module without section omission
+- `passes-split: 2A,2B` recorded in metadata header
+- Total generation time for 8-file module recorded; if >45 minutes, slow-generation fallback path documented
+- Forward payload from Pass 2A carries to Pass 2B without reloading raw source files
 
 **Fail fallback:**
 - Enforce `max_files: 5` guidance for large-file modules
@@ -704,34 +726,112 @@ evals/
     mode-a-standard.yaml         # Mode A assertions for Test 1 standard run
     mode-b-coursedomain.yaml     # Mode B assertions matching courses_service_doc.md
     mode-b-large-module.yaml     # Mode B stress test: 8-file module, no truncation
+    ssg-pass-sequence-backend.yaml
+    ssg-pass-sequence-large.yaml
+    ssg-timing-threshold.yaml
+    ssg-forward-payload.yaml
   datasets/
     coursedomain-files/          # Input files used in Pre-pilot Test 1
   benchmark.json                 # Pass rates + token counts per model version
 ```
+
+### New SSG Eval Cases
+
+| Eval Case File | Type | What It Tests | Assertions |
+|---|---|---|---|
+| `ssg-pass-sequence-backend.yaml` | Automated | SSG pass 1-7 execution order for a standard 5-file backend module | All 7 passes complete; `passes-completed: 1,2,3,4,5,6,7`; no pass omitted |
+| `ssg-pass-sequence-large.yaml` | Automated | SSG pass 2 split behavior for an 8-file module | `passes-split: 2A,2B` present; `passes-completed: 1,2A,2B,3,4,5,6,7`; Operations Map complete across both sub-passes |
+| `ssg-timing-threshold.yaml` | Automated | Total generation time within 30-minute target | `total-generation-seconds` <= 1800; each pass within its per-pass target |
+| `ssg-forward-payload` | Manual checklist | Forward payload discipline - no raw file re-reads after Pass 2 | Standards author runs Mode B on a known 5-file module; observes SKILL.md self-reporting block per pass; records in `benchmark.json` whether any pass beyond Pass 2 reports loading source files (binary YES/NO). Secondary proxy: if Pass 3 timing is unexpectedly close to Pass 2 timing, inspect manually. This is not an automated assertion - the eval framework cannot inspect model execution context. |
+
+Note on `ssg-forward-payload`: This is the only non-automated eval item. It is recorded in `benchmark.json` as:
+
+```json
+"ssg-forward-payload-observation": {
+  "passes-beyond-2-loaded-source-files": null,
+  "observed-by": null,
+  "observed-at": null
+}
+```
+
+`null` values are populated after Phase 0 manual run. `passes-beyond-2-loaded-source-files` is `false` (compliant) or a list of pass numbers that loaded source files unexpectedly.
 
 ### `benchmark.json` Schema
 
 ```json
 {
   "last-updated": "YYYY-MM-DD",
-  "schema-version": "1.0",
+  "schema-version": "1.1",
   "models": {
     "claude-sonnet-4-6": {
       "mode-a-standard":       { "pass-rate": null, "avg-tokens": null },
       "mode-b-coursedomain":   { "pass-rate": null, "avg-tokens": null },
-      "mode-b-large-module":   { "pass-rate": null, "avg-tokens": null, "known-issue": null }
+      "mode-b-large-module":   { "pass-rate": null, "avg-tokens": null, "known-issue": null },
+      "ssg": {
+        "mode-b-coursedomain": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": {
+            "pass1": null, "pass2": null, "pass3": null,
+            "pass4": null, "pass5": null, "pass6": null, "pass7": null
+          },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        },
+        "mode-b-large-module": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": {
+            "pass1": null, "pass2a": null, "pass2b": null, "pass3": null,
+            "pass4": null, "pass5": null, "pass6": null, "pass7": null
+          },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        }
+      }
     },
     "gpt-4o": {
       "mode-a-standard":       { "pass-rate": null, "avg-tokens": null },
       "mode-b-coursedomain":   { "pass-rate": null, "avg-tokens": null },
-      "mode-b-large-module":   { "pass-rate": null, "avg-tokens": null, "known-issue": null }
+      "mode-b-large-module":   { "pass-rate": null, "avg-tokens": null, "known-issue": null },
+      "ssg": {
+        "mode-b-coursedomain": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": {
+            "pass1": null, "pass2": null, "pass3": null,
+            "pass4": null, "pass5": null, "pass6": null, "pass7": null
+          },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        },
+        "mode-b-large-module": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": {
+            "pass1": null, "pass2a": null, "pass2b": null, "pass3": null,
+            "pass4": null, "pass5": null, "pass6": null, "pass7": null
+          },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        }
+      }
     },
-    "coding-agent": {}
+    "coding-agent": {
+      "ssg": {
+        "mode-b-coursedomain": {
+          "avg-total-seconds": null,
+          "pass-timings-available": null,
+          "avg-pass-seconds": {},
+          "slow-module-rate": null
+        }
+      }
+    }
   }
 }
 ```
 
 > `null` values are populated after each phase eval run. Do not publish to `core-akr-templates` main branch until at least one run is complete.
+
+After running SSG eval cases during pre-pilot Tests 1 and 3, populate the `ssg` key in `benchmark.json` for each model with average timing data from at least 3 runs per eval case.
+
+`benchmark.json` schema version at Phase 0 exit: The schema version is bumped to `1.1` in Phase 0, regardless of whether SSG SKILL.md authoring is completed in Phase 0 or deferred to Phase 1. The schema (with null `ssg` values) is a Phase 0 artifact; the data is populated in Phase 1 and Phase 2.5. This ensures no migration is needed later when SSG data begins accumulating.
 
 ### `mode-b-coursedomain.yaml` Assertions (Sample)
 
@@ -764,10 +864,65 @@ pass_threshold: 10/10
 | Author `mode-a-standard.yaml` assertions | Standards author | Assertions match Pre-pilot Test 1 acceptance criteria exactly | 1 hour |
 | Author `mode-b-coursedomain.yaml` assertions | Standards author | Assertions reference `courses_service_doc.md` sections; includes `metadata_header_present` and `self_reporting_block_in_response` assertions | 1 hour |
 | Author `mode-b-large-module.yaml` assertions | Standards author | Includes 8-file boundary check and no-truncation assertion | 1 hour |
+| Author `ssg-pass-sequence-backend.yaml` assertions | Standards author | Verifies pass order and complete `passes-completed` set for standard module | 1 hour |
+| Author `ssg-pass-sequence-large.yaml` assertions | Standards author | Verifies Pass 2 split handling and `2A,2B` encoding in metadata | 1 hour |
+| Author `ssg-timing-threshold.yaml` assertions | Standards author | Verifies total and per-pass timing thresholds | 1 hour |
+| Run manual `ssg-forward-payload` observation | Standards author | Observation recorded in `benchmark.json` under `ssg-forward-payload-observation` | 30 min |
 | Create `benchmark.json` with null baseline | Standards author | File present; schema valid; all `null` values to be populated after Tests 1 and 3 | 30 min |
 | Run eval cases during Pre-pilot Test 1 | Standards author | Assertions checked against output; results recorded in `benchmark.json` | Part of Test 1 (no additional time) |
 | Run eval cases during Pre-pilot Test 3 | Standards author | Large-module assertions checked; results recorded | Part of Test 3 (no additional time) |
 | Populate `SKILL-COMPAT.md` with Phase 0 results | Standards author | Model compatibility matrix rows for `claude-sonnet-4-6` and `gpt-4o` populated with actual pass rates | 1 hour |
+
+### Phase 0 Scope Decision (Standards Lead Required)
+
+SSG SKILL.md authoring adds ~10 hours (~1.5 days) to Phase 0. Choose one:
+
+- Option A: Keep in Phase 0, extend timeline by 2 days. SSG eval cases also validate the non-SSG flow, providing partial consolidation value.
+- Option B: Defer SSG pass sequence to Phase 1 Deliverable 2. Phase 0 establishes charter heading structure and `benchmark.json` schema 1.1 only. Phase 1 SKILL.md authoring includes the full SSG sequence.
+
+Decision must be recorded in writing before Phase 0 begins.
+
+---
+
+## Deliverable N: `CHARTER-RESTORATION-PLAN.md`
+
+### Objective
+
+Document what was removed from each charter during compression, in what order it should be restored as context windows grow, and what restoration conditions trigger a re-evaluation. This preserves the full charter's intent and prevents future maintainers from reconstructing it from memory.
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Author `CHARTER-RESTORATION-PLAN.md` in `core-akr-templates/charters/` | Standards author | One entry per removed content category; restoration order specified; trigger conditions defined | 2 hours |
+| Cross-reference with compressed charters | Standards author | Each removal in the plan maps to a specific section in the full charter | 30 min |
+| Add to Phase 0 exit checklist | Standards lead | Plan reviewed and approved before Phase 1 begins | 15 min |
+
+### Required Content
+
+```markdown
+# Charter Restoration Plan
+
+## Purpose
+Documents what was removed from condensed charters during Phase 0 compression
+and in what order restoration should occur as context windows grow.
+
+## Restoration Order (per section)
+
+| Priority | Content Category | Source Section | Token Estimate | Restore When |
+|---|---|---|---|---|
+| 1st | Worked examples (per section) | Full charter §X | ~800 tokens | Per-pass budget reliably supports +800 tokens |
+| 2nd | Explanatory rationale for rules | Full charter §Y | ~1,200 tokens | Per-pass budget supports +2,000 tokens total |
+| 3rd | Multi-section pass consolidation | All sections | N/A (structural) | Full charter per module fits in one pass context |
+| Final | Single-pass full charter loading | Entire charter | ~11,000 tokens | Single pass reliably handles 30K+ tokens with source files |
+
+## Trigger Conditions for Restoration Review
+
+- Context window capacity confirmed at >=50K tokens effective for structured output
+- SSG `avg-total-seconds` for standard modules drops below 10 minutes consistently
+- New model release with documented context handling improvements
+- `SKILL-COMPAT.md` Future Enhancement Paths row for dynamic resource hydration becomes actionable
+```
 
 ### Gate Dependency
 

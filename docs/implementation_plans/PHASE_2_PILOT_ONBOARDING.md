@@ -283,12 +283,39 @@ Draft `docs/modules/CourseDomain_doc.md` with:
 | Tech lead approval | Tech lead | Content accuracy validated; PR approved | 10 min |
 | Record generation time | Standards author | Actual time vs. 30 min target documented | 2 min |
 
+### SSG Timing Data Collection
+
+During Mode B runs in the pilot, the following timing data must be recorded for every module documented. This data feeds `benchmark.json` and informs future planning.
+
+Collection method: Read from `<!-- akr-generated -->` metadata header in each PR output. If `pass-timings-seconds: unavailable`, record the wall-clock time manually by noting when the session started and when the PR was opened.
+
+| Module | Pass 1 (s) | Pass 2 (s) | Pass 2A (s) | Pass 2B (s) | Pass 3 (s) | Pass 4 (s) | Pass 5 (s) | Pass 6 (s) | Pass 7 (s) | Total (s) | Fallback? |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| [CourseDomain] | | | N/A | N/A | | | | | | | No |
+| [EnrollmentDomain] | | | | | | | | | | | |
+| [UserDomain] | | | | | | | | | | | |
+
+After at least 3 modules are documented:
+- Calculate average total generation time
+- Identify the slowest pass across all modules (expected: Pass 2)
+- Record in `benchmark.json` under the `ssg` key for the model used
+
 ### Success Metrics
 
 - **Section completeness:** 100% required sections present
 - **Content review time:** ≤30 minutes from draft to PR ready
 - **Validation pass rate:** Zero validator errors on first run
 - **❓ fill rate:** ≥95% of `❓` sections filled or marked DEFERRED with justification
+
+### Slow Module Escalation
+
+If a module's total generation time exceeds 45 minutes during the pilot, follow this process:
+
+1. Record the event. Log to `.akr/logs/session-*.jsonl` (via `agentStop` hook). Note which pass was slowest and approximately how many source file tokens were loaded in Pass 2.
+2. Do not re-run immediately. Re-running the same configuration will produce the same timing result. First evaluate whether module splitting is appropriate.
+3. Evaluate module splitting. If the module has 7-8 files and large file sizes, splitting into two sub-modules (<=5 files each) is the preferred resolution. This requires a modules.yaml update (PR through standards team) and a Mode A re-validation step.
+4. If splitting is not feasible (e.g., the files are tightly coupled and cannot be logically separated), document the module as a "large module exception" in modules.yaml with `notes: "SSG slow module - single-pass fallback authorized"` and proceed with single-pass fallback. Expect additional ❓ markers.
+5. Report in retrospective. Include the module name, total time, slowest pass, and resolution chosen. This feeds the `ssg-slow-module-rate` metric in `benchmark.json`.
 
 ---
 
@@ -451,6 +478,19 @@ Conduct retrospective with quantitative metrics and qualitative feedback; decide
 ### Retrospective Outputs
 
 - **Quantitative summary:** Metrics table with actuals vs. targets
+- **SSG retrospective metrics:**
+
+| Metric | Target | Actual (to fill in) |
+|---|---|---|
+| Average SSG total generation time per module | ≤30 minutes | |
+| Slowest individual pass across all modules | Pass 2 expected | |
+| Modules triggering slow-generation fallback (>45 min) | <10% | |
+| Modules requiring Pass 2 split (2A+2B) | <50% of modules | |
+| Average Pass 2 time (seconds) | ≤480 seconds (8 min) | |
+| Timing data availability (% of runs with pass-timings-seconds populated) | ≥80% | |
+
+- **Retrospective question to add:**
+  "For modules where generation took >20 minutes, did developers use the coding agent background execution model or wait interactively? What was the impact on developer experience?"
 - **Friction point log:** Issues encountered with priority ratings
 - **Template updates required:** Specific sections to add/modify/remove
 - **Validator updates required:** Rules that fired false positives or missed errors

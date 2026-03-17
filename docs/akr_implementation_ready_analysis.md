@@ -1692,3 +1692,732 @@ This SDK update does not invalidate current AKR architecture. It improves the co
 *Implementation-Ready Analysis — March 2026 — Engineering Standards — Confidential*
 
 *Synthesizes: Review 1 (Claude, structural); Review 2 (GH Copilot Round 1, repository inspection); Review 3 (GH Copilot Round 2, charter size quantification); Review 4 (M365 Copilot, tooling evaluation); Review 5 (GH Copilot, module architecture response); Review 6 (GH Copilot, full schema audit of `akr-config-schema.json` and `consolidation-config-schema.json`); Review 7 (GH Copilot, final file inspection of `copilot-instructions.md`, `.akr/workflows/`, `tag-registry.json`); Module-Based Documentation Architecture clarification and `courses_service_doc.md` sample; Review 9 (Skill Optimization — three-layer reliability stack; LLM execution quality variance; `SKILL-COMPAT.md` + eval framework; `postToolUse` + `agentStop` hooks; `<!-- akr-generated -->` in-document contract); Review 10 (Agent Skills SDK update validation — `@skill.script`, script approval gating, dynamic resource enhancement path).*
+
+---
+
+# Part 18: Section-Scoped Generation (SSG) — Multi-Turn / Multi-Pass Architecture
+
+**Date reviewed:** March 2026
+**Review type:** Context window strategy — bridge architecture for charter fidelity under current token constraints
+**Appends:** `akr_implementation_ready_analysis.md` as Part 18 (after Part 17: Agent Skills SDK Update)
+
+---
+
+## 18.1 Why SSG Is Being Adopted
+
+The context window saturation problem (Part 3) is currently resolved by charter compression — reducing each charter from ~11,000 tokens to ~2,500 tokens before any source files load. This approach works but introduces a trade-off: condensed charters can lose the nuance and worked guidance that makes them effective generation guides, even when all required rules are preserved.
+
+SSG is adopted as a complementary strategy to charter compression with three goals:
+
+1. **Restore charter fidelity per section** — each generation pass loads only the charter guidance relevant to the section being written, not the full condensed charter for the entire document at once. This enables loading more complete section guidance without increasing total context load.
+
+2. **Provide a defined path to full charter use** — as context windows grow, SSG passes can progressively load larger charter sections, and eventually the full charter per pass, without restructuring the generation pipeline.
+
+3. **Enable background execution** — SSG's sequential pass structure maps naturally to the Copilot coding agent's multi-step task model, allowing generation to run in the background while developers work on other tasks.
+
+SSG does **not** replace charter compression. Both strategies operate together: compression reduces the standing overhead of the charter; SSG reduces the per-section context load by loading only what each pass needs.
+
+---
+
+## 18.2 SSG Architecture — Pass Sequence for Backend Module Docs
+
+The following pass sequence applies to `api-backend` and `microservice` project types. A parallel sequence for `ui-component` follows in section 18.3.
+
+Each pass has:
+- A **context budget** (what gets loaded)
+- A **charter slice** (which section rules are loaded from the condensed charter)
+- An **output** (what the pass produces)
+- A **forward payload** (what gets passed to the next pass — summaries only, never raw files re-loaded)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 1 — Module Inventory                                               │
+│                                                                         │
+│ Context loaded:  modules.yaml (file list + metadata only)               │
+│ Charter slice:   Module Files section rules only                        │
+│ Source files:    NOT loaded yet                                         │
+│                                                                         │
+│ Output:          Module Files section                                   │
+│                  (each file with its role: Controller, Service, etc.)   │
+│                                                                         │
+│ Forward payload: File list with roles (compact — not full source)       │
+│ Timing target:   ≤3 minutes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 2 — Operations Map                                                 │
+│                                                                         │
+│ Context loaded:  All source files (read in full) + Pass 1 forward       │
+│ Charter slice:   Operations Map section rules only                      │
+│ Note:            This is the heaviest pass. For modules at the 8-file   │
+│                  ceiling with large files, this pass may be split into  │
+│                  2A (public operations) + 2B (private/internal) if the  │
+│                  combined source load exceeds the per-pass token budget. │
+│                                                                         │
+│ Output:          Operations Map (all operations across all files)       │
+│                                                                         │
+│ Forward payload: Operations table (condensed — operation names,         │
+│                  signatures, file origin; not full implementation)      │
+│ Timing target:   ≤8 minutes (≤12 minutes for 8-file modules)           │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 3 — Architecture Overview                                          │
+│                                                                         │
+│ Context loaded:  Pass 1 forward + Pass 2 forward (no raw files)         │
+│ Charter slice:   Architecture diagram rules only                        │
+│                                                                         │
+│ Output:          Full-stack text diagram                                │
+│                  (Controller → Service → Repository → DB table)         │
+│                  No Mermaid; text-based only.                           │
+│                                                                         │
+│ Forward payload: Architecture summary (one paragraph)                  │
+│ Timing target:   ≤3 minutes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 4 — Business Rules                                                 │
+│                                                                         │
+│ Context loaded:  Pass 2 forward (operations table — method signatures   │
+│                  and file origins are sufficient anchor for business    │
+│                  rule extraction) + Pass 3 forward (architecture        │
+│                  summary for layer context)                             │
+│ Source files:    NOT re-read. The Pass 2 operations table contains the  │
+│                  method signatures needed to identify rule extraction   │
+│                  points. "Why It Exists" + "Since When" columns are     │
+│                  human-supplied (❓ markers); no source re-read needed. │
+│ Charter slice:   Business Rules section rules only                      │
+│                  (Why It Exists + Since When columns)                   │
+│                                                                         │
+│ Output:          Business Rules table                                   │
+│                  (AI-populated Name + Description columns from Pass 2   │
+│                  signatures; ❓ markers on Why It Exists + Since When)  │
+│                                                                         │
+│ Forward payload: Business rules summary (rule names + brief rationale)  │
+│ Timing target:   ≤5 minutes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 5 — Data Operations                                                │
+│                                                                         │
+│ Context loaded:  Pass 2 forward (operations table already lists all     │
+│                  DB-touching operations with file origins) + Pass 4     │
+│                  forward (business rules as context for data patterns)  │
+│ Source files:    NOT re-read. The operations table from Pass 2 already  │
+│                  contains repository method signatures and their file   │
+│                  origins, which is sufficient to map reads/writes.      │
+│                  If a specific DB call pattern cannot be resolved from  │
+│                  the operations table, mark as ❓ for Mode C review.    │
+│ Charter slice:   Data Operations section rules only                     │
+│                                                                         │
+│ Output:          Reads/Writes table                                     │
+│                                                                         │
+│ Forward payload: Data operations summary (tables touched, patterns)     │
+│ Timing target:   ≤3 minutes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 6 — Questions & Gaps + YAML Front Matter + Transparency Markers    │
+│                                                                         │
+│ Context loaded:  All prior pass outputs assembled (no raw files)        │
+│ Charter slice:   Marker syntax rules + frontmatter field requirements   │
+│                                                                         │
+│ Output:          ❓ markers, 🤖 markers, DEFERRED placeholders,         │
+│                  YAML frontmatter (businessCapability, feature, layer,  │
+│                  project_type, status, compliance_mode)                 │
+│                  Questions & Gaps section                               │
+│                                                                         │
+│ Forward payload: Complete draft assembled from Pass 1–6 outputs         │
+│ Timing target:   ≤3 minutes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASS 7 — Assembly + Validation                                          │
+│                                                                         │
+│ Context loaded:  Complete draft from Pass 6 forward                     │
+│ Actions:         Write <!-- akr-generated --> metadata header           │
+│                  Run validate_documentation.py                          │
+│                  Surface any failures as additional ❓ markers           │
+│                  Write to doc_output path                               │
+│                  Open draft PR                                          │
+│                                                                         │
+│ Output:          Final draft file + PR                                  │
+│ Timing target:   ≤3 minutes                                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Total target: ≤28 minutes (within the ≤30-minute system-level success criterion)
+```
+
+---
+
+## 18.3 SSG Pass Sequence for UI Component Module Docs
+
+The `ui-component` pass sequence follows the same forward-payload-only discipline as the backend sequence. Pass 2 reads all UI source files; Passes 3–5 operate exclusively on forward payloads.
+
+| Pass | Section | Charter Slice | Source Files Loaded | Forward Payload Source |
+|---|---|---|---|---|
+| 1 | Module Files | Module Files rules | None (modules.yaml only) | — |
+| 2 | Component Hierarchy + Hook Dependency Graph | Component hierarchy rules + hook graph rules | All UI source files | Component tree + hook dependency map (~500 tokens) |
+| 3 | Type Definition Cross-Reference | Type definition rules | **None** — derived from Pass 2 component hierarchy output. Type relationships unresolvable from the hierarchy are marked ❓. | Pass 2 forward |
+| 4 | State Management + Props Flow | State/props rules | **None** — props flows and state shapes are mapped from the component hierarchy and hook dependency graph in Pass 2 forward. | Pass 2 + Pass 3 forwards |
+| 5 | Rendering Patterns + Side Effects | Rendering rules | **None** — rendering patterns are inferred from component hierarchy. Side-effect sources (useEffect triggers, API calls) are present in the hook dependency graph. Mark unresolvable patterns ❓. | Pass 2 + Pass 4 forwards |
+| 6 | Questions & Gaps + Front Matter + Markers | Marker syntax + frontmatter rules | None (pass forwards only) | All prior pass forwards |
+| 7 | Assembly + Validation | — | None (assembled draft) | Pass 6 assembled draft |
+
+Timing targets mirror the backend sequence. Pass 2 is the heaviest for UI modules (component hierarchy + hook dependency graph is the equivalent of the Operations Map).
+
+**UI source re-read override:** If a UI module has heavily type-annotated components where the type definitions are the primary structural guide (e.g., complex generic types that are not representable in a component hierarchy summary), a project-level override is available in `modules.yaml`:
+
+```yaml
+- name: CourseManagementUI
+  ssg_pass3_source_reread: true   # Authorizes targeted type file re-read in Pass 3
+```
+
+The same schema and validator treatment applies as `ssg_pass4_source_reread` for backend modules (see NEW-2 resolution in section 18.8A).
+
+**UI forward payload size targets:**
+
+| Pass | Maximum Forward Payload Size |
+|---|---|
+| Pass 1 → Pass 2 | File list with roles (~200 tokens) |
+| Pass 2 → Pass 3 | Component tree + hook graph: component names, props interfaces, hook names, dependency edges (~500 tokens) |
+| Pass 3 → Pass 4 | Type summary: exported type names + shapes (~200 tokens) |
+| Pass 4 → Pass 5 | State/props summary: state shapes, prop drilling paths (~250 tokens) |
+| Pass 5 → Pass 6 | Rendering summary: render patterns, side-effect sources (~200 tokens) |
+| Pass 6 → Pass 7 | Full assembled draft (no token limit — this is the document) |
+
+---
+
+## 18.4 Forward Payload Design — Preventing Context Re-Expansion
+
+The most critical SSG discipline is the **forward payload rule**: each pass hands off a **condensed summary** of its output to the next pass — never the raw source files, never the full output text.
+
+This rule prevents context re-expansion, where earlier passes accumulate in later context windows and recreate the saturation problem SSG is meant to solve.
+
+**Forward payload size targets:**
+
+| Pass | Maximum Forward Payload Size |
+|---|---|
+| Pass 1 → Pass 2 | File list with roles only (~200 tokens) |
+| Pass 2 → Pass 3 | Operations table: names, signatures, file origins (~500 tokens) |
+| Pass 3 → Pass 4 | Architecture summary: one paragraph (~150 tokens) |
+| Pass 4 → Pass 5 | Business rules: rule names + brief rationale (~300 tokens) |
+| Pass 5 → Pass 6 | Data operations: tables touched, read/write pattern names (~200 tokens) |
+| Pass 6 → Pass 7 | Full assembled draft (all sections joined; no token limit — this is the document) |
+
+The Pass 6 → Pass 7 handoff carries the complete draft because Pass 7's only job is final assembly, metadata header writing, and validation. No source files are re-read in Pass 7.
+
+---
+
+## 18.5 SSG and the `<!-- akr-generated -->` Metadata Header
+
+The existing `<!-- akr-generated -->` metadata header (Part 5, Mode B Step 8) must be extended to record SSG pass execution evidence. This gives the CI gate visibility into which passes completed and whether any were skipped or split.
+
+**Extended header format (no split):**
+
+```markdown
+<!-- akr-generated
+skill: akr-docs
+skill-version: v1.0.0
+mode: B
+steps-completed: 1,2,3,4,5,6,7,8,9
+generation-strategy: section-scoped
+template: lean_baseline_service_template.md
+charter: backend-service.instructions.md
+modules-yaml-status: approved
+passes-completed: 1,2,3,4,5,6,7
+passes-split:
+pass-timings-seconds: pass1=142,pass2=597,pass3=98,pass4=213,pass5=117,pass6=134,pass7=89
+total-generation-seconds: 1390
+generated-at: 2026-03-17T09:23:41Z
+-->
+```
+
+**Extended header format (Pass 2 split):**
+
+```markdown
+<!-- akr-generated
+skill: akr-docs
+skill-version: v1.0.0
+mode: B
+steps-completed: 1,2,3,4,5,6,7,8,9
+generation-strategy: section-scoped
+template: lean_baseline_service_template.md
+charter: backend-service.instructions.md
+modules-yaml-status: approved
+passes-completed: 1,2A,2B,3,4,5,6,7
+passes-split: 2A,2B
+pass-timings-seconds: pass1=142,pass2a=287,pass2b=310,pass3=98,pass4=213,pass5=117,pass6=134,pass7=89
+total-generation-seconds: 1390
+generated-at: 2026-03-17T09:23:41Z
+-->
+```
+
+**Field definitions:**
+
+| Field | Description | Required |
+|---|---|---|
+| `generation-strategy` | `section-scoped`, `single-pass`, or `single-pass-fallback` | Yes |
+| `passes-completed` | Comma-separated list of passes that completed. When Pass 2 is split, records `1,2A,2B,3,4,5,6,7` — not `1,2,3,...`. When `single-pass-fallback` occurred mid-run, records only the passes that completed before fallback (e.g., `1,2A,2B,3`). This allows the validator to confirm both sub-passes completed, not just that a split was attempted. | Yes |
+| `passes-split` | Records the split type when a pass was divided (e.g., `2A,2B`). Serves as a flag for the split pattern in case future versions support other split types. Empty string if no split occurred. | No |
+| `pass-timings-seconds` | Per-pass wall-clock time. Keys must match the actual pass IDs in `passes-completed` (e.g., `pass2a`, `pass2b` when split; `pass2` when not split). Value `unavailable` if the surface does not expose timing. | Yes |
+| `total-generation-seconds` | Sum of all pass timings. Value `unavailable` if timing not available. | Yes |
+
+`validate_documentation.py` must check:
+- `generation-strategy` is present and has a valid value
+- `passes-completed` contains all expected pass IDs: `1,2,3,4,5,6,7` (no split) or `1,2A,2B,3,4,5,6,7` (split). Both `2` and `2A,2B` are valid representations of pass 2 completion — the validator accepts either form.
+- `passes-split` and `passes-completed` are consistent: if `passes-split: 2A,2B`, then `passes-completed` must contain `2A` and `2B`, not `2`
+- `pass-timings-seconds` is present (value may be `unavailable`)
+- `total-generation-seconds` is present (value may be `unavailable`)
+
+---
+
+## 18.6 Generation Time Metrics Framework
+
+### Why Timing Data Matters
+
+Per-pass and total generation time data serves three future planning purposes:
+
+1. **Threshold-based routing** — if a module's generation time exceeds the slow-generation threshold (see section 18.8), it triggers the fallback escalation path rather than silently stalling.
+
+2. **AI tooling evolution tracking** — as model speed and context window capacity improve, timing data from earlier periods allows quantitative comparison. A module that takes 28 minutes in 2026 may take 8 minutes in 2027; the historical record makes this improvement visible and guides decisions about whether SSG can be simplified or consolidated.
+
+3. **Phase 3 authorization evidence** — if Phase 2.5 shows the coding agent is slow on large modules specifically at Pass 2 (the heaviest pass), that is targeted Phase 3 automation evidence for the Operations Map extraction step only, not a reason to replace the whole pipeline.
+
+### Metrics to Collect
+
+The following metrics must be collected during every Mode B generation run and stored in `.akr-config.json` monitoring output and `benchmark.json`:
+
+| Metric | Where Collected | Granularity | Target Value |
+|---|---|---|---|
+| `pass_wall_clock_seconds` | `akr-generated` header + `session-*.jsonl` hook log | Per pass | See pass targets in 18.2 |
+| `total_generation_seconds` | `akr-generated` header | Per module | ≤1,800 (30 minutes) |
+| `pass2_split_occurred` | `passes-split` field | Boolean | False for modules ≤5 files |
+| `source_file_token_count` | Logged by skill before Pass 2 | Per module | Informational |
+| `charter_slice_token_count` | Logged by skill per pass | Per pass | Informational |
+| `passes_completed_count` | Count of `passes-completed` | Per run | 7 (or 8 if Pass 2 split) |
+| `validation_pass_on_first_run` | `validate_documentation.py` exit code | Per run | ≥95% of runs |
+| `slow_pass_count` | Passes exceeding their individual target | Per run | 0 |
+
+### `benchmark.json` SSG Schema Extension
+
+The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` key per model:
+
+```json
+{
+  "last-updated": "YYYY-MM-DD",
+  "schema-version": "1.1",
+  "models": {
+    "claude-sonnet-4-6": {
+      "mode-a-standard":     { "pass-rate": null, "avg-tokens": null },
+      "mode-b-coursedomain": { "pass-rate": null, "avg-tokens": null },
+      "mode-b-large-module": { "pass-rate": null, "avg-tokens": null, "known-issue": null },
+      "ssg": {
+        "mode-b-coursedomain": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": {
+            "pass1": null, "pass2": null, "pass3": null,
+            "pass4": null, "pass5": null, "pass6": null, "pass7": null
+          },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        },
+        "mode-b-large-module": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": {
+            "pass1": null, "pass2a": null, "pass2b": null, "pass3": null,
+            "pass4": null, "pass5": null, "pass6": null, "pass7": null
+          },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        }
+      }
+    },
+    "gpt-4o": {
+      "ssg": {
+        "mode-b-coursedomain": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": { "pass1": null, "pass2": null, "pass3": null,
+                                "pass4": null, "pass5": null, "pass6": null, "pass7": null },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        },
+        "mode-b-large-module": {
+          "avg-total-seconds": null,
+          "avg-pass-seconds": { "pass1": null, "pass2a": null, "pass2b": null, "pass3": null,
+                                "pass4": null, "pass5": null, "pass6": null, "pass7": null },
+          "pass2-split-rate": null,
+          "slow-module-rate": null
+        }
+      }
+    },
+    "coding-agent": {
+      "ssg": {
+        "mode-b-coursedomain": {
+          "avg-total-seconds": null,
+          "pass-timings-available": null,
+          "avg-pass-seconds": {},
+          "slow-module-rate": null
+        }
+      }
+    }
+  }
+}
+```
+
+`null` values are populated after each eval run. `pass-timings-available` in the `coding-agent` block is a boolean populated in Phase 2.5 based on whether the coding agent surface exposes per-pass timing.
+
+### `.akr-config.json` Monitoring Extension
+
+The existing monitoring config (Part 12A, Addition A3) must include SSG timing metrics:
+
+```json
+"monitoring": {
+  "enabled": true,
+  "trackMetrics": [
+    "generation-time",
+    "validation-results",
+    "human-input-completion",
+    "cross-repo-sync",
+    "ssg-pass-timings",
+    "ssg-slow-module-events"
+  ]
+}
+```
+
+`ssg-pass-timings` records per-pass wall-clock times for every Mode B run.
+`ssg-slow-module-events` records any module that exceeded the total or per-pass timing threshold, for later review.
+
+---
+
+## 18.7 SSG as a Long-Term Strategy — Assessment
+
+### Where SSG Holds Up Long-Term
+
+SSG's sequential pass structure mirrors how documentation is actually organized. The Operations Map does not depend on the Business Rules being written simultaneously; the Architecture Overview depends only on having the file list and operations already established. This decomposition reflects sound editorial process, not a workaround.
+
+As context windows grow, SSG remains valuable for a different reason: focused, scoped generation produces more consistent output per section than loading everything at once. A model working on one section at a time is less prone to cross-section inconsistency, hallucinated relationships between sections, and token-budget-driven truncation of specific areas.
+
+**SSG is durable as a pattern. The manual orchestration of passes is what gets replaced as AI tooling matures.**
+
+### Where SSG Is Superseded
+
+The following conditions would reduce or eliminate the need for SSG as a context management strategy (though not necessarily as a quality strategy):
+
+| Condition | Impact on SSG |
+|---|---|
+| Context window reliably supports full charter + full module in one pass (~50K+ tokens effectively) | SSG becomes optional for small/medium modules; remains valuable for quality |
+| Copilot coding agent supports native multi-step task decomposition with charter-section routing | SSG passes are automated by the platform rather than encoded in SKILL.md |
+| `@skill.resource` dynamic hydration serves per-section charter content | SSG's charter-slice logic is offloaded to the resource layer |
+| RAG/retrieval layer over charters is implemented (Phase 3+ Future Enhancement) | Retrieval replaces manual pass-level charter slicing |
+
+These conditions are tracked in `SKILL-COMPAT.md` under "Future Enhancement Paths." When any condition is met, a `SKILL.md` revision is evaluated to simplify or consolidate SSG passes.
+
+### Progressive Restoration Plan
+
+As context windows grow, SSG passes can progressively load larger charter sections according to this restoration order:
+
+1. **First to restore:** Worked examples back into charter slices (currently removed in compression; highest fidelity gain per token restored)
+2. **Second:** Explanatory rationale for rules (helps model apply rules correctly in edge cases)
+3. **Third:** Full charter section consolidation — multiple related sections merged into one pass (e.g., Business Rules + Data Operations in a single pass)
+4. **Final state:** Single-pass generation with the full charter loaded — SSG collapses to the current Mode B single-shot approach, but now with full charter fidelity
+
+This restoration order is documented in `CHARTER-RESTORATION-PLAN.md` (see Phase 0 addition in section 18.9 below).
+
+---
+
+## 18.8 Slow-Generation Fallback — Alternative for Long-Running Modules
+
+### Threshold Definition
+
+A module generation run is classified as **slow** if any of the following are true:
+
+| Condition | Classification | Action |
+|---|---|---|
+| Any individual pass exceeds 2× its per-pass target | Slow pass | Log as `ssg-slow-module-event`; no automatic action |
+| Total generation exceeds 45 minutes | Slow module | Trigger fallback escalation path |
+| Pass 2 requires more than 2 splits (i.e., 3+ sub-passes) | Oversized module | Developer review required; consider splitting module |
+
+The 45-minute threshold is set above the ≤30-minute target to distinguish degraded-but-acceptable performance from genuinely blocked generation.
+
+### Fallback Escalation Path
+
+When total generation exceeds 45 minutes:
+
+```
+SLOW GENERATION DETECTED
+Total elapsed: [X] minutes — exceeds 45-minute threshold
+
+Option 1: Continue with current pass sequence
+  → Agent waits for current pass to complete before proceeding
+  → No action required from developer
+  → Recommended if background execution (coding agent) is running
+
+Option 2: Use module splitting to reduce per-pass load
+  → Developer reviews modules.yaml and splits the module into two smaller modules
+  → Each sub-module is documented separately; docs are linked in a module-group header
+  → Requires: re-running Mode A validation for the split; both modules ≤8 files
+  → Add `module_group: [ParentModuleName]` field to modules.yaml for both sub-modules
+
+Option 3: Use single-pass fallback for remaining sections
+  → Remaining incomplete sections are generated in a single consolidated pass
+  → Charter slice for this pass is the full condensed charter (not section-specific slices)
+  → Lower fidelity than SSG; more ❓ markers expected
+  → Validator will flag this via `generation-strategy: single-pass-fallback` in the header
+  → Developer resolves additional ❓ markers in Mode C review
+```
+
+**The fallback is not a failure.** A document generated via `single-pass-fallback` for remaining sections is still a valid draft. The `generation-strategy` field in the metadata header communicates to the CI validator and the developer which sections were generated under which strategy, so review effort can be calibrated accordingly.
+
+### Module Splitting Rules
+
+If a module is consistently slow across multiple runs (recorded in `ssg-slow-module-events`), the recommended path is module splitting rather than repeated fallback generation:
+
+- The module must be split into two sub-modules, each with ≤8 files
+- Both sub-modules must share the same `businessCapability` tag
+- A `module_group` field is added to both entries in `modules.yaml`:
+  ```yaml
+  - name: CourseDomainCore
+    module_group: CourseDomain
+    ...
+  - name: CourseDomainInfrastructure
+    module_group: CourseDomain
+    ...
+  ```
+- `validate_documentation.py` recognizes `module_group` and links the two docs in output
+- `consolidate.py` treats module_group members as a single logical unit for Level 3 feature consolidation
+
+---
+
+## 18.8A Review Findings — Resolved Issues
+
+The following issues were identified during peer review of this document and are resolved here as binding clarifications.
+
+---
+
+### Risk 1 (Blocking): Phase 3 Scope Example 2 Reclassification
+
+**Finding:** Phase 3 currently documents a "Scope Example 2: Chunked Context Processor" defined as:
+
+> *"Failure mode: 'Large modules (8 files) truncate sections.' Root cause: Context window ceiling at ~25,000 tokens. Solution: Multi-pass processing: (1) extract structure, (2) generate per-section, (3) assemble. Lines: ~200 lines."*
+
+SSG's Pass 1–7 sequence is exactly this solution, implemented in SKILL.md rather than a Python code-skill. Since SSG is baked into SKILL.md from Phase 1, "context window ceiling at 8 files" is **no longer a valid Phase 2.5 FAIL condition that authorizes Phase 3's chunked processor**. Leaving both creates two parallel chunking solutions with no decision rule for which applies.
+
+**Resolution:**
+
+Phase 3 Scope Example 2 ("Chunked Context Processor") is **reclassified** as follows when SSG is adopted:
+
+| Condition | Old classification | New classification |
+|---|---|---|
+| Large module (8 files) produces truncated sections | Phase 2.5 FAIL → Phase 3 chunked processor | SSG handles via Pass 2 split; NOT a Phase 3 authorization condition |
+| Operations Map incomplete due to **context overflow** | Phase 2.5 FAIL → Phase 3 chunked processor | SSG handles; not a Phase 3 trigger |
+| Operations Map incomplete due to **AST comprehension failure** (model misses private/async methods regardless of context load) | No prior classification | Phase 2.5 FAIL → Phase 3 deterministic AST extractor (Scope Example 1 remains valid) |
+
+**Required edit to `PHASE_3_AUTOMATION_EXTENSION.md`:** Remove "Context window ceiling at 8 files" from the authorization failure modes. Retain Scope Example 1 (deterministic operation extraction for AST comprehension failures) unchanged. Add a note:
+
+> *"Note: Multi-pass chunking for context overflow (formerly Scope Example 2) is handled by SSG in SKILL.md. Phase 3 authorization on context grounds requires evidence that SSG Pass 2 split produces structurally incomplete output even when executed correctly — i.e., the model comprehends the content but cannot produce a complete Operations Map from correct method signatures. This is an AST comprehension failure, not a context failure, and is addressed by Scope Example 1's deterministic extractor."*
+
+**Phase 2.5 FAIL conditions update:** In `PHASE_2_5_CODING_AGENT_SPIKE.md` Deliverable 5 failure mode table, replace:
+
+> *"'Operations Map only 60% complete' → Context window ceiling at ~25,000 tokens → Authorize Phase 3 chunked processor"*
+
+With:
+
+> *"'Operations Map incomplete after SSG Pass 2 split executed correctly' → AST comprehension failure (model misses private/async methods) → Authorize Phase 3 deterministic AST extractor (Scope Example 1)"*
+
+---
+
+### Risk 2 (Blocking): Pass 4 and Pass 5 Source Re-Read Contradiction — Resolved
+
+**Finding:** The original Pass 4 loaded "domain-logic files only (Service + Repository)" and Pass 5 loaded "DB-touching files only (Repository implementation)" — both direct source re-reads after Pass 2 had already read all files. This contradicts the forward payload discipline stated in section 18.4.
+
+**Resolution:** Applied directly to Pass 4 and Pass 5 definitions in section 18.2. Both passes now operate exclusively on forward payloads from prior passes:
+
+- **Pass 4** uses the Pass 2 operations table (method signatures and file origins) as the anchor for business rule name and description extraction. "Why It Exists" and "Since When" columns are inherently human-supplied and carry ❓ markers — no source re-read is required for those columns.
+- **Pass 5** uses the Pass 2 operations table to map database operations (repository method signatures already identify the read/write patterns). Specific DB call details that cannot be resolved from signatures are marked ❓ for Mode C resolution.
+
+If a team finds that business rules extraction from the operations table is insufficient for a particular codebase (e.g., heavily commented service files where the comments are the primary business rule source), they may authorize a targeted source re-read for Pass 4 only, documented as a project-level override in `modules.yaml` with `ssg_pass4_source_reread: true`. This override is not the default.
+
+---
+
+### Risk 3: SSG SKILL.md Authoring Time — Scope Assessment
+
+**Finding:** The Phase 0 SKILL.md task table provides no time estimate for adding the SSG pass sequence to Mode B. INSERT 3B replaces ~10 lines of Steps 3–4 with an ~80-line structured pass sequence including timing enforcement, forward payload caps, split logic, and fallback escalation.
+
+**Resolution:** The following time estimates are added to the Phase 0 SKILL.md authoring task table (see PHASE_UPDATES.md INSERT 2E for the full task row additions):
+
+| Task | Estimated Time |
+|---|---|
+| Author SSG pass sequence (Pass 1–7) in SKILL.md Mode B | 4 hours |
+| Author slow-generation escalation handler in SKILL.md | 1 hour |
+| Author 4 new SSG eval cases (`evals/cases/ssg-*.yaml`) | 3 hours |
+| Validate SSG pass sequence against eval cases (3 runs each) | 2 hours |
+| **SSG SKILL.md total addition to Phase 0** | **~10 hours (1.5 days)** |
+
+**Assessment:** If Phase 0 is already committed to a 1-2 week timeline, SSG SKILL.md authoring is additive scope. Two options:
+
+- **Option A (Recommended):** Keep SSG SKILL.md authoring in Phase 0, extend Phase 0 timeline by 2 days. SSG eval cases provide coverage that also validates the non-SSG skill flow, so there is partial test consolidation value.
+- **Option B:** Defer SSG pass sequence to Phase 1 Deliverable 2 (SKILL.md authoring). Phase 0 establishes charter section heading structure (INSERT 2A) and `benchmark.json` schema 1.1 (OBS-3 below), but does not implement SSG in the skill yet. Phase 1 SKILL.md authoring then includes the full SSG sequence. Phase 0 eval cases are reduced to the non-SSG baseline.
+
+The standards lead must decide between Options A and B before Phase 0 begins. This document does not pre-commit to either.
+
+---
+
+### OBS-1: Success Metric Clarification — SSG 30-Minute Target vs. Full-Cycle 45-Minute Target
+
+**Finding:** INSERT 1B adds "SSG total generation time per module: ≤30 minutes" alongside the existing "Time-to-first-documented-PR: ≤45 minutes (grouping + generation + review)." These can appear contradictory since Mode A alone can take 10–15 minutes.
+
+**Resolution:** Add the following clarifying note to INSERT 1B immediately after the 30-minute bullet:
+
+> *Note: The 30-minute SSG target covers Mode B generation only (SSG Passes 1–7). It is not the full Mode A → Mode B → review cycle. The existing 45-minute Phase 2 success metric covers the full cycle and remains unchanged. A compliant workflow could be: Mode A grouping validation (10 min) + Mode B SSG generation (≤30 min) + developer review setup (5 min) = 45 minutes total.*
+
+---
+
+### OBS-2: `passes-completed` vs. `steps-completed` Field Name Resolution
+
+**Finding:** The existing `<!-- akr-generated -->` header uses `steps-completed: 1,2,3,4,5,6,7,8,9` (the 9 Mode B workflow steps). SSG introduces `passes-completed: 1,2,3,4,5,6,7` (SSG generation passes — a sub-sequence within workflow Steps 3–4). These are semantically different and the validator checks both.
+
+**Resolution:** Both fields coexist with distinct semantics. The header format is:
+
+```markdown
+<!-- akr-generated
+...
+steps-completed: 1,2,3,4,5,6,7,8,9
+generation-strategy: section-scoped
+passes-completed: 1,2,3,4,5,6,7
+passes-split: (empty if no split; 2A,2B if Pass 2 was split)
+pass-timings-seconds: pass1=142,...
+total-generation-seconds: 1390
+...
+-->
+```
+
+- `steps-completed` = Mode B workflow steps (reading modules.yaml, loading charter, generating, writing, validating, opening PR). This field pre-exists SSG and its validator check is unchanged.
+- `passes-completed` = SSG generation passes. This is a new field, only present when `generation-strategy: section-scoped`. The validator checks it only when `generation-strategy` is set to `section-scoped` or `single-pass-fallback`.
+- When `generation-strategy: single-pass-fallback`, `passes-completed` records which passes ran before fallback triggered (e.g., `passes-completed: 1,2,3`; remaining sections completed via fallback).
+
+This resolution must be reflected in INSERT 3A's validator rules and in the SKILL.md header format block in INSERT 3B.
+
+---
+
+### OBS-3: `benchmark.json` Schema Version at Phase 0 vs. Phase 1
+
+**Finding:** Part 18.6 changes schema-version from `"1.0"` to `"1.1"` but does not specify which phase establishes `1.1`. If SSG eval cases are committed in Phase 0 (INSERT 2C), the schema must be `1.1` from the start.
+
+**Resolution:** The schema version at each phase exit gate is:
+
+| Phase | `benchmark.json` schema-version | Notes |
+|---|---|---|
+| Phase 0 exit | `1.1` | SSG `ssg` key present with null values; established at Phase 0 even if SSG SKILL.md is deferred to Phase 1 (Option B above). The schema is a Phase 0 artifact; the data is populated later. |
+| Phase 1 exit | `1.1` | SSG baseline pass rates populated from Phase 1 SKILL.md authoring validation runs |
+| Phase 2.5 exit | `1.1` | `coding-agent` → `ssg` key populated |
+
+The `1.0` → `1.1` bump is a Phase 0 deliverable regardless of whether SSG SKILL.md authoring is in Phase 0 or Phase 1.
+
+---
+
+### NEW-1: UI Pass Sequence Source Re-Reads — Resolved
+
+**Finding:** The original UI pass sequence table in section 18.3 listed source file re-reads in Passes 3 (Type files), 4 (Component + hook files), and 5 (Component files) — the same structural violation as the backend Risk 2.
+
+**Resolution:** Applied directly to section 18.3. The UI pass sequence now follows identical forward-payload-only discipline:
+
+- **Pass 3 (Type Definitions):** Derived from Pass 2 component hierarchy output. Type relationships unresolvable from the hierarchy receive ❓ markers.
+- **Pass 4 (State/Props):** Props flows and state shapes mapped from the component hierarchy and hook dependency graph in Pass 2 forward.
+- **Pass 5 (Rendering Patterns):** Rendering patterns inferred from component hierarchy; side-effect sources present in hook dependency graph.
+
+The same project-level override pattern (`ssg_pass3_source_reread: true` in `modules.yaml`) is available for heavily type-annotated UI modules, subject to the same schema/validator treatment as `ssg_pass4_source_reread`.
+
+---
+
+### NEW-2: `ssg_pass4_source_reread` / `ssg_pass3_source_reread` Schema Fields Not in Task Tables — Resolved
+
+**Finding:** The override fields added in the Pass 4 fix (backend) and Pass 3 fix (UI) are undocumented schema additions with no task rows to add them to `modules-schema.json`, `validate_documentation.py`, or the `modules.yaml` example.
+
+**Resolution:** The following task rows must be added to Phase 1 Deliverable 3 (schema updates task table). See PHASE_UPDATES.md INSERT 3E for the exact table rows.
+
+Fields to add to `modules-schema.json`:
+
+```json
+"ssg_pass4_source_reread": {
+  "type": "boolean",
+  "default": false,
+  "description": "Authorizes targeted Service file re-read in SSG Pass 4 for modules where service-file comments are the primary business rule source. Not recommended as a default. Document rationale in modules.yaml notes field."
+},
+"ssg_pass3_source_reread": {
+  "type": "boolean",
+  "default": false,
+  "description": "Authorizes targeted type file re-read in SSG Pass 3 for UI modules where complex generic type annotations are not representable in component hierarchy summaries."
+}
+```
+
+`validate_documentation.py` reads these fields during modules.yaml schema validation and records the override in the validation output summary. The `passes-completed` field in the metadata header records the override as `pass4-override` or `pass3-override` when triggered.
+
+---
+
+### NEW-3: Slow-Generation Fallback Agent Autonomy Clarification — Resolved
+
+**Finding:** INSERT 3C presented Option A (module splitting) as a choice the agent offers, implying it might execute it. Module splitting requires a `modules.yaml` PR through the standards team — the agent cannot do this unilaterally.
+
+**Resolution:** The SKILL.md slow-generation handler is clarified as follows (also reflected in INSERT 3C update in PHASE_UPDATES.md):
+
+- **Option A (module splitting)** is presented as a recommendation for the developer to pursue **after the PR is merged**, not as an agent-executable action. The agent documents the slow-module event and proceeds to Option B automatically in background mode.
+- **Option B (single-pass fallback)** is the agent's autonomous path. The agent never waits for a developer decision in background mode — it records `generation-strategy: single-pass-fallback` and opens the PR with a PR checklist note flagging the slow-module event.
+- In interactive VS Code mode, the agent notifies the developer before proceeding to Option B, giving them the opportunity to interrupt and manually execute Option A instead.
+
+---
+
+### NEW-4: `passes-completed` Split Encoding — Resolved
+
+**Finding:** When Pass 2 was split, `passes-completed: 1,2,3,4,5,6,7` did not distinguish whether both 2A and 2B completed — the split was only indicated by `passes-split`. The validator could not confirm both sub-passes ran.
+
+**Resolution:** Applied directly to section 18.5:
+
+- When a split occurs, `passes-completed` records the actual execution sequence: `1,2A,2B,3,4,5,6,7`
+- `passes-split` remains as a flag for the split type (to support future split patterns beyond 2A/2B)
+- The validator accepts both `2` (no split) and `2A,2B` appearing in `passes-completed` as valid pass 2 completions, and checks that `passes-split` and `passes-completed` are consistent
+- When `single-pass-fallback` occurs, `passes-completed` records only the passes that completed before fallback (e.g., `1,2A,2B,3`)
+
+---
+
+### NEW-5: `ssg-forward-payload.yaml` Eval Case Verifiability — Resolved
+
+**Finding:** The assertion "Passes 3–7 context does not include source file content (tested by token count comparison)" is not mechanically verifiable in the Agent Skills eval framework, which tests output artifacts — not model execution context.
+
+**Resolution:** `ssg-forward-payload.yaml` is reclassified from an automated eval assertion to a **manual observation checklist item**. See PHASE_UPDATES.md INSERT 2C update for the revised eval case table.
+
+The verifiability proxy used is behavioral: the standards author runs a Mode B eval on a known 5-file module, observes the SKILL.md self-reporting block output for each pass (which lists "Steps followed: …"), and records whether any pass beyond Pass 2 reports loading source files. This is recorded as a binary YES/NO observation in `benchmark.json` rather than an automated assertion. The `pass-timings-seconds` data provides a secondary proxy: if Pass 3 timing is unexpectedly close to Pass 2 timing, it warrants manual inspection.
+
+---
+
+## 18.9 SSG — Additions Required in Other Parts of This Analysis
+
+The following table summarizes where existing parts of this analysis require additions or cross-references due to SSG adoption. These are the source of the targeted updates in the phase plan files.
+
+| Part | Required Addition |
+|---|---|
+| Part 3 (Context Resolution) | Add Layer 5: SSG as a fifth resolution layer (after Layers 1–4) |
+| Part 5 (Agent Skill Specification) | Add SSG pass sequence to Mode B steps 3–4; add forward payload discipline; add `passes-completed` + `pass-timings-seconds` to the `akr-generated` header |
+| Part 6 (validate_documentation.py) | Add SSG header field validation; add slow-generation warning; add `passes-split` handling; add `single-pass-fallback` detection |
+| Part 11 (Pre-Pilot Tests) | Add SSG timing measurement to Test 1 and Test 3 acceptance criteria |
+| Part 12A (Schema Audit) | Add `ssg-pass-timings` and `ssg-slow-module-events` to monitoring trackMetrics list |
+| Part 16 (Skill Reliability) | Add SSG execution quality note to LLM-dependent execution quality table; add `ssg-avg-total-seconds` to benchmark.json schema |
+
+---
+
+## 18.10 Relationship to Existing Architecture Decisions
+
+SSG does not change any locked decision. It adds a generation strategy layer on top of the existing Mode B workflow:
+
+| Existing Decision | SSG Addition |
+|---|---|
+| Charter compression as Phase 0 blocking precondition (Part 3) | SSG reduces per-pass context load; compression still required to keep each pass within budget |
+| Agent Skill Mode B as primary generation workflow (Part 5) | SSG is implemented as a structured Mode B pass sequence, not a separate mode |
+| `validate_documentation.py` as CI gate (Part 6) | Extended with SSG header field validation and slow-generation warning |
+| Three-layer reliability stack (Part 16) | Unchanged; `passes-completed` field in metadata header is an addition to Layer 3 evidence |
+| Phase 2.5 coding agent test (Phase 2.5) | New Criterion 11 tests SSG pass sequence completion in async context |
+| `benchmark.json` eval framework (Part 16.4) | Extended with `ssg` key per model for timing data |
+
+---
+
+*Part 18 — Section-Scoped Generation (SSG) Architecture — March 2026 — Engineering Standards — Confidential*

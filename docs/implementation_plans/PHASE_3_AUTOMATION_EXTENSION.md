@@ -198,12 +198,13 @@ Build minimal custom agent addressing **only** documented Phase 2.5 failure mode
 **Solution:** Reuse AST-based `CodeAnalyzer` from `akr-mcp-server`  
 **Lines:** ~150 lines (ported + minimal wrapper)
 
-#### Scope Example 2: Chunked Context Processor
+#### Scope Example 2: Reclassified (SSG Adoption)
 
-**Failure mode:** "Large modules (8 files) truncate sections"  
-**Root cause:** Context window ceiling at ~25,000 tokens  
-**Solution:** Multi-pass processing: (1) extract structure, (2) generate per-section, (3) assemble  
-**Lines:** ~200 lines (chunking logic + coordination)
+Context overflow chunking (formerly Scope Example 2) is now handled by SSG in SKILL.md. SSG's Pass 2 split (2A + 2B) is the production solution for large-module context management. This path no longer authorizes Phase 3.
+
+Phase 3 authorization on Operations Map grounds requires evidence of an AST comprehension failure - the model produces an incomplete Operations Map even when the SSG pass executes correctly and context is not overflowing. This is a model-level failure to extract private/async/internal methods from correct method signatures, not a context overflow. This failure is addressed by Scope Example 1's deterministic AST extractor (unchanged).
+
+Evidence required to distinguish the two: Operations Map completeness must be measured with and without SSG. If SSG Pass 2 split produces the same incompleteness as single-pass, the failure is AST comprehension. If SSG Pass 2 split resolves the incompleteness, the failure was context overflow and Phase 3 is not needed.
 
 #### Scope Example 3: Template-to-Module Mapper
 

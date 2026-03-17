@@ -86,6 +86,28 @@ Create validation script from scratch that distinguishes module docs from databa
    - Data Operations (all reads and writes)
   - YAML front matter: `businessCapability`, `feature` (work-item), `layer`, `project_type`, `status`, `compliance_mode`
   - `<!-- akr-generated -->` metadata header block (presence check; fail with `"AKR metadata header missing — skill may not have been properly invoked"` if absent)
+  - SSG metadata validation (when `generation-strategy = section-scoped`):
+    - `passes-completed` field present; contains expected pass numbers
+      (Note: this is distinct from `steps-completed`, which counts the 9 Mode B workflow steps and remains checked independently. `passes-completed` counts SSG generation passes within Steps 3-4. Both fields must be present when generation-strategy is section-scoped.)
+    - `passes-completed` may include override annotations alongside standard pass IDs
+      (e.g., `pass4-override`, `pass3-override`). Validator must accept these as valid
+      entries and not reject them as non-numeric. Emit INFO:
+      "Pass N source re-read override was applied. Verify override is documented
+       in modules.yaml notes field."
+    - `pass-timings-seconds` field present (value may be "unavailable")
+    - `total-generation-seconds` present (value may be "unavailable")
+    - `passes-split` field: if present, value must be a valid sub-pass designation
+    - `passes-split` and `passes-completed` must be consistent: if `passes-split: 2A,2B`
+      then `passes-completed` must contain `2A` and `2B`, not `2`
+    - If `generation-strategy: single-pass-fallback`, `passes-completed` records
+      passes that ran before fallback (e.g., `passes-completed: 1,2,3`); emit WARNING:
+      "Sections generated via fallback strategy. Additional ❓ markers expected.
+       Run Mode C to resolve remaining gaps before production compliance."
+    - If `total-generation-seconds` > 2700 (45 minutes) and not "unavailable",
+      emit WARNING: "Module generation exceeded slow threshold. Consider module
+      splitting if this recurs. See CHARTER-RESTORATION-PLAN.md."
+    - `steps-completed` check: unchanged from existing validator logic; checked
+      independently of SSG fields.
    
    **DB_OBJECT docs require:**
    - Object Definition (schema, columns/parameters)
@@ -118,6 +140,11 @@ Create validation script from scratch that distinguishes module docs from databa
    - PASS/FAIL/WARN per check
    - Summary count
   - List of specific failures with line references
+  - Extended output contract fields for SSG:
+    - `.summary.ssg_slow_modules` (array of module names that exceeded threshold)
+    - `.summary.ssg_avg_total_seconds` (average across all validated docs in run)
+    - `.summary.fallback_strategy_count` (count of docs using single-pass-fallback)
+    - `.summary.ssg_pass_overrides` (array of `{module_name, override_field, value}` for any module with non-default override)
 
 8. **--changed-files support (workflow compatibility)**
   - Reads changed files list from environment (compatible with `tj-actions/changed-files`)
@@ -449,6 +476,180 @@ core-akr-templates/
       agentStop.json                               (NEW — auto-runs validate_documentation.py)
 ```
 
+### SKILL.md Mode B SSG Pass Sequence
+
+Replace the original Mode B generation core with this SSG sequence:
+
+```text
+3. Begin Section-Scoped Generation (SSG) pass sequence.
+   Initialize forward payload as an empty object.
+   Record pass start time before each pass (if surface supports timing).
+
+   PASS 1 — Module Inventory
+   - Load: modules.yaml file list + module metadata only
+   - Charter slice: Load ONLY the "Module Files Rules" section of the condensed charter
+   - Do NOT load source files in this pass
+   - Generate: Module Files section (each file with its role)
+   - Forward payload -> Pass 2: file list with roles (~200 tokens maximum)
+
+   PASS 2 — Operations Map
+   - Load: All source files from the module's files[] array
+   - Charter slice: Load ONLY the "Operations Map Rules" section of the condensed charter
+   - If source file total exceeds per-pass token budget:
+       Split into Pass 2A (public operations) + Pass 2B (private/internal operations)
+       Record split in passes-split field of the metadata header
+   - Generate: Operations Map covering ALL operations across all files
+   - Forward payload -> Pass 3: operations table (names, signatures, file origins)
+     Maximum size: ~500 tokens. Do NOT pass raw source file content forward.
+
+   PASS 3 — Architecture Overview
+   - Load: Pass 1 forward + Pass 2 forward ONLY (no source files re-loaded)
+   - Charter slice: Load ONLY the "Architecture Diagram Rules" section
+   - Generate: Full-stack text diagram (Controller -> Service -> Repository -> DB)
+     No Mermaid. Text-based only.
+   - Forward payload -> Pass 4: architecture summary (one paragraph, ~150 tokens)
+
+   PASS 4 — Business Rules
+   - Load: Pass 2 forward (operations table — method signatures and file origins
+             are the anchor for business rule extraction) + Pass 3 forward
+             (architecture summary for layer context)
+   - Source files: NOT re-read. "Why It Exists" + "Since When" columns are
+     human-supplied — apply ❓ markers. Name + Description columns are derived
+     from the Pass 2 operations table (method signatures). No source re-read needed.
+   - Charter slice: Load ONLY the "Business Rules Requirements" section
+                    (Why It Exists + Since When columns)
+   - Generate: Business Rules table (Name + Description from operations table;
+     ❓ on Why It Exists + Since When for human completion in Mode C)
+   - Forward payload -> Pass 5: rule names + brief rationale (~300 tokens maximum)
+   - Project-level override: if `ssg_pass4_source_reread: true` is set in
+     modules.yaml for this module (e.g., heavily commented service files),
+     targeted re-read of Service files is authorized. Document override in
+     passes-completed as pass4-override.
+
+   PASS 5 — Data Operations
+   - Load: Pass 2 forward (operations table already contains repository method
+             signatures and file origins, sufficient to map reads/writes)
+             + Pass 4 forward (business rules for data pattern context)
+   - Source files: NOT re-read. If a specific DB call pattern cannot be resolved
+     from the operations table, mark as ❓ for Mode C resolution.
+   - Charter slice: Load ONLY the "Data Operations Rules" section
+   - Generate: Reads/Writes table
+   - Forward payload -> Pass 6: table operations summary (~200 tokens maximum)
+
+   PASS 6 — Questions & Gaps + Front Matter + Transparency Markers
+   - Load: All prior pass forwards assembled (no source files)
+   - Charter slice: Load ONLY the "Marker Syntax Rules" + "Front Matter Requirements"
+   - Generate:
+       ❓ markers on sections requiring human input
+       🤖 markers on AI-inferred content
+       DEFERRED placeholders where information is unavailable
+       YAML front matter (businessCapability, feature, layer, project_type,
+                          status, compliance_mode)
+       Questions & Gaps section
+   - Forward payload -> Pass 7: complete assembled draft (all sections joined)
+
+   For ui-component project types, substitute the following pass 2-5 sections:
+
+   PASS 2 (UI) — Component Hierarchy + Hook Dependency Graph
+   - Load: All UI source files from the module's files[] array
+   - Charter slice: Load ONLY the "Component Hierarchy Rules" + "Hook Graph Rules"
+   - If source file total exceeds per-pass token budget: split into Pass 2A + Pass 2B
+   - Generate: Component tree with props interfaces + hook dependency graph
+   - Forward payload -> Pass 3: component tree + hook graph (~500 tokens maximum)
+     Do NOT pass raw source file content forward.
+
+   PASS 3 (UI) — Type Definition Cross-Reference
+   - Load: Pass 2 forward ONLY (no source files re-read)
+   - Charter slice: Load ONLY the "Type Definition Rules"
+   - Generate: Type cross-reference from component hierarchy output
+     Mark unresolvable type relationships as ❓
+   - Override: if ssg_pass3_source_reread: true in modules.yaml, targeted type
+     file re-read is authorized; record pass3-override in passes-completed
+   - Forward payload -> Pass 4: type summary (~200 tokens maximum)
+
+   PASS 4 (UI) — State Management + Props Flow
+   - Load: Pass 2 forward + Pass 3 forward ONLY (no source files re-read)
+   - Charter slice: Load ONLY the "State/Props Rules"
+   - Generate: State shapes and prop drilling paths from component hierarchy
+   - Forward payload -> Pass 5: state/props summary (~250 tokens maximum)
+
+   PASS 5 (UI) — Rendering Patterns + Side Effects
+   - Load: Pass 2 forward + Pass 4 forward ONLY (no source files re-read)
+   - Charter slice: Load ONLY the "Rendering Rules"
+   - Generate: Rendering patterns and side-effect sources from component hierarchy
+     and hook dependency graph
+   - Forward payload -> Pass 6: rendering summary (~200 tokens maximum)
+
+4. PASS 7 — Assembly + Validation
+   - Assemble complete draft from Pass 6 forward payload
+   - Write <!-- akr-generated --> metadata header (see header format in Step 8)
+     Populate fields:
+       passes-completed: record actual execution IDs (e.g., 1,2,3,4,5,6,7 if no split;
+                         1,2A,2B,3,4,5,6,7 if Pass 2 was split)
+       passes-split: record split type if split occurred (e.g., 2A,2B); empty string if not
+       pass-timings-seconds: use pass IDs matching passes-completed
+                             (e.g., pass2a=Xs,pass2b=Ys when split; pass2=Xs when not split)
+       generation-strategy: section-scoped (or single-pass-fallback if fallback occurred)
+     Override annotation examples:
+       Backend with pass4 override: passes-completed: 1,2,3,pass4-override,5,6,7
+       UI with pass3 override:      passes-completed: 1,2,pass3-override,4,5,6,7
+       UI with pass3 override + split: passes-completed: 1,2A,2B,pass3-override,4,5,6,7
+   - Run validate_documentation.py against assembled draft
+   - Resolve or mark DEFERRED any validation failures
+   - Proceed to file write and PR steps
+```
+
+### Slow-Generation Handling in Mode B
+
+```text
+SLOW GENERATION HANDLING
+
+If total elapsed time across all passes exceeds 45 minutes:
+  1. If running in coding agent background mode:
+     - Continue and complete the current pass.
+     - Proceed automatically to single-pass-fallback (Option B below) for any
+       remaining incomplete sections. Do NOT wait for developer input.
+     - Set generation-strategy: single-pass-fallback in metadata header.
+     - Log ssg-slow-module-event to .akr/logs/session-*.jsonl.
+     - Add PR checklist note: "⚠️ Generation exceeded 45-minute threshold.
+       Single-pass fallback used for remaining sections. Consider module
+       splitting (requires standards team PR) if this recurs."
+     - Option A (module splitting) is a POST-PR developer action — the agent
+       cannot modify modules.yaml without a standards team PR. The developer
+       evaluates module splitting after reviewing this PR.
+
+  2. If running in interactive VS Code mode:
+     - Notify developer before proceeding: "Generation is taking longer than
+       expected ([X] minutes elapsed). Remaining sections will be completed
+       using single-pass fallback unless you choose to stop and split the module.
+       A) Stop now — split module in modules.yaml (requires standards team PR)
+       B) Continue — use single-pass fallback for remaining sections (more ❓
+          markers; Mode C review recommended before merge)"
+     - If developer does not respond within the current session, proceed with
+       Option B and note the lack of explicit response.
+
+  3. If Pass 2 requires more than 2 splits (>2 sub-passes):
+     - Do NOT attempt a third sub-pass.
+     - Record passes-completed up to the last completed sub-pass.
+     - Proceed to single-pass-fallback for the Operations Map remainder and all
+       subsequent sections.
+     - Add PR checklist note: "⚠️ Module required >2 Pass 2 sub-passes. Module
+       splitting is strongly recommended. See modules.yaml module_group field."
+
+  Option B — Single-pass fallback:
+     Load full condensed charter (not section-specific slices)
+     Generate remaining incomplete sections in one consolidated pass
+     Set generation-strategy: single-pass-fallback in metadata header
+     Expect additional ❓ markers — Mode C review is recommended before PR merge
+```
+
+### Mode B PR Checklist Additions
+
+- [ ] `<!-- akr-generated -->` header includes `passes-completed` field
+- [ ] `pass-timings-seconds` field present (or `unavailable` with justification)
+- [ ] If `generation-strategy` is `single-pass-fallback`: Mode C review scheduled
+- [ ] If `passes-split` is populated: Operations Map reviewed for completeness across sub-passes
+
 ---
 
 ## Deliverable 3: Template Adaptation
@@ -734,6 +935,16 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
           "compliance_mode": {
             "type": "string",
             "enum": ["pilot", "production"]
+          },
+          "ssg_pass4_source_reread": {
+            "type": "boolean",
+            "default": false,
+            "description": "Authorizes targeted Service file re-read in SSG Pass 4 for modules where service-file comments are the primary business rule source. Not recommended as a default. Document rationale in the notes field."
+          },
+          "ssg_pass3_source_reread": {
+            "type": "boolean",
+            "default": false,
+            "description": "Authorizes targeted type file re-read in SSG Pass 3 for UI modules where complex generic type annotations are not representable in component hierarchy summaries."
           }
         }
       }
@@ -819,6 +1030,10 @@ Phase 3 automation is skipped after a successful Phase 2.5 outcome.
 | Update `tag-registry-schema.json` layers | Standards author | Decide whether to add `Full-Stack` or document exclusion | 1 hour |
 | Validate schemas with test YAML | Standards author | Example `modules.yaml` validates without errors | 1 hour |
 | Document schema versioning | Standards author | Schema version tied to `core-akr-templates` release tag | 30 min |
+| Add `ssg_pass4_source_reread` optional boolean field to `modules-schema.json` | Standards author | Field present with type `boolean`, default `false`, description: "Authorizes targeted Service file re-read in SSG Pass 4 for modules where service-file comments are the primary business rule source. Requires rationale in notes field." | 30 min |
+| Add `ssg_pass3_source_reread` optional boolean field to `modules-schema.json` | Standards author | Field present with type `boolean`, default `false`, description: "Authorizes targeted type file re-read in SSG Pass 3 for UI modules where complex generic types are not representable in the component hierarchy summary." | 30 min |
+| Add validator support for both override fields in `validate_documentation.py` | Standards author | Validator reads both fields from modules.yaml; records `pass4-override` or `pass3-override` in validation output when either is `true`; emits INFO log (not warning) noting the override | 1 hour |
+| Add both fields to `modules.yaml` example file | Standards author | Fields present with `false` values and inline comment: "# Set true only with documented rationale - see CHARTER-RESTORATION-PLAN.md override guidance" | 20 min |
 
 ### Output Locations
 
