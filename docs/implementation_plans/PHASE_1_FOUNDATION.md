@@ -1199,6 +1199,7 @@ Document compliance mode graduation criteria and `TEMPLATE_MANIFEST.json` narrow
 | Document `TEMPLATE_MANIFEST.json` narrowing | Standards author | CHANGELOG entry; deprecated roles listed | 1 hour |
 | Document tag registry requirements | Standards author | New entry requirements in `TAG_REGISTRY_GUIDE.md` | 1 hour |
 | Implement CI check for templateId validity | Standards author | Workflow step validates Agent Skill references | 2 hours |
+| Update pilot `.akr-config.json` monitoring config for SSG | Standards author | Pilot project config includes `ssg-pass-timings` and `ssg-slow-module-events` in `trackMetrics`; activation synchronized with SKILL.md SSG sequence (Deliverable 5, Step 3) | 15 min |
 
 ---
 
