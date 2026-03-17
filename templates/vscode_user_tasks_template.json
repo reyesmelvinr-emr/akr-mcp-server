@@ -23,35 +23,47 @@
       }
     },
     {
-      "label": "AKR: Validate Documentation (file)",
+      "label": "AKR: Validate Documentation (file) [LEGACY]",
       "type": "shell",
       "command": "python",
       "args": [
         "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_documentation.py",
         "${input:akrDocFile}"
       ],
-      "group": "test",
+      "group": "none",
       "problemMatcher": []
     },
     {
-      "label": "AKR: Validate Documentation (changed files)",
+      "label": "AKR: Validate Documentation (changed files) [LEGACY]",
       "type": "shell",
       "command": "python",
       "args": [
         "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_documentation.py",
         "--changed-files"
       ],
-      "group": "test",
+      "group": "none",
       "problemMatcher": []
     },
     {
-      "label": "AKR: Validate Documentation (all in docs/)",
+      "label": "AKR: Validate Documentation (all in docs/) [LEGACY]",
       "type": "shell",
       "command": "python",
       "args": [
         "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_documentation.py",
         "--all",
         "docs/"
+      ],
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "AKR: Validate Implementation (Non-Legacy)",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "${env:AKR_MCP_SERVER_PATH}/scripts/validation/validate_implementation_non_legacy.py",
+        "--workspace-root",
+        "${workspaceFolder}"
       ],
       "group": "test",
       "problemMatcher": []
