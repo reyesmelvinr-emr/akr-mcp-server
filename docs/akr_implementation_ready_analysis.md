@@ -2426,6 +2426,7 @@ The verifiability proxy used is behavioral: the standards author runs a Mode B e
 **Guard rails:**
 - The SKILL.md includes guidance (not enforcement) on when single-pass is and is not recommended, so developers have the information to make a calibrated decision
 - The validator INFO message on any single-pass document reminds the reviewer that extra scrutiny is appropriate on large modules
+- **Production compliance mode is blocked:** If `compliance_mode: production` AND `generation-strategy: developer-elected-single-pass`, `validate_documentation.py` emits ERROR (blocking, not overridable via `--fail-on=never`). SKILL.md halts before generation if `--single-pass` is passed with a production-mode module. Developer must remove the flag or set `compliance_mode: pilot`.
 - Pilot retrospective tracks `developer-single-pass-rate` to assess whether the SSG default needs calibration
 
 **What this does not change:** Single-pass output is still subject to all other CI validation rules — required sections, frontmatter, transparency markers, `<!-- akr-generated -->` header presence. It is not a bypass of governance, only of the multi-pass generation strategy.

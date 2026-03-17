@@ -110,6 +110,11 @@ Create validation script from scratch that distinguishes module docs from databa
        re-running with SSG if module has 5+ files or any file >500 LOC."
       Do NOT count this as a `fallback_strategy_count` event - it is an intentional
       developer choice, not a generation failure.
+    - If `generation-strategy: developer-elected-single-pass` AND `compliance_mode: production`,
+      emit ERROR (blocking):
+      "Developer-elected single-pass is not permitted in production compliance mode.
+       Re-run with SSG (default) or set compliance_mode to pilot."
+      Exit code must reflect failure; this is not overridable via --fail-on=never.
     - If `total-generation-seconds` > 2700 (45 minutes) and not "unavailable",
       emit WARNING: "Module generation exceeded slow threshold. Consider module
       splitting if this recurs. See CHARTER-RESTORATION-PLAN.md."
@@ -519,10 +524,17 @@ Replace the original Mode B generation core with this SSG sequence:
        generation-strategy: developer-elected-single-pass
        passes-completed: single-pass
        pass-timings-seconds: [total time or "unavailable"]
-    - validate_documentation.py emits INFO (not WARNING) when this strategy is present:
+     - validate_documentation.py emits INFO (not WARNING) when this strategy is present:
        "Document generated via developer-elected single-pass. Review thoroughly,
         especially Operations Map and Business Rules on large modules."
-   - Proceed directly to Pass 7 (Assembly + Validation) after generation.
+     - Single-pass is BLOCKED if `compliance_mode: production`. SKILL.md must check
+      compliance_mode before proceeding with single-pass generation:
+       If compliance_mode = production AND --single-pass flag present:
+        Halt with message: "Single-pass is not permitted in production compliance mode.
+        Remove --single-pass flag or set compliance_mode: pilot to proceed."
+      validate_documentation.py enforces this independently as a blocking ERROR on
+      any document that carries both markers (belt-and-suspenders enforcement).
+    - Proceed directly to Pass 7 (Assembly + Validation) after generation.
    - No `ssg_slow_modules` event is logged for single-pass runs.
 
    If single-pass is NOT elected (default), begin SSG:
