@@ -262,6 +262,14 @@ def extract_operations(file_paths: str) -> str:
   return json.dumps({"operations": []})  # placeholder
 
 # ── Failure Mode 2: Chunked Context Processing (if authorized) ──
+# WARNING - SSG RECLASSIFICATION NOTE:
+# Context overflow chunking is handled by SSG Pass 2 split in SKILL.md
+# (Scope Example 2 reclassified). This script is retained as a placeholder only if:
+#   (a) Phase 2.5 shows SSG Pass 2 split executed correctly but the model still
+#       cannot assemble coherent output from forward payloads, or
+#   (b) The active execution surface cannot reliably support multi-turn flow.
+# Authorization requires explicit Phase 2.5 FAIL evidence with SSG split confirmed.
+# Do NOT build this script based on context overflow alone.
 @doc_agent_skill.script(
   name="generate-chunked",
   description="Multi-pass doc generation for large modules (>6 files or >15,000 tokens)."
@@ -298,7 +306,7 @@ When deterministic extraction or chunked assembly is required, call `run_skill_s
 
 1. Operation extraction failure mode:
   - `run_skill_script("extract-operations", {"file_paths": "<space-separated paths>"})`
-2. Large module/chunking failure mode:
+2. Large module/chunking failure mode (only if authorized per Scope Example 2 reclassification criteria):
   - `run_skill_script("generate-chunked", {"module_path": "<path>", "output_path": "<path>"})`
 3. Project type ambiguity failure mode:
   - `run_skill_script("detect-project-type", {"file_tree_json": "<json>"})`
