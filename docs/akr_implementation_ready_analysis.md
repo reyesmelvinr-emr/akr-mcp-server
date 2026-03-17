@@ -1957,10 +1957,10 @@ generated-at: 2026-03-17T09:23:41Z
 
 | Field | Description | Required |
 |---|---|---|
-| `generation-strategy` | `section-scoped`, `single-pass`, or `single-pass-fallback` | Yes |
-| `passes-completed` | Comma-separated list of passes that completed. When Pass 2 is split, records `1,2A,2B,3,4,5,6,7` — not `1,2,3,...`. When `single-pass-fallback` occurred mid-run, records only the passes that completed before fallback (e.g., `1,2A,2B,3`). This allows the validator to confirm both sub-passes completed, not just that a split was attempted. | Yes |
-| `passes-split` | Records the split type when a pass was divided (e.g., `2A,2B`). Serves as a flag for the split pattern in case future versions support other split types. Empty string if no split occurred. | No |
-| `pass-timings-seconds` | Per-pass wall-clock time. Keys must match the actual pass IDs in `passes-completed` (e.g., `pass2a`, `pass2b` when split; `pass2` when not split). Value `unavailable` if the surface does not expose timing. | Yes |
+| `generation-strategy` | `section-scoped` — SSG multi-pass (default); `developer-elected-single-pass` — developer intentionally chose single-pass via `--single-pass` flag or issue template field; `single-pass-fallback` — system triggered fallback after slow generation; `single-pass` — legacy value for documents generated before SSG was introduced | Yes |
+| `passes-completed` | Comma-separated list of passes that completed. When Pass 2 is split, records `1,2A,2B,3,4,5,6,7` — not `1,2,3,...`. When `single-pass-fallback` occurred mid-run, records only the passes that completed before fallback (e.g., `1,2A,2B,3`). When `developer-elected-single-pass`, value is `single-pass`. This allows the validator to confirm both sub-passes completed, not just that a split was attempted. | Yes |
+| `passes-split` | Records the split type when a pass was divided (e.g., `2A,2B`). Serves as a flag for the split pattern in case future versions support other split types. Empty string if no split occurred. Not applicable for single-pass runs. | No |
+| `pass-timings-seconds` | Per-pass wall-clock time. Keys must match the actual pass IDs in `passes-completed` (e.g., `pass2a`, `pass2b` when split; `pass2` when not split). For single-pass runs, use `single-pass=[seconds]`. Value `unavailable` if the surface does not expose timing. | Yes |
 | `total-generation-seconds` | Sum of all pass timings. Value `unavailable` if timing not available. | Yes |
 
 `validate_documentation.py` must check:
@@ -2020,7 +2020,8 @@ The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` 
             "pass4": null, "pass5": null, "pass6": null, "pass7": null
           },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null
         },
         "mode-b-large-module": {
           "avg-total-seconds": null,
@@ -2029,7 +2030,13 @@ The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` 
             "pass4": null, "pass5": null, "pass6": null, "pass7": null
           },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null
+        },
+        "mode-b-single-pass": {
+          "avg-total-seconds": null,
+          "section-completeness-vs-ssg": null,
+          "notes": "Populated when developer-elected-single-pass runs are observed in pilot"
         }
       }
     },
@@ -2040,14 +2047,20 @@ The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` 
           "avg-pass-seconds": { "pass1": null, "pass2": null, "pass3": null,
                                 "pass4": null, "pass5": null, "pass6": null, "pass7": null },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null
         },
         "mode-b-large-module": {
           "avg-total-seconds": null,
           "avg-pass-seconds": { "pass1": null, "pass2a": null, "pass2b": null, "pass3": null,
                                 "pass4": null, "pass5": null, "pass6": null, "pass7": null },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null
+        },
+        "mode-b-single-pass": {
+          "avg-total-seconds": null,
+          "section-completeness-vs-ssg": null
         }
       }
     },
@@ -2057,13 +2070,16 @@ The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` 
           "avg-total-seconds": null,
           "pass-timings-available": null,
           "avg-pass-seconds": {},
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null
         }
       }
     }
   }
 }
 ```
+
+`developer-single-pass-rate` tracks what proportion of Mode B runs in the pilot used developer-elected single-pass. This is an informational metric — it captures how frequently developers bypass SSG, which guides future decisions about whether SSG defaults are calibrated correctly. `mode-b-single-pass` captures average generation time and section completeness compared to SSG runs on equivalent modules, providing a quantitative basis for the quality trade-off discussion.
 
 `null` values are populated after each eval run. `pass-timings-available` in the `coding-agent` block is a boolean populated in Phase 2.5 based on whether the coding agent surface exposes per-pass timing.
 
@@ -2390,6 +2406,32 @@ The verifiability proxy used is behavioral: the standards author runs a Mode B e
 
 ---
 
+### Design Decision: Developer-Elected Single-Pass Mode
+
+**Context:** SSG's multi-pass sequence is the default for Mode B and provides the highest quality output per context load. However, there are two legitimate scenarios where a developer may want to bypass SSG:
+
+1. **Small module, known files:** The developer knows the module contains <=3 small files and the full condensed charter + all source files will fit comfortably in a single context load without saturation risk.
+2. **Speed over fidelity:** The developer needs a quick orientation draft — a scaffold to review rather than a production reference — and explicitly accepts that the output will need more thorough Mode C review than an SSG-generated draft would.
+
+**Decision:** Developer-elected single-pass is supported as a first-class Mode B option, not as an escape hatch. It is distinguishable from system-triggered fallbacks (`single-pass-fallback`) in all tracking fields, so pilot metrics can accurately separate intentional choices from generation failures.
+
+**How it works:**
+- Invoked via `--single-pass` flag or issue template field `Generation mode: single-pass`
+- Loads full condensed charter + all source files in one context load (same as pre-SSG Mode B)
+- Records `generation-strategy: developer-elected-single-pass` in the metadata header
+- Validator emits INFO (not WARNING) — it does not block CI or flag this as a quality problem
+- Does not log a `ssg-slow-module-event` even if total time exceeds thresholds
+- Tracked separately in `benchmark.json` under `mode-b-single-pass` and in `developer_single_pass_count` validator summary field
+
+**Guard rails:**
+- The SKILL.md includes guidance (not enforcement) on when single-pass is and is not recommended, so developers have the information to make a calibrated decision
+- The validator INFO message on any single-pass document reminds the reviewer that extra scrutiny is appropriate on large modules
+- Pilot retrospective tracks `developer-single-pass-rate` to assess whether the SSG default needs calibration
+
+**What this does not change:** Single-pass output is still subject to all other CI validation rules — required sections, frontmatter, transparency markers, `<!-- akr-generated -->` header presence. It is not a bypass of governance, only of the multi-pass generation strategy.
+
+---
+
 ## 18.9 SSG — Additions Required in Other Parts of This Analysis
 
 The following table summarizes where existing parts of this analysis require additions or cross-references due to SSG adoption. These are the source of the targeted updates in the phase plan files.
@@ -2397,11 +2439,11 @@ The following table summarizes where existing parts of this analysis require add
 | Part | Required Addition |
 |---|---|
 | Part 3 (Context Resolution) | Add Layer 5: SSG as a fifth resolution layer (after Layers 1–4) |
-| Part 5 (Agent Skill Specification) | Add SSG pass sequence to Mode B steps 3–4; add forward payload discipline; add `passes-completed` + `pass-timings-seconds` to the `akr-generated` header |
-| Part 6 (validate_documentation.py) | Add SSG header field validation; add slow-generation warning; add `passes-split` handling; add `single-pass-fallback` detection |
+| Part 5 (Agent Skill Specification) | Add SSG pass sequence to Mode B steps 3–4; add `--single-pass` flag; add forward payload discipline; add `passes-completed` + `pass-timings-seconds` to the `akr-generated` header |
+| Part 6 (validate_documentation.py) | Add SSG header field validation; add slow-generation warning; add `passes-split` handling; add `single-pass-fallback` detection; add `developer-elected-single-pass` INFO; add `developer_single_pass_count` to output contract |
 | Part 11 (Pre-Pilot Tests) | Add SSG timing measurement to Test 1 and Test 3 acceptance criteria |
 | Part 12A (Schema Audit) | Add `ssg-pass-timings` and `ssg-slow-module-events` to monitoring trackMetrics list |
-| Part 16 (Skill Reliability) | Add SSG execution quality note to LLM-dependent execution quality table; add `ssg-avg-total-seconds` to benchmark.json schema |
+| Part 16 (Skill Reliability) | Add SSG execution quality note to LLM-dependent execution quality table; add `ssg-avg-total-seconds` and `developer-single-pass-rate` to benchmark.json schema |
 
 ---
 
@@ -2412,11 +2454,11 @@ SSG does not change any locked decision. It adds a generation strategy layer on 
 | Existing Decision | SSG Addition |
 |---|---|
 | Charter compression as Phase 0 blocking precondition (Part 3) | SSG reduces per-pass context load; compression still required to keep each pass within budget |
-| Agent Skill Mode B as primary generation workflow (Part 5) | SSG is implemented as a structured Mode B pass sequence, not a separate mode |
-| `validate_documentation.py` as CI gate (Part 6) | Extended with SSG header field validation and slow-generation warning |
+| Agent Skill Mode B as primary generation workflow (Part 5) | SSG is implemented as a structured Mode B pass sequence, not a separate mode; `--single-pass` flag allows developer to bypass SSG without bypassing governance |
+| `validate_documentation.py` as CI gate (Part 6) | Extended with SSG header field validation, slow-generation warning, and `developer-elected-single-pass` INFO; single-pass output is still subject to all section and frontmatter rules |
 | Three-layer reliability stack (Part 16) | Unchanged; `passes-completed` field in metadata header is an addition to Layer 3 evidence |
 | Phase 2.5 coding agent test (Phase 2.5) | New Criterion 11 tests SSG pass sequence completion in async context |
-| `benchmark.json` eval framework (Part 16.4) | Extended with `ssg` key per model for timing data |
+| `benchmark.json` eval framework (Part 16.4) | Extended with `ssg` key per model for timing data; `mode-b-single-pass` key tracks developer-elected single-pass quality vs. SSG |
 
 ---
 

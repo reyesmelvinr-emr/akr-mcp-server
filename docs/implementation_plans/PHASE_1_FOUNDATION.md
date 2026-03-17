@@ -103,6 +103,13 @@ Create validation script from scratch that distinguishes module docs from databa
       passes that ran before fallback (e.g., `passes-completed: 1,2,3`); emit WARNING:
       "Sections generated via fallback strategy. Additional ❓ markers expected.
        Run Mode C to resolve remaining gaps before production compliance."
+    - If `generation-strategy: developer-elected-single-pass`, `passes-completed`
+      value is `single-pass`; emit INFO (not WARNING):
+      "Document generated via developer-elected single-pass. Review thoroughly,
+       especially Operations Map and Business Rules on large modules. Consider
+       re-running with SSG if module has 5+ files or any file >500 LOC."
+      Do NOT count this as a `fallback_strategy_count` event - it is an intentional
+      developer choice, not a generation failure.
     - If `total-generation-seconds` > 2700 (45 minutes) and not "unavailable",
       emit WARNING: "Module generation exceeded slow threshold. Consider module
       splitting if this recurs. See CHARTER-RESTORATION-PLAN.md."
@@ -143,7 +150,8 @@ Create validation script from scratch that distinguishes module docs from databa
   - Extended output contract fields for SSG:
     - `.summary.ssg_slow_modules` (array of module names that exceeded threshold)
     - `.summary.ssg_avg_total_seconds` (average across all validated docs in run)
-    - `.summary.fallback_strategy_count` (count of docs using single-pass-fallback)
+    - `.summary.fallback_strategy_count` (count of docs using single-pass-fallback - system-triggered)
+    - `.summary.developer_single_pass_count` (count of docs using developer-elected-single-pass - intentional)
     - `.summary.ssg_pass_overrides` (array of `{module_name, override_field, value}` for any module with non-default override)
 
 8. **--changed-files support (workflow compatibility)**
@@ -481,7 +489,44 @@ core-akr-templates/
 Replace the original Mode B generation core with this SSG sequence:
 
 ```text
-3. Begin Section-Scoped Generation (SSG) pass sequence.
+3. Determine generation strategy.
+
+   DEFAULT: Section-Scoped Generation (SSG) - multi-pass sequence (Passes 1-7).
+   OVERRIDE: Developer-elected single-pass - skip SSG passes; generate entire
+             document in one consolidated pass using the full condensed charter.
+
+   Developer may elect single-pass by invoking Mode B with the --single-pass flag
+   or by including "single-pass" in the issue template request:
+     /akr-docs mode-b [ModuleName] --single-pass
+     Issue template field: "Generation mode: single-pass"
+
+   When to use single-pass (developer's discretion):
+   - Module files are known to be small (e.g., <=3 files, each <200 LOC)
+   - A quick draft is needed for orientation or planning purposes, with the
+     developer explicitly accepting that the output will need thorough review
+   - Time constraints require a faster turnaround and the developer understands
+     the trade-off
+
+   Single-pass is NOT recommended when:
+   - Module has 5+ files or any file >500 LOC
+   - Documentation will be used as a production reference without Mode C review
+   - The module is at or near the max_files: 8 ceiling
+
+   If single-pass is elected:
+   - Load: All source files + full condensed charter in one context load
+   - Generate: Complete document in one pass using the appropriate base template
+   - Set in metadata header:
+       generation-strategy: developer-elected-single-pass
+       passes-completed: single-pass
+       pass-timings-seconds: [total time or "unavailable"]
+    - validate_documentation.py emits INFO (not WARNING) when this strategy is present:
+       "Document generated via developer-elected single-pass. Review thoroughly,
+        especially Operations Map and Business Rules on large modules."
+   - Proceed directly to Pass 7 (Assembly + Validation) after generation.
+   - No `ssg_slow_modules` event is logged for single-pass runs.
+
+   If single-pass is NOT elected (default), begin SSG:
+
    Initialize forward payload as an empty object.
    Record pass start time before each pass (if surface supports timing).
 
@@ -648,6 +693,7 @@ If total elapsed time across all passes exceeds 45 minutes:
 - [ ] `<!-- akr-generated -->` header includes `passes-completed` field
 - [ ] `pass-timings-seconds` field present (or `unavailable` with justification)
 - [ ] If `generation-strategy` is `single-pass-fallback`: Mode C review scheduled
+- [ ] If `generation-strategy` is `developer-elected-single-pass`: reviewer is aware output may have more `❓` markers than SSG-generated docs, especially on large modules; Mode C review recommended before production compliance mode
 - [ ] If `passes-split` is populated: Operations Map reviewed for completeness across sub-passes
 
 ---

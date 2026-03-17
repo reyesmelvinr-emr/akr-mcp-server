@@ -177,6 +177,7 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal), M
 | Add `<!-- akr-generated -->` metadata header before validation/write steps in Mode B | Standards author | Mode B writes metadata header to draft output before validator run and before file write; block includes `skill`, `mode`, `template`, `steps-completed`, `generated-at` fields | 30 min |
 | Create `SKILL-COMPAT.md` skeleton | Standards author | File present at `.github/skills/akr-docs/SKILL-COMPAT.md`; contains: (1) model compatibility matrix with columns Model, Pass Rate, Known Issues, Workaround; rows for `claude-sonnet-4-6` and `gpt-4o` populated after Phase 0 eval runs; (2) invocation-surface matrix including `coding-agent`, `custom-agent`, and `code-skills` (`run_skill_script`) rows; (3) "Future Enhancement Paths" section with placeholder row for "Dynamic resource-based skill hydration" (see note below) | 1 hour |
 | Author SSG pass sequence (Pass 1-7) in SKILL.md Mode B | Standards author | All 7 passes specified with context loads, charter slices, outputs, and forward payload caps; Pass 2 split logic included; Pass 4 + Pass 5 operate on forward payloads only (no source re-reads) | 4 hours |
+| Author developer-elected single-pass option in SKILL.md Mode B Step 3 | Standards author | `--single-pass` flag detected; guidance text on when to use/avoid present; `generation-strategy: developer-elected-single-pass` set in header; routes directly to Pass 7 skipping SSG passes | 1 hour |
 | Author slow-generation escalation handler in SKILL.md | Standards author | 45-minute threshold logic present; three options documented (continue, split, fallback); `generation-strategy: single-pass-fallback` set on fallback | 1 hour |
 | Author 4 new SSG eval cases (`evals/cases/ssg-*.yaml`) | Standards author | All 4 cases from Deliverable 5B present; assertions cover pass sequence, split behavior, timing threshold, and forward payload discipline | 3 hours |
 | Validate SSG pass sequence against eval cases | Standards author | At least 3 runs per eval case; pass rates recorded in `benchmark.json` `ssg` key | 2 hours |
@@ -729,7 +730,7 @@ evals/
     ssg-pass-sequence-backend.yaml
     ssg-pass-sequence-large.yaml
     ssg-timing-threshold.yaml
-    ssg-forward-payload.yaml
+    ssg-forward-payload          # Manual checklist item (non-automated)
   datasets/
     coursedomain-files/          # Input files used in Pre-pilot Test 1
   benchmark.json                 # Pass rates + token counts per model version

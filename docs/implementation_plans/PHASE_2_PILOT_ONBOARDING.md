@@ -289,11 +289,11 @@ During Mode B runs in the pilot, the following timing data must be recorded for 
 
 Collection method: Read from `<!-- akr-generated -->` metadata header in each PR output. If `pass-timings-seconds: unavailable`, record the wall-clock time manually by noting when the session started and when the PR was opened.
 
-| Module | Pass 1 (s) | Pass 2 (s) | Pass 2A (s) | Pass 2B (s) | Pass 3 (s) | Pass 4 (s) | Pass 5 (s) | Pass 6 (s) | Pass 7 (s) | Total (s) | Fallback? |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| [CourseDomain] | | | N/A | N/A | | | | | | | No |
-| [EnrollmentDomain] | | | | | | | | | | | |
-| [UserDomain] | | | | | | | | | | | |
+| Module | Pass 1 (s) | Pass 2 (s) | Pass 2A (s) | Pass 2B (s) | Pass 3 (s) | Pass 4 (s) | Pass 5 (s) | Pass 6 (s) | Pass 7 (s) | Total (s) | Single-Pass? | Fallback? |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| [CourseDomain] | | | N/A | N/A | | | | | | | No | No |
+| [EnrollmentDomain] | | | | | | | | | | | | |
+| [UserDomain] | | | | | | | | | | | | |
 
 After at least 3 modules are documented:
 - Calculate average total generation time
@@ -488,6 +488,7 @@ Conduct retrospective with quantitative metrics and qualitative feedback; decide
 | Modules requiring Pass 2 split (2A+2B) | <50% of modules | |
 | Average Pass 2 time (seconds) | ≤480 seconds (8 min) | |
 | Timing data availability (% of runs with pass-timings-seconds populated) | ≥80% | |
+| Modules documented via developer-elected single-pass | Informational (no target) - track proportion | |
 
 - **Retrospective question to add:**
   "For modules where generation took >20 minutes, did developers use the coding agent background execution model or wait interactively? What was the impact on developer experience?"
