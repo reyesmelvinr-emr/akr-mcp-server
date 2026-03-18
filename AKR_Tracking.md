@@ -134,8 +134,8 @@ End date: 2026-03-18
 ### Metrics
 | Metric | Target | Current | Status |
 |---|---|---|---|
-| Validator false positives | 0 | TBD | NOT_STARTED |
-| Cross-platform pass | Ubuntu, macOS, Windows | TBD | NOT_STARTED |
+| Validator false positives | 0 | Deferred to Phase 2 pilot baseline capture | DEFERRED |
+| Cross-platform pass | Ubuntu, macOS, Windows | Deferred to Phase 2 pilot cross-platform capture | DEFERRED |
 
 ### Issues and Clarifications
 - 2026-03-18: Phase 1 execution started immediately after Phase 0 gate approval with tracker-only progress logging rule reaffirmed.
@@ -158,7 +158,7 @@ End date: 2026-03-18
   - **Prepare Distribution Matrix**: SUCCESS (all steps)
   - **Distribute to reyesmelvinr-emr/training-tracker-backend**: SUCCESS (cloned target repo, synced SKILL bundle files, created PR #1 with body and reviewer checklist)
   - **Distribution Summary**: SUCCESS (final rollup)
-  - **Target PR Result**: https://github.com/reyesmelvinr-emr/training-tracker-backend/pull/1 (OPEN, title: "chore(akr): distribute skill bundle manual-2")
+  - **Target PR Result**: https://github.com/reyesmelvinr-emr/training-tracker-backend/pull/1 (MERGED, title: "chore(akr): distribute skill bundle manual-2")
   - **Files Distributed**: SKILL.md (+131 lines), SKILL-COMPAT.md (+33 lines), postToolUse.json (+12 lines), agentStop.json (+12 lines). Hook files included for future local session validation activation.
 - 2026-03-18: **INFRASTRUCTURE UNBLOCK SUMMARY**:
   - Blocker 1 (AKR_DISTRIBUTION_PAT): RESOLVED - configured as repository secret
@@ -191,6 +191,10 @@ End date: 2026-03-18
 - 2026-03-18: **Deliverable 6 COMPLETE**: HITL role alignment and `priorityFilter` integration plan documented in `docs/DEVELOPER_REFERENCE.md`.
 - 2026-03-18: **Deliverable 7 COMPLETE**: Governance policy docs added for compliance graduation, emergency rollback, template manifest narrowing, and tag registry entry requirements (`VALIDATION_GUIDE.md`, `TAG_REGISTRY_GUIDE.md`, `CHANGELOG.md`).
 - 2026-03-18: **Deliverable 7A COMPLETE**: Hook automation finalized with explicit changed-file passing, local log ignore rules, and documented manual-validation fallback when hooks are unavailable in a given execution surface.
+- 2026-03-18: GitHub review follow-up closed for distribution status: target repository PR `reyesmelvinr-emr/training-tracker-backend#1` is confirmed **MERGED**.
+- 2026-03-18: Release verification follow-up closed: `v1.1.0` tag confirmed in `core-akr-templates` locally (`git tag -l v1.1.0`) and on remote (`git ls-remote --tags origin v1.1.0`).
+- 2026-03-18: Phase 1 metrics tracking clarification: `Validator false positives` and `Cross-platform pass` are marked DEFERRED and will be closed during Phase 2 pilot measurement runs.
+- 2026-03-18: Low-priority technical debt cleanup completed: replaced deprecated `datetime.utcnow()` usage in `src/tools/validation_library.py` with timezone-aware `datetime.now(timezone.utc)`.
 
 ### Gate Decision
 - Phase 1 Gate: APPROVED
