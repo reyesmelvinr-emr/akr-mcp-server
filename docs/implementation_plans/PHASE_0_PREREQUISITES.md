@@ -762,7 +762,7 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
 ```json
 {
   "last-updated": "YYYY-MM-DD",
-  "schema-version": "1.1",
+  "schema-version": "1.2",
   "models": {
     "claude-sonnet-4-6": {
       "mode-a-standard":       { "pass-rate": null, "avg-tokens": null },
@@ -776,7 +776,23 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
             "pass4": null, "pass5": null, "pass6": null, "pass7": null
           },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null,
+            "with-pass2-split": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "avg-operations-map-completeness": null,
+            "avg-marker-density": null,
+            "avg-business-rules-populated": null,
+            "validation-first-pass-rate": null,
+            "avg-mode-c-resolution-minutes": null,
+            "avg-cqs": null
+          }
         },
         "mode-b-large-module": {
           "avg-total-seconds": null,
@@ -785,7 +801,42 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
             "pass4": null, "pass5": null, "pass6": null, "pass7": null
           },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null,
+            "with-pass2-split": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "avg-operations-map-completeness": null,
+            "avg-marker-density": null,
+            "avg-business-rules-populated": null,
+            "validation-first-pass-rate": null,
+            "avg-mode-c-resolution-minutes": null,
+            "avg-cqs": null
+          }
+        },
+        "mode-b-single-pass": {
+          "avg-total-seconds": null,
+          "section-completeness-vs-ssg": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "avg-operations-map-completeness": null,
+            "avg-marker-density": null,
+            "avg-business-rules-populated": null,
+            "validation-first-pass-rate": null,
+            "avg-mode-c-resolution-minutes": null,
+            "avg-cqs": null
+          },
+          "notes": "Populated when developer-elected-single-pass runs are observed in pilot"
         }
       }
     },
@@ -801,7 +852,23 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
             "pass4": null, "pass5": null, "pass6": null, "pass7": null
           },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null,
+            "with-pass2-split": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "avg-operations-map-completeness": null,
+            "avg-marker-density": null,
+            "avg-business-rules-populated": null,
+            "validation-first-pass-rate": null,
+            "avg-mode-c-resolution-minutes": null,
+            "avg-cqs": null
+          }
         },
         "mode-b-large-module": {
           "avg-total-seconds": null,
@@ -810,7 +877,41 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
             "pass4": null, "pass5": null, "pass6": null, "pass7": null
           },
           "pass2-split-rate": null,
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null,
+            "with-pass2-split": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "avg-operations-map-completeness": null,
+            "avg-marker-density": null,
+            "avg-business-rules-populated": null,
+            "validation-first-pass-rate": null,
+            "avg-mode-c-resolution-minutes": null,
+            "avg-cqs": null
+          }
+        },
+        "mode-b-single-pass": {
+          "avg-total-seconds": null,
+          "section-completeness-vs-ssg": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "avg-operations-map-completeness": null,
+            "avg-marker-density": null,
+            "avg-business-rules-populated": null,
+            "validation-first-pass-rate": null,
+            "avg-mode-c-resolution-minutes": null,
+            "avg-cqs": null
+          }
         }
       }
     },
@@ -820,10 +921,55 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
           "avg-total-seconds": null,
           "pass-timings-available": null,
           "avg-pass-seconds": {},
-          "slow-module-rate": null
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null,
+            "with-pass2-split": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "validation-first-pass-rate": null,
+            "avg-cqs": null,
+            "note": "operations-map-completeness and mode-c-resolution-minutes collected manually during Phase 2.5 review"
+          }
+        },
+        "mode-b-large-module": {
+          "avg-total-seconds": null,
+          "pass-timings-available": null,
+          "avg-pass-seconds": {},
+          "slow-module-rate": null,
+          "developer-single-pass-rate": null,
+          "premium-requests": {
+            "avg-per-module": null,
+            "min-observed": null,
+            "max-observed": null,
+            "with-pass2-split": null
+          },
+          "quality": {
+            "avg-required-sections-present": null,
+            "validation-first-pass-rate": null,
+            "avg-cqs": null
+          }
         }
       }
     }
+  },
+  "ssg-forward-payload-observation": {
+    "passes-beyond-2-loaded-source-files": null,
+    "observed-by": null,
+    "observed-at": null
+  },
+  "quota-planning": {
+    "monthly-quota-per-developer": null,
+    "avg-requests-ssg-per-module": null,
+    "avg-requests-single-pass-per-module": null,
+    "max-modules-per-month-ssg": null,
+    "max-modules-per-month-single-pass": null,
+    "recommended-mix": null,
+    "notes": "Populate after Phase 2 pilot. recommended-mix is the strategy split that maximizes quality within quota."
   }
 }
 ```
@@ -832,7 +978,7 @@ Note on `ssg-forward-payload`: This is the only non-automated eval item. It is r
 
 After running SSG eval cases during pre-pilot Tests 1 and 3, populate the `ssg` key in `benchmark.json` for each model with average timing data from at least 3 runs per eval case.
 
-`benchmark.json` schema version at Phase 0 exit: The schema version is bumped to `1.1` in Phase 0, regardless of whether SSG SKILL.md authoring is completed in Phase 0 or deferred to Phase 1. The schema (with null `ssg` values) is a Phase 0 artifact; the data is populated in Phase 1 and Phase 2.5. This ensures no migration is needed later when SSG data begins accumulating.
+`benchmark.json` schema version at Phase 0 exit: The schema version is bumped to `1.2` in Phase 0 once premium-request, quality, coding-agent, forward-payload observation, and quota-planning scaffolds are added. The expanded schema is still a Phase 0 artifact with `null` placeholders; the data is populated in Phase 1, Phase 2, and Phase 2.5 as runs occur. This avoids later schema churn once cost-quality benchmarking begins accumulating.
 
 ### `mode-b-coursedomain.yaml` Assertions (Sample)
 

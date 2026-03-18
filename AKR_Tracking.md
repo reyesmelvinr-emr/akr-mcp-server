@@ -1,6 +1,6 @@
 # AKR Implementation Tracking
 
-Status date: 2026-03-17
+Status date: 2026-03-18
 Overall status: IN_PROGRESS
 Current phase: Phase 0 - Prerequisites
 
@@ -48,7 +48,7 @@ End date: TBD
 | Agent Skill Authoring | Add frontmatter, version header, and metadata header requirements | Copilot | COMPLETE | SKILL frontmatter + SKILL_VERSION + akr-generated contract present | 2026-03-17 | |
 | Schema Definition | Define modules.yaml schema and project_type taxonomy | Copilot | COMPLETE | Created core-akr-templates/.akr/schemas/modules-schema.json and example modules.trainingtracker.api.yaml | 2026-03-17 | |
 | Pre-Pilot Tests | Run and document Test 1 through Test 7 | Copilot | COMPLETE | Explicit outcomes documented: PASS (Tests 3,5,7), FALLBACK (Tests 1,2,4,6) | 2026-03-18 | All seven tests now have explicit outcomes |
-| Archive and Baseline | Copy tests and validation baseline artifacts for archive readiness | Copilot | IN_PROGRESS | Created core-akr-templates/evals/benchmark.json and evals/cases baseline files | TBD | Test/baseline artifact copy still pending |
+| Archive and Baseline | Copy tests and validation baseline artifacts for archive readiness | Copilot | IN_PROGRESS | Created core-akr-templates/evals/benchmark.json and evals/cases baseline files; benchmark scaffold now includes premium-request, quality, coding-agent, forward-payload observation, and quota-planning placeholders | TBD | Test/baseline artifact copy still pending |
 | Cost and Governance | Confirm premium request baseline and legal/security sign-off | User/Management | IN_PROGRESS | Legal/security sign-off confirmed COMPLETE; premium baseline strategy set to capture per-document premium consumption and quality across single-pass vs multi-pass; metric schema tables confirmed in Phase 2 and Phase 2.5 plans | TBD | Monthly developer premium quota resets on day 1; benchmark to be derived from Phase 2 and 2.5 metrics |
 
 ### Metrics
@@ -94,7 +94,8 @@ End date: TBD
 - 2026-03-18: Legal/security sign-off status updated to COMPLETE; Pre-Pilot Test 5 moved to PASS and pre-pilot checklist now fully resolved.
 - 2026-03-18: Prior 2026-03-17 legal/security blocker entry is now resolved; remaining Cost and Governance work is premium request baseline benchmarking only.
 - 2026-03-18: Premium request baseline clarified: each developer has a monthly premium quota reset on day 1; Phase 2 and 2.5 metrics will track premium consumption per document for single-pass vs multi-pass and pair it with documentation quality outcomes to define benchmark guidance.
-- 2026-03-18: Reviewed implementation plans and confirmed metric schema tables already exist in Phase 2 and Phase 2.5 for strategy, premium requests, timing, and quality (including benchmark.json and quota-planning population guidance). No additional schema authoring needed in Phase 0 tracker.
+- 2026-03-18: Reviewed implementation plans and validated that the earlier benchmark gap report was partially stale: `core-akr-templates/evals/benchmark.json` is no longer at v1.0 and already includes premium-request, quality, coding-agent, and quota-planning scaffolds.
+- 2026-03-18: Residual alignment gaps identified during validation were closed: added `coding-agent.ssg.mode-b-large-module` and `ssg-forward-payload-observation` scaffolds to `benchmark.json`, and updated Phase 0 prerequisites documentation to show the expanded schema-version `1.2` example instead of the earlier minimal `1.1` example.
 
 ### Gate Decision
 - Phase 0 Gate: PENDING
