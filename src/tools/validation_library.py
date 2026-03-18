@@ -36,7 +36,7 @@ import re
 from dataclasses import dataclass, field, asdict
 from enum import Enum
 from typing import Dict, List, Optional, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from difflib import unified_diff
 
 import jsonschema
@@ -282,7 +282,7 @@ class ValidationEngine:
             template_source="submodule",  # TODO: track actual source
             template_commit=None,  # TODO: get from resolver
             template_version=None,  # TODO: get from manifest
-            validated_at_utc=datetime.utcnow().isoformat() + "Z",
+            validated_at_utc=datetime.now(timezone.utc).isoformat(),
         )
 
         return ValidationResult(

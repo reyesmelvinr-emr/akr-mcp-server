@@ -3,7 +3,7 @@ import sys
 import logging
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -835,7 +835,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             
             result["metadata"]["server_version"] = "0.2.0"
             result["metadata"]["extractor"] = "CodeAnalyzer"
-            result["metadata"]["timestamp"] = datetime.utcnow().isoformat()
+            result["metadata"]["timestamp"] = datetime.now(timezone.utc).isoformat()
             
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         except Exception as e:
