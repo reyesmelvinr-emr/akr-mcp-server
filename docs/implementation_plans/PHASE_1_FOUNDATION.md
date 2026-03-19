@@ -33,7 +33,51 @@ Phase 1 is complete when:
 12. ✅ `DEVELOPER_REFERENCE.md` created/updated with HITL alignment, role mapping, and three-mode skill guidance
 13. ✅ `VALIDATION_GUIDE.md` created/updated with compliance mode graduation and emergency rollback procedure
 
-**Exit Gate:** All items above checked; Phase 1 retrospective complete; Phase 2 pilot onboarding authorized.
+**Exit Gate:** All items above checked; external-review reconciliation items closed; Phase 1 retrospective complete; Phase 2 pilot onboarding authorized.
+
+---
+
+## 2026-03-20 External Review Reconciliation (GH 1)
+
+This section records disposition of recommendations from an external implementation audit against `core-akr-templates`.
+
+### Confirmed Action Items (Required)
+
+1. **Validator schema parity update (blocking)**
+  - Add `review` to `MODULE_STATUS_ENUM` in `.akr/scripts/validate_documentation.py`.
+  - Reason: schema already allows `review`; validator currently rejects it.
+
+2. **Version floor enforcement (blocking)**
+  - Implement `project.standards_version >= project.minimum_standards_version` check in validator manifest validation.
+  - Reason: required by Phase 1 governance contract.
+
+3. **Compliance mode graduation enforcement in CI (blocking)**
+  - Update `.akr/workflows/validate-documentation.yml` to derive validator fail behavior from `modules.yaml`:
+    - pilot -> `--fail-on never`
+    - production -> `--fail-on needs`
+  - Reason: hardcoded `--fail-on needs` violates pilot-mode graduation behavior.
+
+4. **SKILL metadata and mode wording cleanups (non-blocking, required before final gate close)**
+  - Replace static metadata example values with dynamic placeholders for `passes-completed`.
+  - Clarify Mode A Step 2 wording to module-scoped approval logic.
+
+5. **SKILL-COMPAT governance appendix (non-blocking, required for Phase 2.6 readiness)**
+  - Add HITL role-mapping summary and Governance Stability Assessment seed table.
+
+### Recommendations Marked Superseded / Already Satisfied
+
+1. `registered-repos.yaml` missing -> superseded (file exists in `core-akr-templates/.github/registered-repos.yaml`).
+2. `--fail-on` argument missing from validator -> superseded (`--fail-on` exists with `errors|warnings|never|needs|all`).
+3. Template adaptation unknown/incomplete -> superseded (module templates and workshop evidence are already present).
+4. Legacy v1.0.0-only release framing -> superseded by current operational v1.1.0 baseline.
+
+### Phase 1 Reopened Criteria (Post-Audit)
+
+- [ ] Validator accepts `status: review` and enforces standards-version floor.
+- [ ] CI workflow applies compliance-mode-aware fail behavior.
+- [ ] SKILL metadata and Mode A wording updates merged.
+- [ ] SKILL-COMPAT governance appendix merged.
+- [ ] Existing committed-artifact tasks from this plan remain tracked to closure.
 
 ---
 

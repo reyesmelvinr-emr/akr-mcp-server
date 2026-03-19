@@ -1,8 +1,8 @@
 # AKR Implementation Tracking
 
-Status date: 2026-03-19
+Status date: 2026-03-20
 Overall status: IN_PROGRESS
-Current phase: Phase 2 - Pilot Onboarding
+Current phase: Phase 1 - Foundation (Reopened)
 
 ## Governance Rules
 - This file is the single source of truth for implementation tracking from Phase 0 through Phase 4.
@@ -24,8 +24,8 @@ Current phase: Phase 2 - Pilot Onboarding
 | Phase | Gate Status | Target Duration | Gate Condition | Sign-off Evidence |
 |---|---|---|---|---|
 | Phase 0 - Prerequisites | COMPLETE | 1-2 weeks | All prereqs complete; tests pass or fallback documented | Gate approved in AKR_Tracking.md on 2026-03-18 |
-| Phase 1 - Foundation | COMPLETE | 3-5 weeks | Foundation deliverables complete; v1.1.0 release tagged | Gate approved in AKR_Tracking.md on 2026-03-18 |
-| Phase 2 - Pilot Onboarding | IN_PROGRESS | 1-2 weeks/project | Pilot success metrics met; retrospective complete | Kickoff initiated in AKR_Tracking.md on 2026-03-18 |
+| Phase 1 - Foundation | IN_PROGRESS | 3-5 weeks | Foundation deliverables complete; reopened remediation items from 2026-03-20 external review closed | Gate reopened in AKR_Tracking.md on 2026-03-20 |
+| Phase 2 - Pilot Onboarding | BLOCKED | 1-2 weeks/project | Pilot success metrics met; retrospective complete | Blocked pending Phase 1 reopened items |
 | Phase 2.5 - Coding Agent Spike | NOT_STARTED | 1 week | Binary PASS/FAIL decision documented; Phase 2.6 handoff data provided | Pending |
 | Phase 2.6 - Governance Stability Assessment | NOT_STARTED | 1 week | Stability verdict documented (SKILL.md Acceptable / Targeted Migration Authorized / Full Migration Recommended); standards lead sign-off | Pending |
 | Phase 3 - Automation Extension (Conditional) | DEFERRED | 2-4 weeks | Authorized by Phase 2.5 FAIL OR Phase 2.6 Targeted/Full Migration verdict | Pending |
@@ -112,9 +112,9 @@ End date: 2026-03-18
 ---
 
 ## Phase 1 - Foundation
-Status: COMPLETE
+Status: IN_PROGRESS
 Start date: 2026-03-18
-End date: 2026-03-18
+End date: TBD (reopened 2026-03-20)
 
 ### Deliverable Tracking
 | Deliverable | Task | Owner | Status | Evidence | Completion Date | Notes |
@@ -138,6 +138,10 @@ End date: 2026-03-18
 | Validator Preview/Draft Checks | Add --preview flag and draft-only front matter cleanliness check (WARNING in preview, ERROR in final) to validate_documentation.py | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed --preview flag and draft/final-cleanliness error rule absent from both validator copies (scripts/validation/validate_documentation.py and templates/core/.akr/scripts/validate_documentation.py) | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
 | Review Sheet Template | Create review sheet template/sample artifact ({project}_review.md format) in core-akr-templates | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed no review sheet template files exist in core-akr-templates/templates or examples | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
 | Draft Output Template | Create committed draft template/sample artifact ({module}_draft.md format) in core-akr-templates | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed no draft template files exist in core-akr-templates/templates or examples | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
+| Validator Schema Parity | Add `review` to MODULE_STATUS_ENUM and enforce `project.standards_version >= project.minimum_standards_version` in validator manifest checks | Copilot | NOT_STARTED | External review GH 1 (2026-03-20) confirmed `review` missing in validator enum and no standards-version comparison logic present | TBD | Blocking gap from external review reconciliation |
+| CI Compliance Graduation Enforcement | Make validate-documentation workflow derive `--fail-on` from modules.yaml compliance_mode (pilot=never, production=needs) instead of hardcoded value | Copilot | NOT_STARTED | External review GH 1 (2026-03-20) confirmed workflow currently hardcodes `--fail-on needs` in AKR validation step | TBD | Blocking gap from external review reconciliation |
+| SKILL Metadata and Mode A Clarifications | Update SKILL metadata examples to use dynamic passes-completed values and clarify Mode A Step 2 to module-scoped approval logic | Copilot | NOT_STARTED | External review GH 1 (2026-03-20) flagged static `passes-completed: 1,2,3,4,5,6,7` example and ambiguous Mode A Step 2 wording | TBD | Non-blocking quality gap; close before final Phase 1 exit gate |
+| SKILL-COMPAT Governance Appendix | Add HITL role mapping and Governance Stability Assessment seed table to SKILL-COMPAT.md | Copilot | NOT_STARTED | External review GH 1 (2026-03-20) identified missing governance assessment record scaffolding | TBD | Non-blocking quality gap; needed for Phase 2.6 readiness |
 
 ### Metrics
 | Metric | Target | Current | Status |
@@ -210,14 +214,25 @@ End date: 2026-03-18
   4. **Review sheet template artifact missing**: No `{project}_review.md` sample/template file exists in `core-akr-templates/templates` or `examples`. Pilot dev has no reference format.
   5. **Draft output template artifact missing**: No `{module}_draft.md` sample/template file exists in `core-akr-templates/templates` or `examples`. Pilot dev has no reference format.
   See deliverable rows above for tracking. Reference plan: PHASE_1_FOUNDATION.md.
+- 2026-03-20: External review reconciliation (GH 1) completed against current core-akr-templates implementation snapshot. Confirmed additional actionable gaps:
+  1. `MODULE_STATUS_ENUM` in validator is missing `review` despite schema allowing it.
+  2. Validator does not currently enforce `standards_version >= minimum_standards_version`.
+  3. Validation workflow currently hardcodes `--fail-on needs` and does not switch behavior by project compliance_mode.
+  4. SKILL metadata example should use dynamic `passes-completed`; Mode A Step 2 wording should be module-scoped.
+  5. SKILL-COMPAT.md requires Governance Stability Assessment seed content for Phase 2.6 readiness.
+- 2026-03-20: External review items marked as already satisfied/superseded (no new task created):
+  1. `registered-repos.yaml` exists in core-akr-templates.
+  2. `--fail-on` argument exists in validator parser (`errors`, `warnings`, `never`, `needs`, `all`).
+  3. Template adaptation deliverable evidence already exists (module templates + workshop example).
+  4. Release cadence moved to v1.1.0 operational baseline; legacy v1.0.0-only framing is superseded in current program state.
 
 ### Gate Decision
-- Phase 1 Gate: APPROVED
+- Phase 1 Gate: REOPENED (2026-03-20)
 
 ---
 
 ## Phase 2 - Pilot Onboarding
-Status: IN_PROGRESS
+Status: BLOCKED
 Start date: 2026-03-18
 End date: TBD
 
@@ -254,6 +269,7 @@ End date: TBD
 - 2026-03-19: New Phase 2 retrospective data collection requirements added to support Phase 2.6: Operations Map completeness rate (GPT-4o), self-reporting block absent rate, friction score, and reassignment churn rate are now required outputs in addition to existing metrics.
 - 2026-03-20: **Pilot execution blocked by Phase 1 missed tasks**: Mode A re-run cannot produce committed review sheet (SKILL.md Steps 7.5/7.6 not yet implemented). Mode B cannot produce committed draft (SKILL.md Steps 5.5/5.6 not yet implemented). docs/modules/.akr/ cannot be created until Mode A re-run succeeds. All Phase 2 metrics dependent on new workflow remain at NOT_STARTED until Phase 1 missed tasks are completed.
 - 2026-03-20: PR #4 confirmed closed by user with superseded comment. Consolidated document updates applied to nine docs confirmed completed by user. Remaining blockers are the five Phase 1 missed tasks listed under Phase 1 Issues and Clarifications.
+- 2026-03-20: Phase 2 status changed from IN_PROGRESS to BLOCKED after external review reconciliation reopened Phase 1 for additional remediation items (validator schema parity, standards-version enforcement, compliance-mode-aware CI fail-on, SKILL clarification updates, SKILL-COMPAT governance appendix).
 
 ### Gate Decision
 - Phase 2 Gate: PENDING
