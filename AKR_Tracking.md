@@ -275,6 +275,12 @@ End date: TBD
 - 2026-03-20: PR #4 confirmed closed by user with superseded comment. Consolidated document updates applied to nine docs confirmed completed by user.
 - 2026-03-20: Historical note: Phase 2 was temporarily moved to BLOCKED during external review reconciliation while Phase 1 remediation items were reopened.
 - 2026-03-20: Phase 2 status restored to IN_PROGRESS after Phase 1 gate approval and closure of reopened remediation items.
+- 2026-03-20: Validation observations logged as **Phase 2 input only** (non-regressions, no Phase 1 reopen impact):
+  1. **OBS-1 (Cosmetic):** `core-akr-templates/.github/skills/akr-docs/SKILL-COMPAT.md` still shows `Last updated: 2026-03-17` after 2026-03-20 edits. Handling: update on next SKILL touch or v1.1.1 tag.
+  2. **OBS-2 (Informational):** Governance Stability Assessment seed table column shape differs from `PHASE_2_6_GOVERNANCE_STABILITY.md` formal spec. Handling: add formal per-assessment summary table as a second section when Phase 2.6 begins.
+  3. **OBS-3 (Cosmetic/Efficiency):** Validation workflow installs `requests` with `pyyaml` though validator does not require `requests`. Handling: remove `requests` from CI install step in upcoming workflow touch.
+  4. **OBS-4 (Minor):** `date -d` usage in Log Usage Metrics is Linux-specific. Handling: defer to D8 cross-platform pass; acceptable while workflow remains on `ubuntu-latest`.
+  5. **OBS-5 (Minor):** macOS CI lane from Phase 0 Test 6 fallback remains unresolved. Handling: deferred to Phase 2 pilot cross-platform capture (already reflected by DEFERRED metric).
 
 ### Gate Decision
 - Phase 2 Gate: PENDING
@@ -432,3 +438,4 @@ End date: TBD
 - 2026-03-19: Decision to not proceed with PR #4 human semantic review using old diff-based approach. Mode A workflow updated to committed review sheet model. Mode A deliverable reset to IN_PROGRESS pending re-run with new workflow.
 - 2026-03-19: Governance updates applied to tracker: (1) Phase 2.6 Governance Stability Assessment added as mandatory new phase; (2) Governance Rules updated with Phase 2.6 execution order; (3) Phase Gate Dashboard updated; (4) Phase 2.5 gate decision updated; (5) Phase 2 metrics expanded to capture Phase 2.6 baseline data; (6) Phase 2.5 acceptance matrix updated to 12 criteria.
 - 2026-03-20: Gap audit of Phases 0, 1, and 2 completed. Two user-confirmed completions: PR #4 closed as superseded; consolidated document updates applied to nine docs. Five missed Phase 1 implementation tasks identified and added as deliverable rows under Phase 1 and tracking notes under Phase 2: (1) SKILL.md committed workflow steps, (2) schema optional fields, (3) validator preview/draft checks, (4) review sheet template, (5) draft output template. Phase 2 execution remains blocked until these are resolved. Reference plan file for all five items: PHASE_1_FOUNDATION.md.
+- 2026-03-20: Added OBS-1 through OBS-5 as Phase 2 input observations (non-regressions) under Phase 2 Issues and Clarifications; no Phase 1 reopen triggered.
