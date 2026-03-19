@@ -1,6 +1,6 @@
 # AKR Implementation Tracking
 
-Status date: 2026-03-19
+Status date: 2026-03-18
 Overall status: IN_PROGRESS
 Current phase: Phase 2 - Pilot Onboarding
 
@@ -8,10 +8,8 @@ Current phase: Phase 2 - Pilot Onboarding
 - This file is the single source of truth for implementation tracking from Phase 0 through Phase 4.
 - Do not create separate summary files during implementation.
 - Any issues or clarifications after each phase must be recorded in this file under that phase's Issues and Clarifications section.
-- Phase execution order is strict: 0 -> 1 -> 2 -> 2.5 -> 2.6 -> (3 if required) -> 4.
+- Phase execution order is strict: 0 -> 1 -> 2 -> 2.5 -> (3 if required) -> 4.
 - Phase 2.5 is a binary gate. PASS skips Phase 3. FAIL authorizes Phase 3 only for documented failures.
-- Phase 2.6 (Governance Stability Assessment) is mandatory regardless of Phase 2.5 verdict. It runs for one week after Phase 2.5 completes and determines whether any SKILL.md governance steps require migration to code-defined deterministic implementations.
-- Phase 4 proceeds unless Phase 2.6 returns "Full Migration Recommended". Targeted migrations run in parallel with Phase 4.
 
 ## Status Legend
 - NOT_STARTED
@@ -26,10 +24,9 @@ Current phase: Phase 2 - Pilot Onboarding
 | Phase 0 - Prerequisites | COMPLETE | 1-2 weeks | All prereqs complete; tests pass or fallback documented | Gate approved in AKR_Tracking.md on 2026-03-18 |
 | Phase 1 - Foundation | COMPLETE | 3-5 weeks | Foundation deliverables complete; v1.1.0 release tagged | Gate approved in AKR_Tracking.md on 2026-03-18 |
 | Phase 2 - Pilot Onboarding | IN_PROGRESS | 1-2 weeks/project | Pilot success metrics met; retrospective complete | Kickoff initiated in AKR_Tracking.md on 2026-03-18 |
-| Phase 2.5 - Coding Agent Spike | NOT_STARTED | 1 week | Binary PASS/FAIL decision documented; Phase 2.6 handoff data provided | Pending |
-| Phase 2.6 - Governance Stability Assessment | NOT_STARTED | 1 week | Stability verdict documented (SKILL.md Acceptable / Targeted Migration Authorized / Full Migration Recommended); standards lead sign-off | Pending |
-| Phase 3 - Automation Extension (Conditional) | DEFERRED | 2-4 weeks | Authorized by Phase 2.5 FAIL OR Phase 2.6 Targeted/Full Migration verdict | Pending |
-| Phase 4 - Feature Consolidation | NOT_STARTED | 3-4 weeks | Stability prerequisites met; Phase 2.6 verdict is not Full Migration Recommended | Pending |
+| Phase 2.5 - Coding Agent Spike | NOT_STARTED | 1 week | Binary PASS/FAIL decision documented | Pending |
+| Phase 3 - Automation Extension (Conditional) | DEFERRED | 2-4 weeks | Only if Phase 2.5 fails with documented technical gaps | Pending |
+| Phase 4 - Feature Consolidation | NOT_STARTED | 3-4 weeks | Stability prerequisites met and consolidation criteria passed | Pending |
 
 ---
 
@@ -133,11 +130,6 @@ End date: 2026-03-18
 | Agent Session Hooks (7A) | Finalize hook behavior and fallback guidance | Copilot | COMPLETE | Updated `core-akr-templates/.github/hooks/agentStop.json` to pass explicit `--changed-files` list; updated `.gitignore` to exclude `.akr/logs` artifacts; updated `core-akr-templates/.github/skills/akr-docs/SKILL-COMPAT.md` with hook-unavailable fallback command | 2026-03-18 | Distributed hook artifacts remain aligned with skill bundle workflow |
 | Skill Distribution | Deploy and verify distribute-skill workflow to registered repos | Copilot | COMPLETE | PR #1 merged to default branch (`43274e8`); executed workflow_dispatch run `23233549396` (failed at missing secret); configured `AKR_DISTRIBUTION_PAT` secret; re-executed workflow_dispatch run `23234217989` (SUCCESS) with all jobs succeeding; target PR created in `reyesmelvinr-emr/training-tracker-backend/pull/1` with all 4 SKILL files synced (SKILL.md, SKILL-COMPAT.md, postToolUse.json, agentStop.json); PR body includes reviewer checklist and hook merge guidance | 2026-03-18 | All infrastructure blockers resolved; Deliverable 2A complete with end-to-end verification of skill distribution workflow |
 | Release | Tag core-akr-templates v1.1.0 and preserve historical v1.0.0 | Copilot | COMPLETE | Created and pushed annotated tag `v1.1.0` to commit `43274e8`; verified existing `v1.0.0` remains on bootstrap commit `3837e6f5c`; implementation progress tracking remains in `AKR_Tracking.md` | 2026-03-18 | No separate release-notes file used |
-| SKILL.md Committed Workflow Update | Update SKILL.md Mode A steps to include committed review sheet flow (Steps 7.5/7.6) and Mode B steps to include committed draft flow (Steps 5.5/5.6) | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed steps absent from core-akr-templates/.github/skills/akr-docs/SKILL.md; Mode B still lists old write-then-PR sequence at steps 7/8 | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
-| Schema Optional Fields | Add optional fields review_sheet, draft_output, last_reviewed_at, review_mode to modules-schema.json module items | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed fields absent; schema uses additionalProperties:false so new fields must be registered before any pilot modules.yaml uses them | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
-| Validator Preview/Draft Checks | Add --preview flag and draft-only front matter cleanliness check (WARNING in preview, ERROR in final) to validate_documentation.py | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed --preview flag and draft/final-cleanliness error rule absent from both validator copies (scripts/validation/validate_documentation.py and templates/core/.akr/scripts/validate_documentation.py) | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
-| Review Sheet Template | Create review sheet template/sample artifact ({project}_review.md format) in core-akr-templates | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed no review sheet template files exist in core-akr-templates/templates or examples | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
-| Draft Output Template | Create committed draft template/sample artifact ({module}_draft.md format) in core-akr-templates | Copilot | NOT_STARTED | Pending - audit 2026-03-20 confirmed no draft template files exist in core-akr-templates/templates or examples | TBD | Missed task identified in 2026-03-20 gap audit; reference PHASE_1_FOUNDATION.md |
 
 ### Metrics
 | Metric | Target | Current | Status |
@@ -203,13 +195,6 @@ End date: 2026-03-18
 - 2026-03-18: Release verification follow-up closed: `v1.1.0` tag confirmed in `core-akr-templates` locally (`git tag -l v1.1.0`) and on remote (`git ls-remote --tags origin v1.1.0`).
 - 2026-03-18: Phase 1 metrics tracking clarification: `Validator false positives` and `Cross-platform pass` are marked DEFERRED and will be closed during Phase 2 pilot measurement runs.
 - 2026-03-18: Low-priority technical debt cleanup completed: replaced deprecated `datetime.utcnow()` usage in `src/tools/validation_library.py` with timezone-aware `datetime.now(timezone.utc)`.
-- 2026-03-20: **Gap audit identified five missed Phase 1 implementation tasks** (not present in foundation deliverables despite being specified in consolidated plan updates applied 2026-03-19):
-  1. **SKILL.md committed workflow steps missing**: Mode A Steps 7.5/7.6 (write committed review sheet, stop for review) and Mode B Steps 5.5/5.6 (write committed draft, surface for preview, resume on approval) not present in SKILL.md. Old sequence still shows write-to-doc_output then open PR at steps 7/8.
-  2. **Schema optional fields missing**: `review_sheet`, `draft_output`, `last_reviewed_at`, `review_mode` not added to `modules-schema.json` module items. Schema has `additionalProperties:false` so pilot modules.yaml will fail schema validation if these fields are used before schema is updated.
-  3. **Validator --preview flag and cleanliness rules absent**: Both validator copies lack `--preview` argument and the draft-field-in-final-doc ERROR rule. This means final docs won't be caught containing preview/draft-only front matter.
-  4. **Review sheet template artifact missing**: No `{project}_review.md` sample/template file exists in `core-akr-templates/templates` or `examples`. Pilot dev has no reference format.
-  5. **Draft output template artifact missing**: No `{module}_draft.md` sample/template file exists in `core-akr-templates/templates` or `examples`. Pilot dev has no reference format.
-  See deliverable rows above for tracking. Reference plan: PHASE_1_FOUNDATION.md.
 
 ### Gate Decision
 - Phase 1 Gate: APPROVED
@@ -224,36 +209,36 @@ End date: TBD
 ### Deliverable Tracking
 | Deliverable | Task | Owner | Status | Evidence | Completion Date | Notes |
 |---|---|---|---|---|---|---|
-| Onboarding | Complete 10-step onboarding checklist for pilot repo | Unassigned | NOT_STARTED | Pending | TBD | Remaining checklist gaps: (1) hook session log creation (.akr/logs/session-*.jsonl) not yet validated via Mode B run; (2) docs/modules/.akr/ directory not yet created in pilot repo - created on first Mode A committed review sheet run |
-| Pilot Artifact Verification | Verify committed review sheet and committed draft are generated and committed to docs/modules/.akr/ on first Mode A + Mode B pilot run | Pilot dev | NOT_STARTED | Blocked by SKILL.md committed workflow update (Phase 1 missed task) | TBD | Cannot run new Mode A committed workflow until SKILL.md Steps 7.5/7.6 are implemented; reference PHASE_2_PILOT_ONBOARDING.md |
-| CODEOWNERS Verification | Confirm CODEOWNERS entry is in place for docs/modules/.akr/ in pilot repo | Pilot dev | NOT_STARTED | Pending | TBD | Audit 2026-03-20 found no docs/modules/.akr/ directory exists in workspace; cannot be created until Mode A rerun; reference PHASE_0_PREREQUISITES.md |
-| Mode A | Propose module groupings using committed review sheet workflow and complete validation | Pilot dev + Tech lead | IN_PROGRESS | PR #4 opened with CI passing (run 23240713978); old PR-diff review approach superseded by committed review sheet workflow (2026-03-19). Re-run Mode A to generate docs/modules/.akr/{project}_review.md; close PR #4 after review sheet approach is confirmed. | TBD | New workflow: agent generates committed review sheet; developer reviews in VS Code; agent patches modules.yaml and opens final PR only after approval |
-| Mode B | Generate and review docs for 3 pilot modules | Unassigned | NOT_STARTED | Pending | TBD | |
-| CI Validation | Validate documented PRs with zero errors | Unassigned | NOT_STARTED | Pending | TBD | |
-| Pilot Metrics | Capture time-to-first-documented-PR and CI pass rates | Unassigned | NOT_STARTED | Pending | TBD | |
-| Independent Usage | Document 2 additional modules without assisted pairing | Unassigned | NOT_STARTED | Pending | TBD | |
-| Retrospective | Complete retrospective and update checklist from lessons learned | Unassigned | NOT_STARTED | Pending | TBD | |
+| Onboarding | Complete 10-step onboarding checklist for pilot repo | Pilot dev | IN_PROGRESS | Bootstrap implementation merged in training-tracker-backend PR #2 (https://github.com/reyesmelvinr-emr/training-tracker-backend/pull/2) with merge commit eba469173bfa11958ffa29faf77793e9f382927c. Added and verified on `main`: `.gitmodules` + `.akr/templates` submodule pinned to core-akr-templates commit 3837e6f5c2990843a3d8a9f16eed500cf6252641 (v1.0.0), `.github/workflows/validate-documentation.yml`, `modules.yaml`, `.vale.ini`, `validation/vale-rules/**`, `.github/CODEOWNERS`, and previously distributed skill/hooks. Hosted MCP fallback path closed by merge of PR #3 (https://github.com/reyesmelvinr-emr/training-tracker-backend/pull/3) adding `.github/copilot-instructions.md` on `main`. | TBD | Remaining checklist gap: hook session log creation (`.akr/logs/session-*.jsonl`) not yet validated via Mode B run |
+| Mode A | Propose module groupings and complete validation review | Pilot dev + Tech lead | IN_PROGRESS | Opened grouping proposal PR #4 (https://github.com/reyesmelvinr-emr/training-tracker-backend/pull/4) with populated module boundaries for Course/Enrollment/User/Admin domains plus unassigned rationale. CI workflow run `23240713978` completed SUCCESS on first pass. | TBD | Target <= 15 min; pending pilot dev + tech lead semantic validation and reassignment count capture |
+| Mode B | Generate and review docs for 3 pilot modules | Pilot dev + Tech lead | NOT_STARTED | Pending | TBD | |
+| CI Validation | Validate documented PRs with zero errors | Pilot dev + Standards author | IN_PROGRESS | Validation workflow executed on onboarding PR branch. Run `23240155027` failed (validator script remote fallback 404), fixed in PR commits `8f31ea5` and `d5a6450`; rerun `23240397954` succeeded. | TBD | CI smoke path verified; next step is zero-error validation on first real module documentation PR |
+| Pilot Metrics | Capture time-to-first-documented-PR and CI pass rates | Standards author | IN_PROGRESS | Metric capture fields confirmed in AKR_Tracking.md for grouping time, first documented PR time, first-run pass rate, and unresolved marker rate | TBD | Capture starts with first Mode A and Mode B runs |
+| Independent Usage | Document 2 additional modules without assisted pairing | Pilot dev | NOT_STARTED | Pending | TBD | |
+| Retrospective | Complete retrospective and update checklist from lessons learned | Standards lead + pilot team | NOT_STARTED | Pending | TBD | |
 
 ### Metrics
 | Metric | Target | Current | Status |
 |---|---|---|---|
-| Grouping validation time | <= 15 min | Measurement approach changed: timer now starts when committed review sheet is displayed in VS Code, ends when developer replies 'approved' to agent. PR #4 timer not captured (old workflow). Next Mode A run will capture first measurement. | RESET - awaiting new Mode A run |
-| Mode A update-run time (new file added) | <= 5 min | TBD - requires first incremental Mode A run | NOT_STARTED |
-| Mode B update-run time (one file changed) | <= 10 min | TBD - requires first incremental Mode B run | NOT_STARTED |
+| Grouping validation time | <= 15 min | Timer starts at pilot review kickoff for PR #4; completion timestamp pending | IN_PROGRESS |
 | Time-to-first-documented-PR | <= 45 min | TBD | NOT_STARTED |
 | First-run CI validation pass rate | >= 95% | TBD | NOT_STARTED |
 | Unresolved question marker rate | < 5% | TBD | NOT_STARTED |
-| Operations Map completeness on GPT-4o | >= 90% of methods (public + private + async) | TBD - captured during Mode B runs | NOT_STARTED |
-| Self-reporting block absent rate | < 5% of Mode B runs | TBD - captured during Mode B runs | NOT_STARTED |
-| Preview friction score | >= 80% reviews completed in VS Code without opening GitHub | TBD - collected via retrospective form | NOT_STARTED |
-| Reassignment churn rate | 0 PR comments requesting reassignment | TBD | NOT_STARTED |
 
 ### Issues and Clarifications
-- 2026-03-19: Decision made not to proceed with human semantic review on PR #4 using the old PR-diff approach. Mode A workflow superseded by committed review sheet model: agent generates docs/modules/.akr/{project}_review.md, developer reviews in VS Code, agent patches modules.yaml and opens PR only after approval. PR #4 to be closed after new Mode A run produces committed review sheet.
-- 2026-03-19: Workflow improvement and governance stability updates incorporated into project plans (consolidated document updates file). Key structural changes: committed review sheet (Mode A), committed draft (Mode B), incremental update workflow, Phase 2.6 Governance Stability Assessment added as mandatory post-Phase 2.5 gate.
-- 2026-03-19: New Phase 2 retrospective data collection requirements added to support Phase 2.6: Operations Map completeness rate (GPT-4o), self-reporting block absent rate, friction score, and reassignment churn rate are now required outputs in addition to existing metrics.
-- 2026-03-20: **Pilot execution blocked by Phase 1 missed tasks**: Mode A re-run cannot produce committed review sheet (SKILL.md Steps 7.5/7.6 not yet implemented). Mode B cannot produce committed draft (SKILL.md Steps 5.5/5.6 not yet implemented). docs/modules/.akr/ cannot be created until Mode A re-run succeeds. All Phase 2 metrics dependent on new workflow remain at NOT_STARTED until Phase 1 missed tasks are completed.
-- 2026-03-20: PR #4 confirmed closed by user with superseded comment. Consolidated document updates applied to nine docs confirmed completed by user. Remaining blockers are the five Phase 1 missed tasks listed under Phase 1 Issues and Clarifications.
+- 2026-03-18: Phase 2 implementation started. Tracker updated to IN_PROGRESS and Phase 2 designated as current execution phase.
+- 2026-03-18: Governance reaffirmed for Phase 2 execution: AKR_Tracking.md is the only progress ledger. Do not create separate phase summaries, release notes, or ad-hoc tracking files.
+- 2026-03-18: Pilot target confirmed as training-tracker-backend (TrainingTracker.Api subfolder/project). Owner model remains role-based placeholders until kickoff staffing is finalized.
+- 2026-03-18: Immediate execution order for Deliverable 1 onboarding checklist locked: submodule/tag pin -> instruction source path -> SKILL copy/version check -> workflow deployment -> modules.yaml seed -> Vale setup -> CI smoke -> CODEOWNERS -> repo registration/distribution test -> hooks presence/session log check.
+- 2026-03-18: Onboarding preflight verification completed against template source: `core-akr-templates/.github/registered-repos.yaml` contains `reyesmelvinr-emr/training-tracker-backend` with `enabled: true`; `core-akr-templates/.github/workflows/distribute-skill.yml` exists for distribution execution; `core-akr-templates/.github/skills/akr-docs/SKILL.md` includes `<!-- SKILL_VERSION: v1.0.0 -->` and managed-distribution marker.
+- 2026-03-18: Live onboarding artifact audit executed against pilot repo (`reyesmelvinr-emr/training-tracker-backend`) via GitHub API. Present: `.github/skills/akr-docs/SKILL.md`, `.github/hooks/postToolUse.json`, `.github/hooks/agentStop.json`. Missing and queued as next implementation actions: `.gitmodules`, `.github/workflows/validate-documentation.yml`, `modules.yaml`, `.vale.ini`, `.github/CODEOWNERS`.
+- 2026-03-18: Implemented onboarding bootstrap in pilot repo via branch `chore/phase2-onboarding-bootstrap`; opened PR #2 and merged to `main`. Added submodule + validation workflow + modules manifest + Vale config/rules + CODEOWNERS in a single onboarding commit set.
+- 2026-03-18: CI smoke-test findings from PR #2: initial failure in `Run AKR validation` due 404 fallback fetch from private raw URL. Workflow patched to prefer local/submodule/cloned-template validator paths before remote fallback. Final run `23240397954` completed SUCCESS.
+- 2026-03-18: Post-merge artifact audit on `main` confirms onboarding files now present: `.gitmodules`, `.github/workflows/validate-documentation.yml`, `modules.yaml`, `.vale.ini`, `.github/CODEOWNERS`, `validation/vale-rules/README.md`, `.github/skills/akr-docs/SKILL.md`, `.github/hooks/postToolUse.json`, `.github/hooks/agentStop.json`.
+- 2026-03-18: Hosted MCP fallback coverage completed: merged `training-tracker-backend` PR #3 added `.github/copilot-instructions.md` to `main` for repositories where hosted MCP context source is unavailable.
+- 2026-03-18: Remaining onboarding evidence gap is singular: no committed `.akr/logs/session-*.jsonl` yet from a Mode B session.
+- 2026-03-18: Mode A execution started in pilot repo. Proposed module grouping manifest committed on branch `chore/phase2-mode-a-grouping-draft` and opened as PR #4; first CI run `23240713978` passed.
+- 2026-03-18: Mode A completion remains gated on human semantic review (pilot dev + tech lead), reassignment count capture, and measured review duration against <=15 min target.
 
 ### Gate Decision
 - Phase 2 Gate: PENDING
@@ -272,8 +257,7 @@ End date: TBD
 | Test Case 1 | Execute baseline module case and evaluate criteria | Unassigned | NOT_STARTED | Pending | TBD | |
 | Test Case 2 | Execute UI module case and evaluate criteria | Unassigned | NOT_STARTED | Pending | TBD | |
 | Test Case 3 | Execute large module case and evaluate criteria | Unassigned | NOT_STARTED | Pending | TBD | |
-| Acceptance Matrix | Evaluate criteria 1-12 across all cases | Unassigned | NOT_STARTED | Pending | TBD | Criterion 12 added: committed draft present in PR Files Changed; final doc free of draft-only front matter fields |
-| Phase 2.6 Handoff | Provide five required data items to standards lead for governance stability assessment | Standards author | NOT_STARTED | Pending | TBD | Required before Phase 2.6 can begin; see PHASE_2_5_CODING_AGENT_SPIKE.md Update 6D |
+| Acceptance Matrix | Evaluate criteria 1-11 across all cases | Unassigned | NOT_STARTED | Pending | TBD | |
 | Cost Measurement | Capture premium request consumption and estimate cost profile | Unassigned | NOT_STARTED | Pending | TBD | |
 | Recommendation | Record PASS/FAIL and go/no-go recommendation | Unassigned | NOT_STARTED | Pending | TBD | Blocking decision |
 
@@ -291,7 +275,6 @@ End date: TBD
 | 9 - Metadata header present | TBD | TBD | TBD | NOT_STARTED |
 | 10 - Hook log handling | TBD | TBD | TBD | NOT_STARTED |
 | 11 - SSG background completion | TBD | TBD | TBD | NOT_STARTED |
-| 12 - Committed draft/review sheet handling | TBD | TBD | TBD | NOT_STARTED |
 
 ### Issues and Clarifications
 - No entries yet.
@@ -299,46 +282,8 @@ End date: TBD
 ### Gate Decision
 - Phase 2.5 Gate: PENDING
 - Conditional branch:
-  - PASS: Skip Phase 3. Proceed to Phase 2.6 (mandatory) then Phase 4.
-  - FAIL: Authorize Phase 3 only for documented technical failures. Proceed to Phase 2.6 (mandatory) in parallel.
-- Note: Phase 2.6 runs regardless of PASS or FAIL verdict.
-
----
-
-## Phase 2.6 - Governance Stability Assessment
-Status: NOT_STARTED
-Start date: TBD (begins after Phase 2.5 completes)
-End date: TBD
-
-### Purpose
-Determines whether SKILL.md governance fidelity is acceptable for production use, or whether specific deterministic steps (Operations Map extraction, draft writing, validation) should migrate to code-defined `@skill.script` implementations. Independent of Phase 2.5 verdict.
-
-### Deliverable Tracking
-| Deliverable | Task | Owner | Status | Evidence | Completion Date | Notes |
-|---|---|---|---|---|---|---|
-| Data Collection | Receive five Phase 2.5 handoff data items; run Operations Map completeness measurement | Standards author | NOT_STARTED | Pending | TBD | Script: evals/scripts/check_ops_map_completeness.py |
-| Assessment | Evaluate four governance stability criteria; produce verdict | Standards lead | NOT_STARTED | Pending | TBD | |
-| SKILL-COMPAT.md Update | Record verdict in Governance Stability Assessment Record; distribute via distribute-skill.yml | Standards author | NOT_STARTED | Pending | TBD | |
-
-### Assessment Criteria
-| Criterion | Target (Acceptable) | Requires Targeted Migration |
-|---|---|---|
-| First-run CI pass rate | >= 95% | < 90% |
-| Operations Map completeness on GPT-4o | >= 90% of methods (public + private + async) | Private/async methods consistently missing |
-| Self-reporting block absent rate | < 5% of Mode B runs | >= 10% of runs |
-| Post-model-update regression potential | Baseline gap <= 10 points | Gap > 10 points AND growing |
-
-### Verdict Options
-- `SKILL.md Governance Acceptable`: All criteria met - no migration authorized
-- `Targeted Migration Authorized`: One or more criteria failed - specific steps migrate to `@skill.script`; runs in parallel with Phase 4
-- `Full Migration Recommended`: Three or more criteria failed - Phase 4 blocked until scope documented and management signs off
-
-### Issues and Clarifications
-- No entries yet.
-
-### Gate Decision
-- Phase 2.6 Gate: PENDING
-- Phase 4 proceeds unless verdict is "Full Migration Recommended". Targeted migrations do not block Phase 4.
+  - PASS: Skip Phase 3 and proceed to Phase 4 prerequisites.
+  - FAIL: Authorize Phase 3 only for documented technical failures.
 
 ---
 
@@ -405,9 +350,10 @@ End date: TBD
 - 2026-03-17: Initialized AKR_Tracking.md with phase gates, deliverable trackers, metrics, and mandatory issues/clarifications sections.
 - 2026-03-17: Completed Phase 0 charter compression deliverable and token validation evidence entries.
 - 2026-03-17: Completed Phase 0 Agent Skill authoring baseline artifacts (SKILL.md and SKILL-COMPAT.md).
+- 2026-03-18: Started Phase 2 implementation in tracker-only mode; moved Phase 2 gate/status to IN_PROGRESS, initialized onboarding and pilot-metrics workstreams, and logged kickoff decisions for pilot target and governance.
+- 2026-03-18: Implemented and merged pilot onboarding bootstrap PR (`training-tracker-backend` #2), added missing checklist artifacts (`.gitmodules` + pinned submodule, validation workflow, modules.yaml, Vale config/rules, CODEOWNERS), and logged CI smoke-test failure/fix/success evidence in Phase 2 issues.
+- 2026-03-18: Merged follow-up onboarding PR (`training-tracker-backend` #3) to add `.github/copilot-instructions.md` fallback, closing hosted MCP fallback gap for pilot onboarding.
+- 2026-03-18: Started Phase 2 Mode A execution by opening grouping proposal PR (`training-tracker-backend` #4) with first-pass CI success (`23240713978`); pending human semantic review timing and approval.
 - 2026-03-17: Completed Phase 0 schema definition deliverable and started archive/baseline artifact setup.
 - 2026-03-17: Ran pre-pilot baseline tests and logged warning for follow-up.
 - 2026-03-17: Verified generated artifact integrity for compressed instructions, skill package, schema, and benchmark baseline.
-- 2026-03-19: Decision to not proceed with PR #4 human semantic review using old diff-based approach. Mode A workflow updated to committed review sheet model. Mode A deliverable reset to IN_PROGRESS pending re-run with new workflow.
-- 2026-03-19: Governance updates applied to tracker: (1) Phase 2.6 Governance Stability Assessment added as mandatory new phase; (2) Governance Rules updated with Phase 2.6 execution order; (3) Phase Gate Dashboard updated; (4) Phase 2.5 gate decision updated; (5) Phase 2 metrics expanded to capture Phase 2.6 baseline data; (6) Phase 2.5 acceptance matrix updated to 12 criteria.
-- 2026-03-20: Gap audit of Phases 0, 1, and 2 completed. Two user-confirmed completions: PR #4 closed as superseded; consolidated document updates applied to nine docs. Five missed Phase 1 implementation tasks identified and added as deliverable rows under Phase 1 and tracking notes under Phase 2: (1) SKILL.md committed workflow steps, (2) schema optional fields, (3) validator preview/draft checks, (4) review sheet template, (5) draft output template. Phase 2 execution remains blocked until these are resolved. Reference plan file for all five items: PHASE_1_FOUNDATION.md.

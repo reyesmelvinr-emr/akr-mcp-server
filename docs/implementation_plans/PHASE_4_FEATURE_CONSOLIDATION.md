@@ -39,6 +39,16 @@ At least 6 weeks will have elapsed since the Phase 1 `benchmark.json` baseline w
 | Communicate regressions before Phase 4 documentation runs begin | Standards lead | If pass rate dropped >10%, team briefed; `SKILL.md` updated and re-distributed before Phase 4 runs | External |
 | Review Agent Framework SDK release notes for dynamic resource capabilities | Standards author | Check if `@skill.resource` dynamic resources can replace static `benchmark.json` and `standards_version` reads; document finding in `SKILL-COMPAT.md` | 30 min |
 
+**Connection to Phase 2.6 Governance Stability Assessment:**
+
+The Phase 4 Skill Re-Evaluation is the production instance of the same governance stability question Phase 2.6 first answered. If Phase 2.6 produced a "Targeted Migration Authorized" verdict for any governance step, Phase 4 must confirm the migrated code-defined skill is performing correctly before Phase 4 documentation runs begin.
+
+Add to the Phase 4 Re-Evaluation Tasks table:
+
+| If Phase 2.6 authorized targeted migration of any governance step | Verify migrated `@skill.script` implementation against Phase 4 eval cases; confirm output is equivalent to or better than SKILL.md baseline; document result in benchmark.json `code-defined-skill` key | Standards author | 2 hours |
+
+Phase 4 proceeds regardless of Phase 2.6 verdict unless verdict is "Full Migration Recommended". Targeted migrations run in parallel with Phase 4 and do not block it.
+
 > **Dynamic Resources (future enhancement path):** The Agent Framework SDK supports `@skill.resource`
 > decorated functions that execute at read time, returning live data from repos, APIs, or config
 > files rather than static snapshots. If charter staleness or stale `benchmark.json` thresholds
@@ -353,6 +363,28 @@ Build deterministic Python aggregator that matches module docs by `businessCapab
 **Scope lock (v1.0):** `consolidate.py` generates `feature-consolidated.md` only. The
 `feature-testing-consolidated.md` variant is deferred to a follow-up enhancement after Phase 4
 stabilization.
+
+**Consolidation draft as committed artifact:** Before `consolidate.py` writes `docs/features/{FeatureName}_doc.md`, it writes a consolidation draft to `docs/features/.akr/{FeatureName}_draft.md`. The PO reviews and annotates this draft before the final consolidated doc is committed. The draft is permanent - it is the starting context for future `consolidate.py` incremental runs when only one module's documentation changes.
+
+As with Mode B module drafts, the finalization step must strip consolidation-draft-only front matter fields before writing the final `docs/features/{FeatureName}_doc.md`.
+
+Consolidation draft front matter:
+---
+feature: FN00001_US001
+modules-included: [CourseDomain, EnrollmentDomain, UserDomain]
+consolidation-generated-at: "2026-03-19T10:00:00Z"
+review-mode: full | incremental
+last-reviewed-at: "2026-03-19T10:00:00Z"
+---
+
+Consolidation preview block (displayed before PO confirms):
+── Consolidation Draft: {FeatureName} ────────────────────────────
+Modules included:     CourseDomain ✅ | EnrollmentDomain ✅ | UserDomain ✅
+Feature tag matched:  FN00001_US001 ✅ | FN00001_US002 ✅ | FN00001_US003 ✅
+Sections assembled:   Overview ✅ | Operations ✅ | Architecture ✅
+Gaps detected:        Business Rules — UserDomain has unresolved ❓ in source
+Draft path:           docs/features/.akr/{FeatureName}_draft.md
+──────────────────────────────────────────────────────────────────
 
 ### Design Principles
 

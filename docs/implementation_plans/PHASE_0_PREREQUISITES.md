@@ -166,6 +166,9 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal), M
 |---|---|---|---|
 | Author `SKILL.md` with Mode A workflow | Standards author | Full specification from Part 5 of analysis document implemented | 2 hours |
 | Author `SKILL.md` with Mode B workflow | Standards author | Loads condensed charter based on `project_type`; references `modules.yaml` | 2 hours |
+| Author Mode A Semantic Review Sheet template | Standards author | `docs/modules/.akr/` directory structure documented in core-akr-templates; review sheet template covers: YAML front matter with last-reviewed-at, per-module file-role table, unassigned rationale table, reviewer checkboxes, reassignment summary, pre-filled AKR_Tracking.md update blocks; incremental update trigger condition documented in SKILL.md Step 7.6 | 1.5 hours |
+| Author Mode B Draft format and validation summary block | Standards author | Draft front matter fields defined (preview-generated-at, review-mode, passes-completed, generation-strategy); full and incremental validation summary block syntax defined; SKILL.md Steps 5.5 and 5.6 authored; tested against CourseDomain sample | 1.5 hours |
+| Author Mode B Incremental Update workflow in SKILL.md | Standards author | Incremental branch of Step 5.5 authored; trigger condition (draft_output path exists) clearly specified; charter section targeting logic per changed file type defined; draft-only front matter stripping sub-step (Step 6a) present in Mode B finalization | 1 hour |
 | Author `SKILL.md` with Mode C workflow | Standards author | Enumerates unresolved `❓` markers; guides interactive in-editor resolution; re-runs validator after each batch | 2 hours |
 | Add prerequisite check in Mode B | Standards author | Mode B stops if `modules.yaml` status is `draft` | 30 min |
 | Document skill invocation patterns | Standards author | "propose module groupings" → Mode A; "generate documentation for X" → Mode B; "walk me through ❓ sections" → Mode C | 1 hour |
@@ -357,6 +360,28 @@ core-akr-templates/
 ```
 
 > **Path note:** `modules-schema.json` is defined here in Phase 0 as a schema specification but physically created in Phase 1 Deliverable 5 alongside the other existing schemas (`akr-config-schema.json`, `tag-registry-schema.json`, `consolidation-config-schema.json`) in `.akr/schemas/`. The Phase 0 deliverable for this item is the schema field specification document, not the JSON file itself.
+
+### Committed Working Artifact Layout
+
+```text
+{application-repo}/
+  docs/
+    modules/
+      CourseDomain_doc.md                 # Final Level 1 documentation (existing)
+      .akr/                               # AKR working artifacts - committed, CODEOWNERS-gated
+        CourseDomain_draft.md             # Mode B committed draft (permanent)
+        {project}_review.md               # Mode A committed semantic review sheet (permanent)
+  .akr/
+    logs/                                 # Session logs - gitignored, NOT committed
+  modules.yaml                            # Updated with review_sheet, draft_output, last_reviewed_at fields
+```
+
+⚠️ Do not conflate the two .akr directories:
+- docs/modules/.akr/ -> committed, permanent artifacts, CODEOWNERS-gated under docs/**
+- .akr/ at repository root -> transient session logs only, gitignored
+
+CODEOWNERS entry required: docs/modules/.akr/**  @org/standards-team @tech-lead
+Validator emits WARNING (not ERROR) when declared paths are absent.
 
 ---
 
@@ -572,6 +597,14 @@ Validate seven foundational assumptions before Phase 1 investment. Each test mus
 - `run_skill_script` invocation succeeds for the test function
 - Approval prompt behavior is confirmed and documented (supported/unsupported + UX surface)
 - Rejection behavior documented with evidence (alternative path vs. informative failure)
+
+**Additional acceptance criteria for Test 7:**
+- Mode A invocation generates and commits `docs/modules/.akr/{project}_review.md` alongside modules.yaml
+- Mode B invocation writes committed draft to `docs/modules/.akr/{ModuleName}_draft.md` and displays validation summary in chat before committing to doc_output
+- Mode B incremental invocation (with pre-existing committed draft) reads draft, patches only affected sections, displays incremental summary block
+- Final doc at doc_output does not contain draft-only front matter fields (`preview-generated-at`, `review-mode`)
+- If the surface cannot write files (e.g., Copilot CLI in read-only mode), render inline in chat - KNOWN-GAP, not FAIL
+- Both full and incremental paths tested; results recorded separately in benchmark.json
 
 **Fail fallback:**
 - Record Option D as unavailable for current environment

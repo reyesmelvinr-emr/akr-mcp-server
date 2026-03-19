@@ -19,6 +19,7 @@ This implementation plan transforms the AKR Documentation Governance system from
 | **Binary Phase 2.5 gate** | Coding agent must be tested before custom Azure Function is justified |
 | **Deterministic Phase 4** | No AI in GitHub Actions; human-refined structured output |
 | **`@skill.script` before Azure Functions** | Code-defined in-process scripts evaluated first for Phase 3 Path B; Azure Functions authorized only if subprocess isolation required (see Phase 3 Deployment Options) |
+| **v2.0 code-defined skills are Phase 3+ scope, not Phase 1-2 replacements** | SKILL.md is the delivery mechanism for GitHub Copilot interactive surfaces; code-defined Python skills require `agent-framework` SDK (currently unconfirmed on target surface) and are authorized only after Phase 2.6 Governance Stability Assessment. Mixing architectures mid-pilot invalidates benchmark data and removes Phase 2.6 assessment evidence. |
 | **Section-Scoped Generation (SSG) as Mode B generation strategy** | Loads charter guidance and source files per section rather than all at once; reduces per-pass context load without requiring additional charter condensation; forward payload discipline prevents context re-expansion across passes; maps naturally to Copilot coding agent background execution |
 
 ---
@@ -35,10 +36,15 @@ Phase 1 (Foundation)
 Phase 2 (Pilot Onboarding)
     ↓
 Phase 2.5 (Coding Agent Spike)
-    ↓ GO/NO-GO DECISION
-Phase 3 (Automation Extension) [CONDITIONAL]
+    ↓ MANDATORY (regardless of PASS/FAIL)
+Phase 2.6 (Governance Stability Assessment)
+    ↓
+Phase 3 (Automation Extension) [CONDITIONAL - authorized by Phase 2.5 FAIL or Phase 2.6 migration verdict]
     ↓
 Phase 4 (Feature Consolidation)
+
+Note: Phase 4 proceeds unless Phase 2.6 returns "Full Migration Recommended".
+Targeted migrations authorized by Phase 2.6 run in parallel with Phase 4 and do not block it.
 ```
 
 ### Phase Overview
@@ -49,6 +55,7 @@ Phase 4 (Feature Consolidation)
 | **Phase 1: Foundation** | 3-5 weeks | Templates (2 adapted), `validate_documentation.py` (with metadata header check), CI workflow, schemas (1 new), hooks (`postToolUse` + `agentStop`), `SKILL-COMPAT.md` v1.0 | CI validation working; hooks distributed; pilot-ready release tag v1.0.0 |
 | **Phase 2: Pilot Onboarding** | 1-2 weeks per project | Pilot project complete end-to-end, retrospective, onboarding checklist | Zero validation failures; <15 min grouping time |
 | **Phase 2.5: Coding Agent Spike** | 1 week | Acceptance test results; go/no-go recommendation | PASS → Phase 3 skipped; FAIL → Phase 3 authorized |
+| **Phase 2.6: Governance Stability Assessment** | 1 week | Governance stability verdict (SKILL.md acceptable or targeted migration authorized); `PHASE_2_6_GOVERNANCE_STABILITY.md` plan document | Phase 2.5 complete (PASS or FAIL); Phase 2 retrospective data available |
 | **Phase 3: Automation Extension** | 2-4 weeks (conditional) | Custom @doc-agent or Copilot Studio agent | Only if Phase 2.5 documents specific failure modes |
 | **Phase 4: Feature Consolidation** | 3-4 weeks | consolidate.py, feature-registry, cross-repo workflows | 3-component feature consolidated in <2 min |
 
@@ -75,6 +82,8 @@ Phase 4 (Feature Consolidation)
 - **SSG per-pass timing data:** Collected from >=80% of Mode B runs by end of Phase 2 pilot (timing unavailable on some surfaces is acceptable; see Part 18.5)
 - **Slow-module rate:** <10% of modules trigger the 45-minute fallback threshold (tracked in `ssg-slow-module-events` monitoring metric)
 - **Grouping validation:** ≤15 minutes per project (developer time)
+- **Mode A update-run time (new file added to existing module):** ≤5 minutes (reads committed review sheet; proposes targeted addition; developer confirms) - baseline established in Phase 2 retrospective
+- **Mode B update-run time (one file changed in existing module):** ≤10 minutes (reads committed draft; patches affected sections only; developer confirms) - baseline established in Phase 2 retrospective
 - **CI validation pass rate:** ≥95% on first PR
 - **Unresolved ❓ marker rate:** <5% after developer review
 - **Standards drift incidents:** Zero (enforced by `minimum_standards_version`)
@@ -100,6 +109,8 @@ Phase 4 (Feature Consolidation)
 | **Cross-platform validator failures** | 🟠 Low | Test Ubuntu + macOS + Windows in Phase 1 | Fix platform-specific file path or YAML parsing issues |
 | **Copilot (GPT-4o) skill non-invocation** | 🟡 Medium | `disable-model-invocation: true` frontmatter; interactive runs use explicit `/akr-docs` commands, coding-agent runs use issue-template Mode B instructions; CI metadata header check enforces completion | Document in `SKILL-COMPAT.md`; treat as known limitation, not blocker |
 | **SSG generation time exceeds developer patience on large modules** | 🟡 Medium | Per-pass timing targets in Part 18.2; slow-generation fallback at 45-minute threshold; coding agent background execution eliminates active wait time | Module splitting into sub-modules (<=8 files each); single-pass fallback for remaining sections with additional `❓` markers expected |
+| **PR-gated review loop creates reassignment churn** | 🟡 Medium | Committed review sheet (Mode A) and committed draft (Mode B) decouple human validation from CI/merge loop; incremental update path eliminates full re-generation cost for ongoing changes | Metric: reassignment count per Mode A PR should trend to 0 after first two pilots |
+| **Stale committed draft misleads incremental update agent** | 🟡 Medium | `last_reviewed_at` in modules.yaml + v1.1 `--check-sync` WARNING when draft older than most recent file change | v1.0 mitigation: committed drafts older than most recent code change are advisory; v1.1 automates detection |
 
 ### Deferred Risks (Post-Pilot)
 
@@ -152,6 +163,7 @@ drafts with unresolved ❓ markers (replaces /docs.interview)
 | **Standards distribution** | GitHub Hosted MCP Context Sources | Copilot Business (tier-dependent) |
 | **Cross-functional review (Phase 3+)** | Copilot Studio (Teams) | M365 Copilot (premium) |
 | **In-process script execution (Phase 3, conditional)** | Agent Framework `@skill.script` (Python SDK) | Included with `agent-framework` package; zero additional infra cost |
+| **v2.0 target architecture (Phase 3+ conditional on Phase 2.6 verdict)** | AKR Python skill package (`akr.module_boundary`, `akr.module_doc_generation`, `akr.validation_skill`, `akr.consolidation_skill`) with `@skill.script` + `@skill.resource` + `require_script_approval=True` | `agent-framework` package - requires SDK verification before implementation |
 | **Generation strategy** | Section-Scoped Generation (SSG) - structured Mode B pass sequence with forward payload discipline | Zero cost - encoded in SKILL.md; no new infrastructure |
 
 ---
@@ -177,8 +189,9 @@ Each phase has a dedicated implementation plan document:
 2. [Phase 1: Foundation](PHASE_1_FOUNDATION.md) — Templates, validator, CI, schemas
 3. [Phase 2: Pilot Onboarding](PHASE_2_PILOT_ONBOARDING.md) — End-to-end pilot, retrospective, onboarding checklist
 4. [Phase 2.5: Coding Agent Spike](PHASE_2_5_CODING_AGENT_SPIKE.md) — Binary test with acceptance criteria
-5. [Phase 3: Automation Extension](PHASE_3_AUTOMATION_EXTENSION.md) — Conditional custom agent or Copilot Studio
-6. [Phase 4: Feature Consolidation](PHASE_4_FEATURE_CONSOLIDATION.md) — Cross-repository deterministic aggregation
+5. [Phase 2.6: Governance Stability Assessment](PHASE_2_6_GOVERNANCE_STABILITY.md) — Mandatory stability verdict after Phase 2.5
+6. [Phase 3: Automation Extension](PHASE_3_AUTOMATION_EXTENSION.md) — Conditional custom agent or Copilot Studio
+7. [Phase 4: Feature Consolidation](PHASE_4_FEATURE_CONSOLIDATION.md) — Cross-repository deterministic aggregation
 
 ---
 

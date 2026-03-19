@@ -78,6 +78,12 @@ assignees: ''
 - **Business Capability:** [e.g., CourseCatalogManagement] (PascalCase from tag-registry.json)
 - **Files in Module:** [List all files, or reference modules.yaml entry]
 
+## Documentation Mode
+
+- **Generation mode:** [Full - first-time generation | Incremental - update after code change]
+   Default: Full for new modules; Incremental for modules with existing committed draft at docs/modules/.akr/.
+- **Changed files (Incremental only):** [List files changed since last Mode B run]
+
 ## Documentation Requirements
 
 This module must be documented following AKR module documentation standards:
@@ -242,9 +248,10 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | 6. **Data Operations coverage** | All reads and writes across all files covered | ≥95% of data operations listed |
 | 7. **Validation passes** | `validate_documentation.py --fail-on needs` exits 0 | Exit code 0 |
 | 8. **No truncation** | No "..." or "[content omitted]" artifacts in output | Zero truncation markers |
-| 9. **Metadata header present** | `<!-- akr-generated -->` block present at top of output file | Header present with all required fields |
+| 9. **Metadata header and final-doc cleanliness** | `<!-- akr-generated -->` block present with correct review_mode context; final doc free of draft-only front matter fields | Header present with all required fields and no draft-only fields in final doc |
 | 10. **Hook log present** | `.akr/logs/session-*.jsonl` contains file write entry for the output doc path | Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue |
 | 11. **SSG background completion** | `passes-completed` present and complete; split info consistent; timing availability captured | All expected passes present; timing known-gap documented if unavailable |
+| 12. **Committed draft/review sheet handling in async context** | Mode A review sheet committed at `docs/modules/.akr/{project}_review.md`; Mode B draft committed at `docs/modules/.akr/{ModuleName}_draft.md`; final doc contains no draft-only fields | Present in PR Files Changed and issue comments; if async review gate unsupported, record `ASYNC-REVIEW-GATE` known gap |
 
 ### Testing Matrix
 
@@ -261,6 +268,7 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | Criterion 9: Metadata header | ⬜ | ⬜ | ⬜ |
 | Criterion 10: Hook log | ⬜ | ⬜ | ⬜ |
 | Criterion 11: SSG completion | ⬜ | ⬜ | ⬜ |
+| Criterion 12: Committed draft + review sheet handling | ⬜ | ⬜ | ⬜ |
 | **Overall** | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL |
 
 ### Pass/Fail Decision Logic
@@ -433,6 +441,20 @@ Phase 2.5 Result: FAIL
 ## Next Steps
 
 [Based on PASS/FAIL decision]
+
+## Phase 2.6 Governance Stability Assessment Handoff
+
+Regardless of Phase 2.5 PASS or FAIL verdict, the following data must be explicitly handed off to Phase 2.6:
+
+| Data item | Source | Status |
+|---|---|---|
+| First-run CI pass rate across 3 test cases | Phase 2.5 acceptance matrix CI results | Required |
+| Operations Map completeness on GPT-4o (% of public + private + async methods correctly enumerated) | Manual review of Test Cases 1-3 Operations Map sections | Required |
+| Self-reporting block absent rate across all Mode B runs | Phase 2 retrospective + Phase 2.5 test runs | Required |
+| benchmark.json actual vs. target pass rates | Phase 2.5 benchmark recording | Required |
+| Any new GPT-4o failure modes documented in SKILL-COMPAT.md | SKILL-COMPAT.md v1.1 | Required |
+
+Phase 2.6 cannot begin until all five items are provided in writing to the standards lead.
 
 ---
 

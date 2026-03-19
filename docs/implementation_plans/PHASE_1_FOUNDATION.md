@@ -167,6 +167,37 @@ Create validation script from scratch that distinguishes module docs from databa
   - `--output json` writes JSON to stdout with workflow-compatible fields
   - `--output text` writes human-readable summary
 
+### Preview Mode and Draft Presence Rules
+
+**New CLI flag: `--preview`**
+
+`validate_documentation.py --file <path> --preview [--module-name <n>]`
+
+When `--preview` is passed:
+- Runs all validation checks against the file (draft or final)
+- Outputs human-readable summary block for Copilot Chat display:
+  ── Mode B Preview: {ModuleName} ──────────────────────────────
+  Sections present:     Module Files ✅ | Operations Map ✅ | ...
+  ❓ markers:           N sections require human input
+  🤖 inferred content:  N items flagged
+  Validator result:     0 errors / N warnings
+  Generation strategy:  {from akr-generated header}
+  Review mode:          {full | incremental}
+  ──────────────────────────────────────────────────────────────
+- Does NOT emit JSON output (JSON is for CI)
+- Does NOT write GitHub check annotations (CI only)
+- Exit code: 0 if no errors; 1 if errors
+
+**v1.0 draft presence check (WARNING level - no new ERRORs introduced):**
+All new checks added in this update are WARNING-level in v1.0. No existing ERROR behaviors are modified.
+- modules.yaml declares `draft_output` but file absent → WARNING: "Draft declared but not found. Run Mode B."
+- modules.yaml declares `review_sheet` but file absent → WARNING: "Review sheet declared but not found. Run Mode A."
+
+**v1.0 final doc cleanliness check (ERROR level - enforced at finalization):**
+- Final doc at doc_output path contains draft-only fields (`preview-generated-at`, `review-mode`) → ERROR:
+  "Final doc contains draft-only front matter fields. Re-run Mode B Step 6a to strip before committing."
+This check applies only to files matching a modules[].doc_output path (not draft_output paths).
+
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
@@ -182,6 +213,7 @@ Create validation script from scratch that distinguishes module docs from databa
 | Document CLI usage | Standards author | `--file`, `--changed-files`, `--module-name`, `--fail-on`, `--output` flags documented in README | Day 5 (1 hour) |
 | Add `pyyaml` to `requirements.txt` | Standards author | `pyyaml` listed as explicit dependency; `pip install -r requirements.txt` installs cleanly on all platforms | 15 min |
 | Implement `<!-- akr-generated -->` metadata header check | Standards author | Validator checks for header presence in MODULE docs; fails with exact message: `"AKR metadata header missing — skill may not have been properly invoked"` | 2 hours |
+| Add `--preview` flag and draft presence check | Standards author | Flag produces human-readable summary block with review-mode field; presence checks emit WARNING (not ERROR) for declared but absent draft_output / review_sheet; final doc cleanliness check emits ERROR for draft-only fields in final docs; tested against CourseDomain in both full and incremental scenarios | 2.5 hours |
 
 ### Test Cases (Port from `test_validation_library.py`)
 
@@ -729,6 +761,8 @@ Adapt `lean_baseline_service_template.md` and `ui_component_template.md` for mod
 | Adapt `ui_component_template.md` | Standards author | Module Files, component hierarchy diagram sections added | 3 hours |
 | Add module-scope YAML front matter | Standards author | `businessCapability`, `feature`, `layer`, `project_type`, `status` fields documented | 1 hour |
 | **Update all YAML front matter examples to PascalCase** | Standards author | All `businessCapability` examples use PascalCase matching `tag-registry.json` (e.g., `CourseCatalogManagement` not `course-catalogmanagement`) | 1 hour |
+| Create `{project}_review.md` template in core-akr-templates | Standards author | Template contains: YAML front matter (project, last-reviewed-at, review-mode); per-module sections with file-role table and checkbox column; unassigned rationale table; reassignment summary; review decision checkboxes; pre-filled AKR_Tracking.md update blocks; incremental update section | 1.5 hours |
+| Create `{ModuleName}_draft.md` front matter spec and sample | Standards author | Draft front matter fields defined: preview-generated-at, review-mode (full/incremental), passes-completed, generation-strategy; draft-only fields clearly marked; spec added to DEVELOPER_REFERENCE.md; sample CourseDomain_draft.md in core-akr-templates/examples/ | 1 hour |
 | Test backend template on CourseDomain | Standards author | Output matches `courses_service_doc.md` structure | 2 hours |
 | Test UI template on sample UI module | Standards author | Component grouping logic works; hierarchy clear | 2 hours |
 | Document template selection logic | Standards author | `project_type` → template mapping table in README | 1 hour |
@@ -937,6 +971,17 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
 - `consolidation-config-schema.json` (cross-repo aggregation): excludes `Full-Stack`
 
 **Scope:** Define complete `modules.yaml` schema per Part 4 of analysis document.
+
+### Additional Optional Fields for Module Entries
+
+| Field | Type | Validation Rule |
+|---|---|---|
+| `review_sheet` | string (path) | Must be under `docs/` tree; WARNING if declared but absent |
+| `draft_output` | string (path) | Must be under `docs/` tree; must not duplicate another module's draft_output |
+| `last_reviewed_at` | string (ISO 8601) | Parseable as datetime; staleness check deferred to v1.1 |
+| `review_mode` | enum: `full` \| `incremental` | Records last Mode B run type; present in draft front matter only, not in final doc |
+
+All four fields are optional. Their absence does not cause validation errors on existing modules.
 
 #### Schema Structure
 
@@ -1273,6 +1318,7 @@ The hook must derive a local changed-file list and pass it explicitly to `--chan
 | Author `postToolUse.json` audit logger hook | Standards author | File present at `.github/hooks/postToolUse.json`; bash command writes valid JSONL to `.akr/logs/session-YYYYMMDD.jsonl`; monitored tools include `write_file`, `create_file`, `run_skill_script` | 1 hour |
 | Author `agentStop.json` auto-validation hook | Standards author | File present at `.github/hooks/agentStop.json`; hook derives local changed files and passes explicit list to `--changed-files` (fallback `--all docs/modules` when no local changes); writes output to `.akr/logs/last-validation.json`; handles missing `modules.yaml` gracefully | 1 hour |
 | Add `.akr/logs/` to `.gitignore` | Standards author | Log files not committed; `session-*.jsonl` pattern in `.gitignore` | 10 min |
+| Clarify `.gitignore` scope | Standards author | Root `.akr/logs/` and root-level `.akr/` added to .gitignore (transient session artifacts); `docs/modules/.akr/` is explicitly NOT gitignored - committed working artifacts are intentionally tracked; comment in .gitignore explains the distinction between the two .akr locations | 15 min |
 | Test `postToolUse` hook in Claude Code session | Standards author | File write events appear in `.akr/logs/session-YYYYMMDD.jsonl` after Mode B run | 30 min |
 | Test `agentStop` hook in Claude Code session | Standards author | Validation output appears in `.akr/logs/last-validation.json`; errors surfaced before PR opened | 30 min |
 | Verify hook JSON syntax against Agent Skills spec | Standards author | Both JSON files validate without errors | 15 min |

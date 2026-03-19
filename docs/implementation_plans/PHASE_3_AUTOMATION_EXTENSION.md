@@ -98,6 +98,8 @@ For each failed acceptance criterion:
 | Cost/benefit favorable? | Build deterministic AST-based extractor (150 lines); reuse from `akr-mcp-server` |
 | **Decision** | **Authorize custom extractor module** |
 
+| `ASYNC-REVIEW-GATE` - coding agent opens PR before developer reviews committed draft | Phase 3 custom Python agent with explicit HITL wait state: agent commits draft, posts issue comment with review link, opens PR only after developer reply or label confirmation |
+
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
@@ -447,6 +449,21 @@ These requirements apply to **all custom agents** built in Phase 3, regardless o
 **Evaluation order (required):** Evaluate **Option D first**. Only proceed to Azure Functions (Option A) if the failure mode requires subprocess isolation, external network access, or is incompatible with in-process execution.
 
 **Decision gate:** Standards author must document in writing why Option D is insufficient before Option A is authorized. This decision is recorded in `ARCHITECTURE.md` (Deliverable 4).
+
+**v2.0 Architecture Note:** If Phase 2.5 authorizes Phase 3 and Phase 2.6 confirms targeted migration, the v2.0 Python skill package is the target architecture for Option D:
+- `akr.module_boundary` skill: Mode A deterministic tasks (boundary inference, review sheet writes)
+- `akr.module_doc_generation` skill: Mode B deterministic tasks (operation extraction, draft patching, finalization with front matter stripping)
+- `akr.validation_skill`: wraps `validate_documentation.py` as a callable script
+- `akr.consolidation_skill`: Phase 4 deterministic aggregation (alternative to GitHub Actions path)
+
+SKILL.md is not replaced - it remains the delivery mechanism for GitHub Copilot interactive surfaces. Code-defined skills run in the Phase 3 custom Python agent only.
+
+**SDK verification required before implementation:** Before authoring any production code-defined skill, verify:
+1. `@skill.script` registration and `run_skill_script` invocation work end-to-end in target environment
+2. Approval mechanism: `require_script_approval=True` in `SkillsProvider` (confirm `@approval_required` decorator is not the current API pattern - potential mismatch in v2.0 spec)
+3. Document result in SKILL-COMPAT.md and benchmark.json before writing production code.
+
+**Committed draft as Phase 3 context anchor:** The committed draft model (`docs/modules/.akr/{ModuleName}_draft.md`) provides Phase 3 custom automation with a stable, human-validated context anchor. A custom agent reads the committed draft as its starting context and generates targeted patches - it does not re-read all source files. This reduces custom agent context requirements by approximately 50% relative to full re-generation on a mid-size module.
 
 ---
 

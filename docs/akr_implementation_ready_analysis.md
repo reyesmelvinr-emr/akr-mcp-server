@@ -98,7 +98,13 @@ A module is a **logical grouping of source files that together implement a singl
 |---|---|---|---|
 | Mode A — Grouping proposal | Copilot coding agent | Scans project; groups by domain noun; writes draft `modules.yaml`; opens PR | Automated |
 | Mode A — Grouping validation | Developer who knows the codebase | Reviews groupings; reassigns misplaced files; names modules correctly; splits over-large groups | 5–10 min per project |
+| Mode A — Pre-commit review sheet | Copilot agent | Before committing modules.yaml, generates a Semantic Review Sheet at `docs/modules/.akr/{project}_review.md`. Lists each proposed module with file-role table, unassigned rationale, and reviewer checkboxes. Commits the sheet alongside modules.yaml. | <1 min (agent) |
+| Mode A — Review sheet validation | Developer who knows the codebase | Opens `docs/modules/.akr/{project}_review.md` in VS Code. Marks files, records reassignments. Agent reads completed sheet, patches modules.yaml, opens PR. | 5–10 min |
+| Mode A — Incremental update (new/changed file) | Copilot agent + developer | Agent reads committed review sheet; proposes targeted update to affected module section only; displays change in chat. Developer confirms. Agent patches review sheet and modules.yaml in-place. | ≤5 min |
 | Mode B — Documentation generation | Copilot coding agent | Reads approved `modules.yaml`; loads condensed charter; reads source files; generates doc; opens draft PR | Automated |
+| Mode B — Pre-commit draft (committed) | Copilot agent | Before writing to doc_output, generates draft at `docs/modules/.akr/{ModuleName}_draft.md` and displays validation summary in chat. Developer edits draft in VS Code. Agent writes final doc from confirmed draft. Draft is a permanent committed artifact. | <1 min (agent) |
+| Mode B — In-editor content review | Developer + tech lead | Opens draft in VS Code Markdown Preview. Fills ❓ sections, validates business rules, confirms architecture. Replies 'ready to commit'. | 20–30 min |
+| Mode B — Incremental update (code change) | Copilot agent + developer | Agent reads committed draft; reads only changed source files; loads only relevant charter sections; patches affected sections. Developer confirms targeted changes only. Does not re-read all files or re-run full SSG unless patch scope expands. | ≤10 min |
 | Mode B — Content review | Developer + tech lead | Fills `❓` sections; validates business rules; confirms data operations accuracy | 20–30 min per module |
 | Mode C — Interactive HITL completion | Copilot agent mode + developer | Guides developer through unresolved `❓` one section at a time in existing documents; records accepted edits and deferred items | 10–20 min per document |
 | CI gate | `validate_documentation.py` + Vale | Validates required sections, markers, `project_type`, `feature_tag` format | Automated at PR merge |
@@ -238,6 +244,23 @@ Agent Skills load contextually, not as a monolithic pre-load. The condensed char
 **Layer 4 — `.github/copilot-instructions.md` as Fallback**
 
 If hosted MCP context source configuration (Assumption 2) fails, the condensed charter (~3,000–4,000 characters) fits within `.github/copilot-instructions.md`'s practical limit. This is simultaneously the Assumption 2 fallback and the primary delivery mechanism for teams that do not configure hosted MCP context sources.
+
+**Committed draft as update-scenario context anchor:**
+
+The value of the pre-commit draft is fully realized when it is committed as a permanent artifact and used as the starting context for all subsequent Mode B runs on that module. The first-run benefit (loading a single markdown file instead of re-reading all source files to incorporate developer edits) is real but modest. The update-run benefit is the primary economic argument.
+
+For the update scenario - the most common Mode B invocation after initial onboarding - the difference is significant:
+
+| Context load | Tokens (typical 6-file api-backend module) |
+|---|---|
+| Full Mode B re-generation (current) | Condensed charter (~2,500) + 6 source files (~6,000) = ~8,500 |
+| Incremental update via committed draft | Committed draft (~3,000) + 1 changed source file (~800) + targeted charter section (~400) = ~4,200 |
+
+The incremental path reduces per-update context load by approximately 50% for a mid-size module. An 8-file module at the `max_files` ceiling benefits proportionally more - exactly the scenario where context economics matter most.
+
+The committed draft also changes what SSG Pass 2 means in the update context. Pass 2 is the most expensive pass - it loads all source files. In incremental-update mode, Pass 2 is replaced by a targeted read of only the changed files. The committed draft provides the established context for all unchanged sections. This is forward payload discipline extended to the update scenario: carry what was validated forward; re-generate only what changed.
+
+**Staleness governance:** A committed draft that is not updated after code changes can mislead future agents. Two mitigations: (1) `last_reviewed_at` field in modules.yaml updated by the agent on every Mode B run; (2) v1.1 `--check-sync` validator flag compares `last_reviewed_at` against `git log` dates on module source files and emits WARNING when the draft is stale. For v1.0, document that committed drafts older than the most recent code change are advisory, not authoritative.
 
 ---
 
@@ -386,15 +409,40 @@ When asked to "propose module groupings", "initialize modules.yaml", or
 7. Write draft modules.yaml to project root.
    Set status: draft on all modules and unassigned items.
 
-8. Open a draft PR titled: "docs: propose module groupings for [project name]"
-   Include PR checklist:
-   - [ ] All module groupings reviewed for semantic accuracy
-   - [ ] Module names reflect domain language (not file names)
-   - [ ] No module exceeds max_files: 8
-   - [ ] Misplaced files reassigned to correct module
-   - [ ] Shared/infrastructure files correctly placed in unassigned[]
-   - [ ] All database objects identified and typed correctly
-   - [ ] modules.yaml approved before documentation generation begins
+7.5. BEFORE opening a PR, generate a Semantic Review Sheet and commit it alongside modules.yaml.
+     Output the review sheet to `docs/modules/.akr/{project-name}_review.md`.
+     Review sheet must contain:
+     - YAML front matter: project, last-reviewed-at (ISO 8601), review-mode: full
+     - One section per proposed module with:
+       - Module name, businessCapability, feature tag, max_files status
+       - File-role table with "Belongs Here? ☐ Yes ☐ No" column per file
+       - "Files to move out" table (empty rows for reviewer to fill)
+       - Free-text notes field
+     - One section for unassigned files with:
+       - Each file path, proposed reason, "Reason correct? ☐ Yes ☐ No" column
+       - "Files to move from unassigned → module" table
+     - Summary table: modules reviewed, total reassignment count
+     - Review decision checkboxes: ☐ Approve ☐ Request changes
+     - Pre-filled AKR_Tracking.md update blocks for both outcomes
+
+     After generating and committing the review sheet:
+     - Display it inline in Copilot Chat
+     - Instruct: "Review `docs/modules/.akr/{project}_review.md` in VS Code. Mark reassignments,
+       then reply 'approved' or 'N reassignments made'."
+
+7.6. IF modules.yaml and a committed review sheet already exist (incremental update scenario):
+     DO NOT run a full scan. Instead:
+     - Read the existing committed review sheet
+     - Identify files that are new or changed since last-reviewed-at
+     - Propose only the affected module section updates in chat
+     - Ask: "X new/changed file(s) detected. Proposed: [module]. Confirm?"
+     - On confirmation: patch review sheet in-place; update last-reviewed-at; update modules.yaml
+
+8. ONLY after developer confirms approval:
+   Patch modules.yaml with reassignments; add review_sheet and last_reviewed_at fields.
+   Open draft PR titled: "docs(mode-a): propose module groupings for [project name]"
+   Review sheet is committed as part of the PR branch (written in Step 7.5).
+   Include standard PR checklist.
 
 ---
 
@@ -437,19 +485,79 @@ When asked to "generate documentation for [ModuleName]" or
    Pass the --module-name flag so the script applies module-level section rules.
    Resolve or mark DEFERRED any validation failures before continuing.
 
-6. Write the draft to the doc_output path on a new feature branch.
-   Branch name: docs/{module-name}-documentation
+5.5. BEFORE writing to doc_output, write the draft to the committed path and display
+    a validation summary block in Copilot Chat.
 
-7. Open a draft PR titled: "docs: [ModuleName] module documentation"
-   Include PR checklist:
-   - [ ] Module Files section lists all files with correct roles
-   - [ ] All ❓ sections reviewed; filled or marked DEFERRED with justification
-   - [ ] Business Rules table complete including Why It Exists column
-   - [ ] Data Operations section covers all reads and writes
-   - [ ] Questions & Gaps populated with open items
-   - [ ] validate_documentation.py passes with zero errors
-  - [ ] akr-generated metadata header present at top of document
-   - [ ] CODEOWNERS notified for review
+    IF this is a first-time generation (draft_output path does not exist):
+     Write draft to `docs/modules/.akr/{ModuleName}_draft.md`.
+     Set front matter: preview-generated-at (ISO 8601), review-mode: full,
+     passes-completed, generation-strategy.
+     Display validation summary block:
+     ── Mode B Preview: {ModuleName} ──────────────────────────────
+     Sections present:     Module Files ✅ | Operations Map ✅ | Architecture ✅
+                    Business Rules ✅ | Data Operations ✅ | Q&G ✅
+     ❓ markers:           N sections require human input (listed below)
+     🤖 inferred content:  N items flagged for review
+     Validator result:     0 errors / N warnings
+     Generation strategy:  SSG (passes-completed: 1,2,3,4,5,6,7)
+     Review mode:          Full generation
+     ──────────────────────────────────────────────────────────────
+     Each ❓ section listed with its header and specific question.
+     Instruction: "Edit `docs/modules/.akr/{ModuleName}_draft.md` to fill ❓ sections,
+     then reply 'ready to commit'."
+
+    IF this is an incremental update (draft_output path exists):
+     Read committed draft as primary context. DO NOT re-read all files or re-run full SSG
+     unless patch scope expands beyond the initially identified changed files.
+     Read only changed files (from developer instruction or git diff).
+     Load only relevant charter sections for changed files:
+     - Controller changed    → Operations Map charter section
+     - Service/Repository    → Business Rules + Data Operations charter sections
+     - DTOs changed          → Operations Map + Data Operations charter sections
+     If patch scope reveals additional related sections require update, load those charter
+     sections and patch them before presenting the summary - this is still incremental
+     (draft as primary context) but may touch more than one section.
+     Apply patch to committed draft in-place.
+     Update front matter: preview-generated-at, review-mode: incremental.
+     Display incremental validation summary:
+     ── Mode B Incremental Update: {ModuleName} ───────────────────
+     Sections patched:     [patched section names] ✅
+     Sections unchanged:   [unchanged section names]
+     New ❓ markers:       N (section - reason)
+     Validator result:     0 errors / N warnings
+     Generation strategy:  incremental-update
+     ──────────────────────────────────────────────────────────────
+     Instruction: "Review patched sections in `docs/modules/.akr/{ModuleName}_draft.md`.
+     Reply 'ready to commit' when satisfied."
+
+    Do NOT open a PR until the developer confirms.
+
+5.6. Update modules.yaml: last_reviewed_at and review_mode to reflect this run.
+
+6. AFTER developer confirms 'ready to commit':
+  Read `docs/modules/.akr/{ModuleName}_draft.md` (containing developer edits).
+
+  6a. STRIP draft-only front matter before writing the final doc. Remove these fields:
+     - preview-generated-at
+     - review-mode
+     Any field present in the draft but not in the final doc YAML front matter spec
+     must be removed here. Failure to strip these fields is a validator error on the
+     final doc (see validate_documentation.py: "Final doc must not contain draft-only fields").
+
+  6b. Inject final-doc front matter:
+     - Ensure businessCapability, feature, layer, project_type, status, compliance_mode
+      are present and correctly populated from modules.yaml.
+     - Carry the akr-generated metadata header forward from the draft (do not strip it).
+
+  Write final version to the doc_output path on a new feature branch.
+  Branch: docs/{module-name}-documentation (full) or docs/{module-name}-update-{date} (incremental)
+
+7. Open a draft PR titled:
+  Full:        "docs: [ModuleName] module documentation"
+  Incremental: "docs: update [ModuleName] documentation — [changed file(s)]"
+  Include validation summary block from Step 5.5 as PR description header.
+  Note in PR body: "Pre-commit draft reviewed at docs/modules/.akr/{ModuleName}_draft.md before PR open."
+  For incremental: include diff summary showing sections patched vs. unchanged.
 
 8. Write the akr-generated metadata header block to the TOP of the output file
   (this step is required - do not skip; validate_documentation.py checks for it):
@@ -637,6 +745,9 @@ Execution flow:
 | `feature-registry.yaml` cross-repo validation | Phase 4 dependency; `tag-registry.json` local validation is sufficient for v1.0 |
 | Full Vale subprocess integration | Vale can run as a separate CI step in v1.0; tight integration in v1.1 |
 | Model-specific pass-rate adaptive logic | Detecting which model ran the skill and adjusting validation thresholds accordingly - `benchmark.json` data provides the inputs but the logic is v1.1 scope; v1.0 applies uniform rules regardless of model |
+| `--check-sync` flag (draft staleness detection) | Compares `last_reviewed_at` in modules.yaml against `git log` dates on module files; emits WARNING when draft is stale; requires git subprocess integration not in v1.0 scope |
+| Committed draft presence validation | Checks that `draft_output` path in modules.yaml resolves to an existing file; emits WARNING if declared but absent; v1.0 only warns on `doc_output` absence |
+| `review_mode` consistency check | If `review_mode: incremental` in draft front matter but `passes-completed` includes full pass sequence, emit INFO suggesting possible mislabeling |
 
 The `<!-- akr-generated -->` metadata header check is explicitly **v1.0 scope** - it is not deferred. It is the in-document enforcement contract for the three-layer reliability stack and must be present before the pilot begins.
 
@@ -2464,3 +2575,96 @@ SSG does not change any locked decision. It adds a generation strategy layer on 
 ---
 
 *Part 18 — Section-Scoped Generation (SSG) Architecture — March 2026 — Engineering Standards — Confidential*
+
+---
+
+# Part 19: v2.0 Architecture Reference and Governance Stability Assessment
+
+**Sources:** AKR v2.0 Architecture Proposal + v2.0 Code-Defined Skill Architecture Specification (M365 Copilot, March 2026); Governance Stability Analysis (March 2026)
+**Review type:** External architectural input - selectively integrated; not a current-phase implementation directive
+
+---
+
+## 19.1 What v2.0 Validates
+
+The following decisions already locked in this analysis are independently confirmed by the v2.0 proposal:
+- Committed draft model (`docs/modules/.akr/`) as single source of truth for incremental updates (Part 18 additions)
+- Three-layer HITL governance (script approval -> draft review -> PR approval) as the correct model (Part 16)
+- `@skill.script` / Option D as the preferred Phase 3 custom automation path before Azure Functions (Part 17)
+- Dynamic resources (`@skill.resource`) as the long-term replacement for SSG pass orchestration (Part 18.7)
+
+## 19.2 Named Governance Architecture — Three-Layer HITL Model
+
+The three HITL layers documented across Parts 16, 17, and the committed-draft additions are named here as a unified model for navigability:
+
+**Layer 1 — Script Approval (pre-execution):** Required before any file-modifying operation executes. In SKILL.md architecture: `disable-model-invocation: true` + explicit `/akr-docs` command. In code-defined skill architecture (Phase 3+): `require_script_approval=True` in `SkillsProvider`. Prevents unauthorized automated file writes.
+
+**Layer 2 — Draft Review (in-editor):** Developer validates committed draft at `docs/modules/.akr/{ModuleName}_draft.md` in VS Code before confirming 'ready to commit'. Decouples semantic content validation from the CI/merge loop. Applies to both Mode A (review sheet) and Mode B (documentation draft).
+
+**Layer 3 — PR Approval (post-commit):** Tech lead reviews and approves merged diff. Final governance gate before documentation enters the canonical `docs/modules/` tree.
+
+## 19.3 Workflow State Graph — Mode A and Mode B
+
+Mode A states: `COLLECT_INPUTS` -> `PROPOSE_BOUNDARIES` -> **[HITL: DEVELOPER_REVIEW]** -> `APPLY_CHANGES` -> `CREATE_PR`
+
+Mode B states: `DETERMINE_STRATEGY` -> `GENERATE_OR_PATCH` -> **[HITL: DEVELOPER_REVIEW]** -> `FINALIZE` -> `CREATE_PR`
+
+HITL checkpoints are named state transitions, not implied steps. Conditional branches (full vs. incremental) are explicit:
+- Mode A: if committed review sheet exists -> `INCREMENTAL_UPDATE` branch; else -> `FULL_SCAN` branch
+- Mode B: if draft_output exists and status is approved -> `INCREMENTAL_UPDATE` branch; else -> `FULL_GENERATION` branch
+
+## 19.4 Surface Compatibility — SKILL.md vs. Code-Defined Skills
+
+SKILL.md and code-defined Python skills serve different execution surfaces. They are parallel patterns, not replacements:
+
+| Surface | Skill delivery mechanism | SDK requirement |
+|---|---|---|
+| VS Code Copilot Chat (agent mode) | `SKILL.md` at `.github/skills/` | None - file-based |
+| Copilot coding agent (async) | `SKILL.md` + issue template | None - file-based |
+| Custom Python agent (Phase 3 Path B) | `SkillsProvider` + `@skill.script` | `agent-framework` package required |
+| Copilot Studio | Power Platform | M365 license required |
+
+**SKILL.md is not replaced by code-defined skills.** Removing SKILL.md breaks the GitHub Copilot interactive workflow. Code-defined skills augment SKILL.md for deterministic tasks in a Phase 3 custom agent only.
+
+## 19.5 What v2.0 Does Not Change (Timing-Gated)
+
+The following v2.0 components are Phase 3+ decisions, contingent on Phase 2.5 outcome and Phase 2.6 governance stability assessment:
+- Python code-defined skills replacing SKILL.md workflow logic
+- `@skill.resource` dynamic resources replacing SSG passes
+- Workflow engine graph execution
+
+**Do not implement v2.0 Python skills before Phase 2.6 produces its verdict.** Doing so removes the Phase 2/2.5 evidence base that Phase 2.6 needs to make its assessment, and breaks the GitHub Copilot interactive workflow that the pilot depends on.
+
+## 19.6 v2.0 Open Verification Requirements
+
+| Requirement | Status | Gate |
+|---|---|---|
+| `@skill.script` + `run_skill_script` confirmed working in target VS Code Copilot environment | NOT VERIFIED - Phase 0 Test 7 confirmed SKILL.md structure only, not Python SDK execution | Re-run Test 7 with Python SkillsProvider path specifically tested before Phase 3 Path B |
+| `@approval_required` decorator vs. `require_script_approval` constructor argument - confirm current API | NOT VERIFIED - potential mismatch in v2.0 spec | Verify against current `agent-framework` package before authoring production code-defined skills |
+| `@skill.resource` dynamic resource hydration available and performant on GitHub Copilot surfaces | NOT VERIFIED - Phase 0 Test 2 FALLBACK; Test 7 FALLBACK | Must be confirmed before SSG replacement is authorized |
+
+## 19.7 Governance Stability Assessment — The LLM Variance Problem
+
+A Phase 2.5 PASS verdict closes the coding agent authorization question but does not close the structural reliability question. SKILL.md governance fidelity is LLM-dependent:
+- GPT-4o pass rate: ~75% (Operations Map truncation on large modules documented in SKILL-COMPAT.md)
+- Claude Sonnet 4.6 pass rate: >=90%
+- Model updates happen without announcement and may shift pass rates silently
+
+Code-defined skills solve this categorically for **deterministic tasks** (method extraction, file role detection, draft writing, validation). They do not solve it for **interpretation tasks** (business rule inference, architectural narrative, Questions & Gaps) - those require LLM reasoning regardless.
+
+**Phase 2.6: Governance Stability Assessment** (mandatory, runs after Phase 2.5 regardless of verdict) answers: is the measured SKILL.md reliability ceiling acceptable for production compliance at the intended scale?
+
+Assessment criteria:
+
+| Criterion | Acceptable | Requires Targeted Migration |
+|---|---|---|
+| First-run CI pass rate (Phase 2 pilot) | >=95% | <90% |
+| Operations Map completeness on GPT-4o | >=90% of methods across public and private | Private/async methods consistently missing |
+| Self-reporting block absent rate | <5% of Mode B runs | >=10% of runs |
+| Post-model-update regression severity | Pass rate within 5 points of baseline | Baseline gap already >10 points |
+
+**If all criteria acceptable:** SKILL.md remains primary; code-defined skills stay in Future Enhancement Paths. Proceed to Phase 3 (if Phase 2.5 FAIL) or Phase 4 (if Phase 2.5 PASS).
+
+**If any criterion not acceptable:** Authorize targeted migration of the specific failing step to `@skill.script`. Surgical replacement only - not full v2.0 migration. Most likely candidate: Operations Map extraction (Scope Example 1, already specified in Phase 3). Migration runs in parallel with Phase 4 and does not block it unless verdict is Full Migration Recommended.
+
+Phase 2.6 migration is authorized independently of Phase 2.5's binary verdict.
