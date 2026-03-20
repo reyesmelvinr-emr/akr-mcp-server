@@ -243,15 +243,43 @@ End date: TBD
 ### Deliverable Tracking
 | Deliverable | Task | Owner | Status | Evidence | Completion Date | Notes |
 |---|---|---|---|---|---|---|
-| Onboarding | Complete 10-step onboarding checklist for pilot repo | Unassigned | NOT_STARTED | Pending | TBD | Remaining checklist gaps: (1) hook session log creation (.akr/logs/session-*.jsonl) not yet validated via Mode B run; (2) docs/modules/.akr/ directory not yet created in pilot repo - created on first Mode A committed review sheet run |
-| Pilot Artifact Verification | Verify committed review sheet and committed draft are generated and committed to docs/modules/.akr/ on first Mode A + Mode B pilot run | Pilot dev | NOT_STARTED | Pending execution in first unblocked pilot run | TBD | Execute Mode A then Mode B to generate and verify committed artifacts |
-| CODEOWNERS Verification | Confirm CODEOWNERS entry is in place for docs/modules/.akr/ in pilot repo | Pilot dev | NOT_STARTED | Pending | TBD | Audit 2026-03-20 found no docs/modules/.akr/ directory exists in workspace; cannot be created until Mode A rerun; reference PHASE_0_PREREQUISITES.md |
-| Mode A | Propose module groupings using committed review sheet workflow and complete validation | Pilot dev + Tech lead | IN_PROGRESS | PR #4 opened with CI passing (run 23240713978); old PR-diff review approach superseded by committed review sheet workflow (2026-03-19). Re-run Mode A to generate docs/modules/.akr/{project}_review.md; close PR #4 after review sheet approach is confirmed. | TBD | New workflow: agent generates committed review sheet; developer reviews in VS Code; agent patches modules.yaml and opens final PR only after approval |
-| Mode B | Generate and review docs for 3 pilot modules | Unassigned | NOT_STARTED | Pending | TBD | |
-| CI Validation | Validate documented PRs with zero errors | Unassigned | NOT_STARTED | Pending | TBD | |
-| Pilot Metrics | Capture time-to-first-documented-PR and CI pass rates | Unassigned | NOT_STARTED | Pending | TBD | |
-| Independent Usage | Document 2 additional modules without assisted pairing | Unassigned | NOT_STARTED | Pending | TBD | |
-| Retrospective | Complete retrospective and update checklist from lessons learned | Unassigned | NOT_STARTED | Pending | TBD | |
+| Deliverable 1 - Onboarding | Add core-akr-templates as submodule pinned to release tag v1.0.0 (not main) | Pilot dev | IN_PROGRESS | .gitmodules present and git submodule status reports templates/core at 95fd390 (v1.1.0-3-g95fd390) | TBD | Pinned to release lineage (not main); confirm whether strict v1.0.0 pin is still required versus current v1.1.0 baseline |
+| Deliverable 1 - Onboarding | Configure hosted MCP context source or fallback .github/copilot-instructions.md | Pilot dev | NOT_STARTED | Pending | TBD | Must confirm condensed backend charter is accessible |
+| Deliverable 1 - Onboarding | Confirm initial skill copy with SKILL_VERSION match | Pilot dev | COMPLETE | .github/skills/akr-docs/SKILL.md synced; skill-version: 1.0.0 and SKILL_VERSION v1.0.0 marker present | 2026-03-20 | Synced from templates/core bundle |
+| Deliverable 1 - Onboarding | Deploy validate-documentation workflow and verify draft PR trigger | Pilot dev | IN_PROGRESS | .github/workflows/validate-documentation.yml copied from templates/core | TBD | Workflow file deployed; draft PR trigger run ID still pending |
+| Deliverable 1 - Onboarding | Create initial modules.yaml scaffold (project complete, arrays empty) | Pilot dev | COMPLETE | modules.yaml created with project block and empty modules/database_objects/unassigned arrays | 2026-03-20 | Standards baseline set to v1.1.0 with minimum v1.0.0 |
+| Deliverable 1 - Onboarding | Configure Vale rules and .vale.ini for pilot repo | Pilot dev | COMPLETE | .vale.ini present at repo root; validation/vale-rules copied from templates/core | 2026-03-20 | Runtime lint execution still to be captured during CI scenario tests |
+| Deliverable 1 - Onboarding | Verify CODEOWNERS coverage for docs/modules/.akr, docs, modules.yaml, and SKILL.md | Pilot dev | COMPLETE | .github/CODEOWNERS created with coverage for docs/**, docs/modules/.akr/**, modules.yaml, and .github/skills/akr-docs/SKILL.md | 2026-03-20 | Ownership entries established for standards governance |
+| Deliverable 1 - Onboarding | Register repository in core-akr-templates registered-repos list | Standards author | NOT_STARTED | Pending | TBD | Record merged registration PR evidence |
+| Deliverable 1 - Onboarding | Verify distribution workflow reaches pilot repository via workflow_dispatch | Pilot dev | NOT_STARTED | Pending | TBD | Record distribution run ID and target PR |
+| Deliverable 1 - Onboarding | Confirm hooks present and validate .akr/logs/session-YYYYMMDD.jsonl creation via Mode B run | Pilot dev | IN_PROGRESS | .github/hooks/postToolUse.json and .github/hooks/agentStop.json copied from templates/core | TBD | Hook files present; session log creation still requires Mode B execution proof |
+| Deliverable 2 - Mode A | Invoke Mode A for TrainingTracker.Api using committed review sheet workflow | Pilot dev | IN_PROGRESS | Superseded old flow after PR #4 closure; rerun pending with committed review sheet generation | TBD | Generates docs/modules/.akr/{project}_review.md |
+| Deliverable 2 - Mode A | Complete semantic review checklist and capture reassignment count | Pilot dev | NOT_STARTED | Pending | TBD | Validate naming, file role placement, unassigned rationale, businessCapability tags |
+| Deliverable 2 - Mode A | Confirm approval in chat, let agent patch modules.yaml, and open final PR | Pilot dev + Agent | NOT_STARTED | Pending | TBD | Track final PR number and CI result |
+| Deliverable 2 - Mode A | Record validation time from review-sheet display to approval reply (target <= 15 min) | Standards author | NOT_STARTED | Pending | TBD | Replaces old PR-diff timing model |
+| Deliverable 3 - Mode B | Generate and review CourseDomain docs using committed draft workflow | Pilot dev | NOT_STARTED | Pending | TBD | Includes local validator run and PR opening |
+| Deliverable 3 - Mode B | Generate and review EnrollmentDomain docs using committed draft workflow | Pilot dev | NOT_STARTED | Pending | TBD | Includes local validator run and PR opening |
+| Deliverable 3 - Mode B | Generate and review UserDomain docs using committed draft workflow | Pilot dev | NOT_STARTED | Pending | TBD | Includes local validator run and PR opening |
+| Deliverable 3 - Mode B | Capture SSG timing and quality fields for each module into benchmark tracking inputs | Standards author | NOT_STARTED | Pending | TBD | Capture strategy, premium requests, duration, completeness, validator pass, CQS |
+| Deliverable 4 - CI Validation | Execute scenario 1: happy path (all sections present, no unresolved markers) | Pilot dev | NOT_STARTED | Pending | TBD | Expect CI pass |
+| Deliverable 4 - CI Validation | Execute scenario 2: missing required section (Operations Map) | Pilot dev | NOT_STARTED | Pending | TBD | Expect CI fail with clear section error |
+| Deliverable 4 - CI Validation | Execute scenario 3: unresolved question markers in pilot compliance mode | Pilot dev | NOT_STARTED | Pending | TBD | Expect warning-only behavior in pilot mode |
+| Deliverable 4 - CI Validation | Execute scenario 4: file absent from modules.yaml | Pilot dev | NOT_STARTED | Pending | TBD | Expect warning plus generic rule application |
+| Deliverable 4 - CI Validation | Execute scenario 5: Vale prose quality issue | Pilot dev | NOT_STARTED | Pending | TBD | Expect style warnings without merge block |
+| Deliverable 5 - Visual Studio Testing | Configure agent skill in Visual Studio or document fallback path if unavailable | Pilot dev | NOT_STARTED | Pending | TBD | Missing deliverable now added to tracker |
+| Deliverable 5 - Visual Studio Testing | Run Mode A in Visual Studio and capture result | Pilot dev | NOT_STARTED | Pending | TBD | Record parity or gap vs VS Code workflow |
+| Deliverable 5 - Visual Studio Testing | Run Mode B in Visual Studio and capture result | Pilot dev | NOT_STARTED | Pending | TBD | Record parity or gap vs VS Code workflow |
+| Deliverable 5 - Visual Studio Testing | Publish Visual Studio-specific invocation/fallback steps in tracker notes | Standards author | NOT_STARTED | Pending | TBD | Keep process notes in AKR_Tracking only |
+| Deliverable 6 - Independent Usage | Document EnrollmentDomain independently without assisted pairing | Pilot dev | NOT_STARTED | Pending | TBD | Track elapsed time and friction points |
+| Deliverable 6 - Independent Usage | Document UserDomain independently without assisted pairing | Pilot dev | NOT_STARTED | Pending | TBD | Track elapsed time and friction points |
+| Deliverable 7 - Pilot Period | Execute Week 1 paired flow for three modules and capture daily check-ins | Pilot dev + Standards author | NOT_STARTED | Pending | TBD | Collect time-to-doc, unresolved marker fill rate, validation outcomes |
+| Deliverable 7 - Pilot Period | Execute Week 2+ independent module documentation and production-use validation | Pilot dev | NOT_STARTED | Pending | TBD | Include developer satisfaction notes |
+| Deliverable 7 - Pilot Period | Capture ongoing pilot metrics cadence (time, quality, friction, governance signals) | Standards author | NOT_STARTED | Pending | TBD | Feeds Phase 2 retrospective and Phase 2.6 baseline |
+| Deliverable 8 - Retrospective | Conduct full retrospective agenda and capture quantitative summary and recommendations | Standards lead + Pilot team | NOT_STARTED | Pending | TBD | Include governance stability baseline outputs |
+| Deliverable 9 - Checklist Finalization | Update onboarding checklist from pilot findings and validate time estimates | Standards author | NOT_STARTED | Pending | TBD | Missing deliverable now added to tracker |
+| Deliverable 9 - Checklist Finalization | Add platform-specific notes and publish final checklist in core-akr-templates docs | Standards author | NOT_STARTED | Pending | TBD | Keep status updates in AKR_Tracking only |
+| Deliverable 10 - Second Project Onboarding | Select second project and run finalized onboarding checklist end-to-end | Standards lead + Project team | NOT_STARTED | Pending | TBD | Missing deliverable now added to tracker |
+| Deliverable 10 - Second Project Onboarding | Record checklist gaps from second project and apply final refinements | Standards author | NOT_STARTED | Pending | TBD | Completes repeatability proof for Phase 2 exit |
 
 ### Metrics
 | Metric | Target | Current | Status |
@@ -261,11 +289,13 @@ End date: TBD
 | Mode B update-run time (one file changed) | <= 10 min | TBD - requires first incremental Mode B run | NOT_STARTED |
 | Time-to-first-documented-PR | <= 45 min | TBD | NOT_STARTED |
 | First-run CI validation pass rate | >= 95% | TBD | NOT_STARTED |
-| Unresolved question marker rate | < 5% | TBD | NOT_STARTED |
+| Unresolved question marker rate | < 5% unresolved OR >= 95% filled/DEFERRED | TBD | NOT_STARTED |
 | Operations Map completeness on GPT-4o | >= 90% of methods (public + private + async) | TBD - captured during Mode B runs | NOT_STARTED |
 | Self-reporting block absent rate | < 5% of Mode B runs | TBD - captured during Mode B runs | NOT_STARTED |
+| AKR metadata header presence rate | 100% of generated docs include akr-generated metadata block | TBD - captured during Mode B runs | NOT_STARTED |
 | Preview friction score | >= 80% reviews completed in VS Code without opening GitHub | TBD - collected via retrospective form | NOT_STARTED |
 | Reassignment churn rate | 0 PR comments requesting reassignment | TBD | NOT_STARTED |
+| Visual Studio workflow parity | Mode A and Mode B run in Visual Studio OR fallback procedure documented and tested | TBD | NOT_STARTED |
 
 ### Issues and Clarifications
 - 2026-03-19: Decision made not to proceed with human semantic review on PR #4 using the old PR-diff approach. Mode A workflow superseded by committed review sheet model: agent generates docs/modules/.akr/{project}_review.md, developer reviews in VS Code, agent patches modules.yaml and opens PR only after approval. PR #4 to be closed after new Mode A run produces committed review sheet.
@@ -275,6 +305,9 @@ End date: TBD
 - 2026-03-20: PR #4 confirmed closed by user with superseded comment. Consolidated document updates applied to nine docs confirmed completed by user.
 - 2026-03-20: Historical note: Phase 2 was temporarily moved to BLOCKED during external review reconciliation while Phase 1 remediation items were reopened.
 - 2026-03-20: Phase 2 status restored to IN_PROGRESS after Phase 1 gate approval and closure of reopened remediation items.
+- 2026-03-20: Implementation kickoff executed by expanding Phase 2 deliverable tracking to include task-level rows for Deliverables 1 through 10, including previously missing Deliverable 5 (Visual Studio testing), Deliverable 9 (checklist finalization), and Deliverable 10 (second project onboarding). Progress tracking remains centralized in AKR_Tracking.md only.
+- 2026-03-20: Deliverable 1 execution started in repository: synchronized onboarding artifacts from templates/core into pilot repo (.github/workflows/validate-documentation.yml, .github/hooks/*.json, .github/skills/akr-docs/*, .vale.ini, validation/vale-rules/*), created root modules.yaml scaffold, and created .github/CODEOWNERS.
+- 2026-03-20: Open onboarding decision: current submodule pin is 95fd390 (v1.1.0-3-g95fd390). Need standards confirmation whether strict v1.0.0 pin from Phase 2 plan remains mandatory or v1.1.0 baseline is accepted.
 - 2026-03-20: Validation observations logged as **Phase 2 input only** (non-regressions, no Phase 1 reopen impact):
   1. **OBS-1 (Cosmetic):** `core-akr-templates/.github/skills/akr-docs/SKILL-COMPAT.md` still shows `Last updated: 2026-03-17` after 2026-03-20 edits. Handling: update on next SKILL touch or v1.1.1 tag.
   2. **OBS-2 (Informational):** Governance Stability Assessment seed table column shape differs from `PHASE_2_6_GOVERNANCE_STABILITY.md` formal spec. Handling: add formal per-assessment summary table as a second section when Phase 2.6 begins.
@@ -439,3 +472,5 @@ End date: TBD
 - 2026-03-19: Governance updates applied to tracker: (1) Phase 2.6 Governance Stability Assessment added as mandatory new phase; (2) Governance Rules updated with Phase 2.6 execution order; (3) Phase Gate Dashboard updated; (4) Phase 2.5 gate decision updated; (5) Phase 2 metrics expanded to capture Phase 2.6 baseline data; (6) Phase 2.5 acceptance matrix updated to 12 criteria.
 - 2026-03-20: Gap audit of Phases 0, 1, and 2 completed. Two user-confirmed completions: PR #4 closed as superseded; consolidated document updates applied to nine docs. Five missed Phase 1 implementation tasks identified and added as deliverable rows under Phase 1 and tracking notes under Phase 2: (1) SKILL.md committed workflow steps, (2) schema optional fields, (3) validator preview/draft checks, (4) review sheet template, (5) draft output template. Phase 2 execution remains blocked until these are resolved. Reference plan file for all five items: PHASE_1_FOUNDATION.md.
 - 2026-03-20: Added OBS-1 through OBS-5 as Phase 2 input observations (non-regressions) under Phase 2 Issues and Clarifications; no Phase 1 reopen triggered.
+- 2026-03-20: Expanded Phase 2 deliverable table to task-level execution tracking from PHASE_2_PILOT_ONBOARDING and added missing deliverables (Visual Studio testing, checklist finalization, second-project onboarding) without creating separate progress files.
+- 2026-03-20: Started Phase 2 implementation work by applying Deliverable 1 onboarding artifacts directly in akr-mcp-server and updating corresponding Phase 2 row statuses/evidence in this tracker.
