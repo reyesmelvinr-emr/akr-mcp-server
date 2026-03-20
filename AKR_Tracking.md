@@ -253,6 +253,7 @@ End date: TBD
 | Deliverable 1 - Onboarding | Register repository in core-akr-templates registered-repos list | Standards author | NOT_STARTED | Pending | TBD | Record merged registration PR evidence |
 | Deliverable 1 - Onboarding | Verify distribution workflow reaches pilot repository via workflow_dispatch | Pilot dev | NOT_STARTED | Pending | TBD | Record distribution run ID and target PR |
 | Deliverable 1 - Onboarding | Confirm hooks present and validate .akr/logs/session-YYYYMMDD.jsonl creation via Mode B run | Pilot dev | IN_PROGRESS | .github/hooks/postToolUse.json and .github/hooks/agentStop.json copied from templates/core | TBD | Hook files present; session log creation still requires Mode B execution proof |
+| Vale Governance | Add `validation/vale-rules/` and `validation/.vale.ini` to CODEOWNERS in training-tracker-backend | Pilot dev | NOT_STARTED | Pending | TBD | Identified as gap after PR #2 merge; required before onboarding checklist is complete |
 | Deliverable 2 - Mode A | Invoke Mode A for TrainingTracker.Api using committed review sheet workflow | Pilot dev | IN_PROGRESS | Superseded old flow after PR #4 closure; rerun pending with committed review sheet generation | TBD | Generates docs/modules/.akr/{project}_review.md |
 | Deliverable 2 - Mode A | Complete semantic review checklist and capture reassignment count | Pilot dev | NOT_STARTED | Pending | TBD | Validate naming, file role placement, unassigned rationale, businessCapability tags |
 | Deliverable 2 - Mode A | Confirm approval in chat, let agent patch modules.yaml, and open final PR | Pilot dev + Agent | NOT_STARTED | Pending | TBD | Track final PR number and CI result |
@@ -314,6 +315,8 @@ End date: TBD
   3. **OBS-3 (Cosmetic/Efficiency):** Validation workflow installs `requests` with `pyyaml` though validator does not require `requests`. Handling: remove `requests` from CI install step in upcoming workflow touch.
   4. **OBS-4 (Minor):** `date -d` usage in Log Usage Metrics is Linux-specific. Handling: defer to D8 cross-platform pass; acceptable while workflow remains on `ubuntu-latest`.
   5. **OBS-5 (Minor):** macOS CI lane from Phase 0 Test 6 fallback remains unresolved. Handling: deferred to Phase 2 pilot cross-platform capture (already reflected by DEFERRED metric).
+- 2026-03-20: Vale distribution gap identified. `validation/vale-rules/**` and `validation/.vale.ini` were added to `training-tracker-backend` during onboarding bootstrap (PR #2) but are not yet CODEOWNERS-protected in that repo, and no automated distribution mechanism exists for future rule updates from `core-akr-templates`. Decision required: Option A (extend `distribute-skill.yml`) or Option B (submodule path reference in `.vale.ini`). Blocking for Phase 1 completion gate.
+- 2026-03-20: Phase 2 Onboarding Deliverable 1 checklist gap identified. CODEOWNERS in `training-tracker-backend` covers `docs/modules/**`, `modules.yaml`, and `.github/skills/akr-docs/SKILL.md` but does not cover `validation/vale-rules/` or `validation/.vale.ini`. A follow-up PR to `training-tracker-backend` is required to add these paths before the onboarding checklist can be marked complete.
 
 ### Gate Decision
 - Phase 2 Gate: PENDING

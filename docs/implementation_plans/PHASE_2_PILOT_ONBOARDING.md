@@ -78,7 +78,8 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Confirm initial skill copy from submodule | Pilot dev | `.github/skills/akr-docs/SKILL.md` copied from `.akr/templates/.github/skills/akr-docs/SKILL.md`; `SKILL_VERSION` matches current release | 10 min |
 | Deploy `validate-documentation.yml` | Pilot dev | Workflow file in `.github/workflows/`; triggered on draft PR | 30 min |
 | Create initial `modules.yaml` | Pilot dev | Project section complete; `modules[]` empty; `database_objects[]` empty | 30 min |
-| Configure Vale | Pilot dev | Vale rules at `validation/vale-rules/`; `.vale.ini` configured | 30 min |
+| Copy Vale rules bundle into application repo | Pilot dev | `validation/vale-rules/AKR/` and `validation/.vale.ini` present; files copied from `core-akr-templates` submodule path or delivered via distribution PR - not manually authored | 20 min |
+| Add Vale files to CODEOWNERS | Pilot dev | `validation/vale-rules/    @org/standards-team` and `validation/.vale.ini    @org/standards-team` present in CODEOWNERS; prevents local rule edits without standards-team review | 10 min |
 | Test CI workflow | Pilot dev | Trigger workflow on draft PR; verify it runs without errors | 30 min |
 | Create CODEOWNERS file | Pilot dev | Standards team + tech lead as owners for `docs/**`, `modules.yaml`, and `.github/skills/akr-docs/SKILL.md` | 20 min |
 | Register repo in `core-akr-templates` | Standards author | Entry added to `registered-repos.yaml`; registration PR merged | 15 min |
@@ -89,6 +90,8 @@ Recommended CODEOWNERS additions:
 - `docs/modules/**  @org/standards-team @tech-lead`
 - `modules.yaml     @org/standards-team`
 - `.github/skills/akr-docs/SKILL.md  @org/standards-team`
+- `validation/vale-rules/    @org/standards-team`
+- `validation/.vale.ini       @org/standards-team`
 
 **Critical:** Submodule must reference the v1.0.0 release tag, not `main`. Using `main` will cause instability if breaking changes are merged to `core-akr-templates` after pilot begins.
 
@@ -97,6 +100,8 @@ Recommended CODEOWNERS additions:
 **Critical:** `modules.yaml` must be in CODEOWNERS to prevent rogue changes to `compliance_mode` or `max_files` limits without standards team review.
 
 **Critical:** `.github/skills/akr-docs/SKILL.md` must be in CODEOWNERS so manual edits cannot bypass standards-team review.
+
+**Critical:** `validation/vale-rules/` and `validation/.vale.ini` must be in CODEOWNERS. Application teams must never edit these files directly. Rule updates arrive via distribution PRs from `core-akr-templates`.
 
 ### Initial `modules.yaml` Template
 
@@ -607,7 +612,8 @@ Finalize onboarding checklist based on pilot learnings; prepare for second proje
 - [ ] Confirm `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` present (distributed with SKILL.md); run Mode B session to verify `.akr/logs/` is created
 - [ ] Deploy validate-documentation.yml workflow
 - [ ] Create initial modules.yaml (project section only)
-- [ ] Configure Vale rules
+- [ ] Copy Vale rules bundle from submodule or distribution PR (do not manually author)
+- [ ] Add `validation/vale-rules/` and `validation/.vale.ini` to CODEOWNERS under @org/standards-team
 - [ ] Test CI workflow on draft PR
 - [ ] Create CODEOWNERS file
 

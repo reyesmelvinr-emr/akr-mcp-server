@@ -627,6 +627,7 @@ Audit existing `.akr/` infrastructure to migrate rather than rebuild; identify h
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Audit `.akr/workflows/` | Standards author | Both workflows documented; migration plan per workflow | 2 hours |
+| Inventory `.akr/vale-rules/` content and identify path references | Standards author | All rule files listed; any hardcoded `.akr/` paths flagged for update during migration; file count matches analysis estimate (7+ files) | 30 min |
 | Add pilot feature tags to `tag-registry.json` | Standards author | `CourseCatalogManagement` and other pilot tags added; `distribute-tag-registry.yml` validates and distributes | 1 hour |
 | Extended migration inventory | Standards author | Git grep results, CI/CD pipelines, deployment scripts, .gitmodules references documented | 2 hours |
 | Narrow `TEMPLATE_MANIFEST.json` | Standards author | Document deprecated roles; retain only `templateId → version` registry function | 1 hour |
@@ -647,6 +648,11 @@ Audit existing `.akr/` infrastructure to migrate rather than rebuild; identify h
 - Distributes to application repos automatically
 - **Phase 0 action:** Add pilot feature tags; workflow auto-distributes on commit
 - **Phase 4 consideration:** Assess whether `tag-registry.json` can evolve into `feature-registry.yaml`
+
+**3. `.akr/vale-rules/` (7+ rule files) — MIGRATE TO `validation/vale-rules/`**
+- Already present: `RequiredSections.yml` and additional AKR-specific style rules
+- **Phase 1 action:** Move to `validation/vale-rules/`; audit all rule files for hardcoded path references before migration; update `StylesPath` in `.vale.ini` to match new location
+- **Distribution decision required:** These files must reach application repos via `distribute-skill.yml` extension (Option A) or submodule reference (Option B) - see Phase 1 Deliverable 2A. Do not leave this as a manual onboarding-only step.
 
 ### Extended Inventory Commands
 

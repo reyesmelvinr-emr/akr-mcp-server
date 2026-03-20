@@ -454,6 +454,16 @@ Reads space-separated file paths compatible with `tj-actions/changed-files@v41` 
 - Update `.vale.ini` `StylesPath` to `validation/vale-rules`.
 - Add a CI check that fails when `StylesPath` is missing.
 
+**Distribution gap (must be resolved):** Moving the rules to `validation/vale-rules/` in `core-akr-templates` only solves the source-of-truth problem. Application repos that copy these files during onboarding will drift silently when rules change unless a distribution mechanism is specified. See Deliverable 2A for the chosen resolution path.
+
+##### Vale Distribution Decision
+
+**Option A - Extend `distribute-skill.yml`:** Include `validation/vale-rules/` and `validation/.vale.ini` in the distribution bundle. Rule updates flow to registered repos via the same PR mechanism as skill updates, triggered on `v*` tag push. This is the simplest path and keeps all governed artifacts in one workflow.
+
+**Option B - Reference rules via submodule path:** The application repo `.vale.ini` `StylesPath` points into the pinned submodule (`.akr/templates/validation/vale-rules`). No copy exists in the application repo; there is only one copy of the rules, and it updates when the submodule pin is bumped. The tradeoff is a less obvious developer experience when editing `.vale.ini`.
+
+**Decision required before Phase 1 is complete.** The chosen option must be documented here and the appropriate task added to the Deliverable 2A task table.
+
 #### Change 6: Remove Traceability Download
 
 - Remove step that downloads `validate_traceability.py` from `akr-mcp-server`.
@@ -540,6 +550,8 @@ Phase 2 begins copying skill files into application repositories. Without distri
 | Add per-repo distribution status summary and failure follow-up | Standards author | Workflow summary lists success/failure for each repo; failures create or link tracking issue for stale-skill follow-up | 45 min |
 | Add distribution checks to release checklist | Standards author | v1.0.0 release checklist includes distribution validation | 10 min |
 | Include `.github/hooks/` in distribution bundle | Standards author | `distribute-skill.yml` copies `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` to registered repos alongside `SKILL.md`; PR body notes that hook files must be merged to activate local validation | 1 hour |
+| Decide and document Vale distribution mechanism (Option A or B) | Standards lead | Decision recorded in Phase 1 plan; either `distribute-skill.yml` extended to include `validation/vale-rules/` bundle OR `.vale.ini` `StylesPath` updated to reference submodule path; application repo CODEOWNERS updated accordingly | 1 hour |
+| Extend `distribute-skill.yml` to include Vale bundle (if Option A) | Standards author | Workflow copies `validation/vale-rules/**` and `validation/.vale.ini` to registered repos alongside skill files; PR body notes Vale files must not be locally edited; test run confirms files arrive in target pilot repo via PR | 1.5 hours |
 
 ### Required Secret
 
@@ -563,6 +575,24 @@ core-akr-templates/
     hooks/
       postToolUse.json                             (NEW — logs file writes to .akr/logs/)
       agentStop.json                               (NEW — auto-runs validate_documentation.py)
+  validation/
+    vale-rules/
+      AKR/
+        RequiredSections.yml                       (source of truth; never edit in app repos)
+        Terminology.yml
+        ...
+    .vale.ini                                      (canonical config template)
+```
+
+Per-project (if Option A is selected):
+
+```
+[application-repo]/
+  validation/
+    vale-rules/
+      AKR/
+        RequiredSections.yml                       (distributed copy; CODEOWNERS protected)
+    .vale.ini                                      (distributed copy)
 ```
 
 ### SKILL.md Mode B SSG Pass Sequence
@@ -1280,6 +1310,14 @@ Document compliance mode graduation criteria and `TEMPLATE_MANIFEST.json` narrow
 
 **Validation:** Entries must match `tag-registry-schema.json` `patternProperties` regex (`^[A-Z][a-zA-Z0-9]*$`)
 
+### Vale Rules Governance
+
+Vale rule files in `validation/vale-rules/` are governed artifacts. Application repo teams must never edit these files directly. All rule changes originate in `core-akr-templates` and arrive via the distribution mechanism chosen in Deliverable 2A.
+
+**To request a rule change:** Open an issue in `core-akr-templates` with the label `vale-rule-request`. The standards team reviews, authors the change, and releases it in the next minor version. The updated rules reach all registered repos via the automated distribution PR.
+
+**CODEOWNERS requirement:** `validation/vale-rules/` and `validation/.vale.ini` must be added to CODEOWNERS in every application repo during onboarding, requiring standards-team approval for any PR that touches these paths. This is a blocking requirement, not optional.
+
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
@@ -1287,6 +1325,7 @@ Document compliance mode graduation criteria and `TEMPLATE_MANIFEST.json` narrow
 | Document compliance mode graduation | Standards author | Process documented in `VALIDATION_GUIDE.md`; includes emergency rollback procedure (--fail-on=never usage, authority requirements, hotfix SLA, org-wide disable mechanism) | 1.5 hours |
 | Document `TEMPLATE_MANIFEST.json` narrowing | Standards author | CHANGELOG entry; deprecated roles listed | 1 hour |
 | Document tag registry requirements | Standards author | New entry requirements in `TAG_REGISTRY_GUIDE.md` | 1 hour |
+| Document Vale rules governance policy | Standards author | Policy present in `VALIDATION_GUIDE.md`: no direct edits in app repos; rule-change request process; CODEOWNERS requirement | 30 min |
 | Implement CI check for templateId validity | Standards author | Workflow step validates Agent Skill references | 2 hours |
 | Update pilot `.akr-config.json` monitoring config for SSG | Standards author | Pilot project config includes `ssg-pass-timings` and `ssg-slow-module-events` in `trackMetrics`; activation synchronized with SKILL.md SSG sequence (Deliverable 5, Step 3) | 15 min |
 
@@ -1452,6 +1491,7 @@ Tag `core-akr-templates` v1.0.0 and publish release notes.
 - [ ] Distribution workflow fires successfully on v1.0.0 tag push
 - [ ] `docs/DEVELOPER_REFERENCE.md` updated with HITL alignment and role mapping
 - [ ] `docs/VALIDATION_GUIDE.md` updated with compliance mode graduation and rollback procedure
+- [ ] Vale distribution mechanism decided (Option A or B) and implemented; `VALIDATION_GUIDE.md` documents which option is in use and how to request a rule update
 - [ ] **`minimum_standards_version` initial value decided** (see Critical Decision below)
 - [ ] CHANGELOG updated with breaking changes
 - [ ] Migration guide written (`.akr/` → `validation/` paths)
@@ -1558,6 +1598,7 @@ Phase 1 succeeds when:
 ✅ `akr-config-schema.json`: `project_type` added to required tags  
 ✅ HITL alignment: Role mapping documented; templates updated  
 ✅ Governance policies: Compliance graduation + TEMPLATE_MANIFEST narrowing documented  
+✅ Vale distribution mechanism implemented (Option A or B); `VALIDATION_GUIDE.md` documents governance policy; CODEOWNERS requirement for `validation/vale-rules/` documented  
 ✅ Cross-platform: Ubuntu + macOS + Windows all passing  
 ✅ v1.0.0 release: Tagged, release notes published, team announced  
 ✅ `SKILL.md` frontmatter: `disable-model-invocation: true` + self-reporting CRITICAL block + `<!-- akr-generated -->` Mode B final step all present  
