@@ -462,7 +462,11 @@ Reads space-separated file paths compatible with `tj-actions/changed-files@v41` 
 
 **Option B - Reference rules via submodule path:** The application repo `.vale.ini` `StylesPath` points into the pinned submodule (`.akr/templates/validation/vale-rules`). No copy exists in the application repo; there is only one copy of the rules, and it updates when the submodule pin is bumped. The tradeoff is a less obvious developer experience when editing `.vale.ini`.
 
-**Decision required before Phase 1 is complete.** The chosen option must be documented here and the appropriate task added to the Deliverable 2A task table.
+**Decision:** Option A selected on 2026-03-20.
+
+**Rationale:** Local file distribution avoids CI submodule initialization coupling, keeps Vale artifacts visible in application repos, and allows explicit CODEOWNERS enforcement on `validation/vale-rules/` and `validation/.vale.ini`.
+
+**Implementation linkage:** Deliverable 2A tasks "Decide and document Vale distribution mechanism" and "Extend `distribute-skill.yml` to include Vale bundle" are the execution path for this decision.
 
 #### Change 6: Remove Traceability Download
 
