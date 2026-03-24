@@ -243,7 +243,7 @@ End date: TBD
 ### Deliverable Tracking
 | Deliverable | Task | Owner | Status | Evidence | Completion Date | Notes |
 |---|---|---|---|---|---|---|
-| Deliverable 1 - Onboarding | Add core-akr-templates as submodule pinned to release tag v1.0.0 (not main) | Pilot dev | IN_PROGRESS | .gitmodules present and git submodule status reports templates/core at 95fd390 (v1.1.0-3-g95fd390) | TBD | Pinned to release lineage (not main); confirm whether strict v1.0.0 pin is still required versus current v1.1.0 baseline |
+| Deliverable 1 - Onboarding | Add core-akr-templates as submodule pinned to release tag v1.0.0 (not main) | Pilot dev | COMPLETE | .gitmodules present; submodule path confirmed as .akr/templates; pinned to f972ce2 (v1.1.0-6-gf972ce2, current HEAD of core-akr-templates post-PR4, accepted as v1.1.0 baseline per 2026-03-24 pin decision) | 2026-03-24 | Pin decision resolved: v1.1.0 baseline accepted over strict v1.0.0; submodule path is .akr/templates |
 | Deliverable 1 - Onboarding | Configure hosted MCP context source or fallback .github/copilot-instructions.md | Pilot dev | NOT_STARTED | Pending | TBD | Must confirm condensed backend charter is accessible |
 | Deliverable 1 - Onboarding | Confirm initial skill copy with SKILL_VERSION match | Pilot dev | COMPLETE | .github/skills/akr-docs/SKILL.md synced; skill-version: 1.0.0 and SKILL_VERSION v1.0.0 marker present | 2026-03-20 | Synced from templates/core bundle |
 | Deliverable 1 - Onboarding | Deploy validate-documentation workflow and verify draft PR trigger | Pilot dev | IN_PROGRESS | .github/workflows/validate-documentation.yml copied from templates/core | TBD | Workflow file deployed; draft PR trigger run ID still pending |
@@ -319,7 +319,22 @@ End date: TBD
 - 2026-03-20: Implementation kickoff executed by expanding Phase 2 deliverable tracking to include task-level rows for Deliverables 1 through 10, including previously missing Deliverable 5 (Visual Studio testing), Deliverable 9 (checklist finalization), and Deliverable 10 (second project onboarding). Progress tracking remains centralized in AKR_Tracking.md only.
 - 2026-03-20: Deliverable 1 execution started in repository: synchronized onboarding artifacts from templates/core into pilot repo (.github/workflows/validate-documentation.yml, .github/hooks/*.json, .github/skills/akr-docs/*, .vale.ini, validation/vale-rules/*), created root modules.yaml scaffold, and created .github/CODEOWNERS.
 - 2026-03-21: Gap audit completed against PHASE_2_PILOT_ONBOARDING.md. Identified 10 task rows defined in the plan that were not yet tracked: 3 in Deliverable 1 (friction doc, tooling validation, Mode A scheduling), 1 in Deliverable 2 (tech lead spot-check), 2 in Deliverable 7 (template iteration and CHANGELOG rationale), and 4 in Deliverable 8 (retrospective deck preparation, recommendations document, template update task, v1.1.0 tag task). All 10 rows added to Deliverable Tracking table. No new files created.
-- 2026-03-20: Open onboarding decision: current submodule pin is 95fd390 (v1.1.0-3-g95fd390). Need standards confirmation whether strict v1.0.0 pin from Phase 2 plan remains mandatory or v1.1.0 baseline is accepted.
+- 2026-03-23: Submodule pin decision: v1.1.0 baseline accepted (Option B).
+  Rationale: v1.1.0 is the first complete Phase 1 foundation release. All Phase 1
+  remediation items are closed. Running against v1.0.0 (bootstrap commit 3837e6f5c)
+  would test an incomplete foundation. Current HEAD f972ce2 includes today's two
+  merged PRs (distribution workflow fix + token access investigation) and is
+  accepted as the pilot baseline.
+  Action taken: Submodule in training-tracker-backend at .akr/templates updated
+  from 3837e6f5c (v1.0.0 bootstrap) to f972ce2. Note: submodule path is
+  .akr/templates (not templates/core as originally referenced in plan docs).
+  Standards version in modules.yaml remains v1.1.0 with
+  minimum_standards_version: v1.0.0.
+- 2026-03-24: Submodule pin decision resolved. v1.1.0 baseline accepted (Option B).
+  Submodule path confirmed as .akr/templates (not templates/core as originally
+  referenced in plan docs). Final pin: f972ce2 (v1.1.0-6-gf972ce2), confirmed
+  via git submodule status. Standards version in modules.yaml remains v1.1.0
+  with minimum_standards_version: v1.0.0.
 - 2026-03-20: Validation observations logged as **Phase 2 input only** (non-regressions, no Phase 1 reopen impact):
   1. **OBS-1 (Cosmetic):** `core-akr-templates/.github/skills/akr-docs/SKILL-COMPAT.md` still shows `Last updated: 2026-03-17` after 2026-03-20 edits. Handling: update on next SKILL touch or v1.1.1 tag.
   2. **OBS-2 (Informational):** Governance Stability Assessment seed table column shape differs from `PHASE_2_6_GOVERNANCE_STABILITY.md` formal spec. Handling: add formal per-assessment summary table as a second section when Phase 2.6 begins.
