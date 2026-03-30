@@ -264,6 +264,75 @@ The committed draft also changes what SSG Pass 2 means in the update context. Pa
 
 ---
 
+## Part 3A: Separation of Concerns for Context Optimization
+
+### Why this separation is required
+
+Pilot assets currently repeat the same requirements across four surfaces: full charters, module templates, `.github/copilot-instructions.md`, and `SKILL.md` workflow steps. The repeated content causes three concrete failures:
+
+1. **Token waste in every Mode B run** because the model re-reads equivalent constraints from multiple files.
+2. **Conflict drift** when one file updates and another copy of the rule remains stale.
+3. **Ambiguous enforcement ownership** where teams cannot tell whether a failure should be fixed in template shape, workflow sequencing, or policy constraints.
+
+The solution is strict ownership by function: **why (charter), what (copilot instructions), shape (template), and when/how (skill steps)**.
+
+### Definitive ownership model
+
+| Artifact | Primary Purpose | Must Contain | Must Not Contain |
+|---|---|---|---|
+| Full Charter (`.akr/charters/*.md`) | Governance rationale and policy intent | Principles, rationale, tradeoffs, decision history, examples for human understanding | Runtime generation steps, duplicated marker syntax blocks, repeated section checklists already enforced elsewhere |
+| Condensed Copilot Instructions (`copilot-instructions/*.instructions.md` and fallback `.github/copilot-instructions.md`) | Runtime constraints loaded into model context | Required front matter keys, marker policy, required section constraints, exclusions, minimum quality gates | Pass-by-pass workflow orchestration, long rationale prose, large examples |
+| Module Templates (`templates/*_module*.md`) | Output document shape | Section order, headings, table schemas, placeholders | Policy explanations, workflow instructions, repeated rule definitions that belong to copilot instructions |
+| Skill Workflow (`.github/skills/akr-docs/SKILL.md`) | Execution sequence and HITL gates | Mode A/B/C steps, branching logic, approval stops, artifact paths, metadata write steps | Duplicated policy/rule semantics that already live in copilot instructions |
+
+### Rationale by artifact
+
+- **Charter -> rationale only**: charters are the authoritative source of intent and evolution. They are read by humans and reviewers, not optimized as active generation context. Moving operational constraints out of charter reduces context pressure without losing governance traceability.
+- **Copilot instructions -> constraints only**: this is the highest-frequency runtime context. It must be compact and deterministic so every run gets one unambiguous set of rules.
+- **Templates -> shape only**: template inflation directly increases generation tokens. Keeping only document skeleton and placeholders minimizes context and avoids conflicting prose guidance.
+- **SKILL.md -> sequence only**: step files should govern orchestration and approval flow. If policy rules are duplicated in SKILL.md, both policy and sequence drift together and become hard to validate.
+
+### Recommended normalization changes
+
+#### A. Charter updates
+
+- Keep universal principles and backend rationale in full charter files.
+- Replace repeated operational blocks with short references to condensed instructions and validator enforcement points.
+- Add a one-line note in each charter: "Reference document for governance intent; runtime constraints are enforced via copilot instructions and validator."
+
+#### B. Template updates
+
+- Remove explanatory policy prose from templates (for example marker semantics and rule-format explanations).
+- Keep only section scaffolds, tables, and placeholder markers (`🤖`, `❓`) where needed for authoring flow.
+- Ensure module templates remain strictly structural so they can be reused across models without policy drift.
+
+#### C. Copilot instructions updates
+
+- Consolidate all runtime constraints into one concise contract per project type.
+- Keep: front matter fields, marker rules, mandatory sections, exclusions, and completeness thresholds.
+- Remove: pass sequencing and mode orchestration details (owned by `SKILL.md`).
+
+#### D. SKILL.md updates
+
+- Retain only workflow sequencing and approval gating for Mode A/B/C.
+- Replace duplicated marker/quality policy text with explicit reference to copilot instruction contract.
+- Keep metadata header write requirements and committed artifact checkpoints as workflow obligations.
+
+### Expected measurable outcomes
+
+| Outcome | Baseline Risk | Post-normalization Expectation |
+|---|---|---|
+| Context load per Mode B run | Elevated by repeated policy text | Lower token load due to single-copy constraints |
+| Rule drift across artifacts | High when updates are partial | Reduced through single-owner rule placement |
+| Debugging governance failures | Ambiguous root cause | Faster triage by artifact ownership (policy vs workflow vs shape) |
+| Pilot onboarding clarity | Mixed due to overlap | Clear where to edit for each change type |
+
+### Implementation consequence
+
+Phase 2 should include a targeted "artifact normalization" workstream that updates all four surfaces in one coordinated pass, then validates parity with pilot repos through distribution workflow and CI checks.
+
+---
+
 ## Part 4: The `modules.yaml` Schema — Definitive Specification
 
 This schema is the single most important new artifact in the entire implementation. `validate_documentation.py`, `consolidate.py`, and both Agent Skill modes all read from it.

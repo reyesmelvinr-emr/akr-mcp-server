@@ -74,6 +74,7 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Add `core-akr-templates` as submodule | Pilot dev | Submodule pinned to **v1.0.0 release tag** (not `main`); `.gitmodules` configured | 15 min |
+| Initialize submodule for local hook/runtime use | Pilot dev | `git submodule update --init --recursive` executed; `.akr/templates/.akr/scripts/validate_documentation.py` resolvable in local working tree | 5 min |
 | Configure hosted MCP context source OR `.github/copilot-instructions.md` | Pilot dev | Context source configured; condensed backend charter accessible | 30 min |
 | Confirm initial skill copy from submodule | Pilot dev | `.github/skills/akr-docs/SKILL.md` copied from `.akr/templates/.github/skills/akr-docs/SKILL.md`; `SKILL_VERSION` matches current release | 10 min |
 | Deploy `validate-documentation.yml` | Pilot dev | Workflow file in `.github/workflows/`; triggered on draft PR | 30 min |
@@ -84,7 +85,7 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Create CODEOWNERS file | Pilot dev | Standards team + tech lead as owners for `docs/**`, `modules.yaml`, and `.github/skills/akr-docs/SKILL.md` | 20 min |
 | Register repo in `core-akr-templates` | Standards author | Entry added to `registered-repos.yaml`; registration PR merged | 15 min |
 | Verify distribution workflow reaches this repo | Pilot dev | `workflow_dispatch` targeting this repo opens an update PR | 15 min |
-| Confirm `.github/hooks/` directory present | Pilot dev | Both `postToolUse.json` and `agentStop.json` present in application repo (distributed by `distribute-skill.yml`); test by running a Mode B session and confirming `.akr/logs/session-YYYYMMDD.jsonl` is created | 15 min |
+| Confirm `.github/hooks/` directory present | Pilot dev | Both `postToolUse.json` and `agentStop.json` present in application repo (distributed by `distribute-skill.yml`); run a Mode B session and confirm both `.akr/logs/session-YYYYMMDD.jsonl` and `.akr/logs/last-validation.json` are created | 15 min |
 
 Recommended CODEOWNERS additions:
 - `docs/modules/**  @org/standards-team @tech-lead`
@@ -239,6 +240,16 @@ CI validates modules.yaml schema, enum values, and businessCapability tags.
 
 Run Agent Skill Mode B to generate documentation for CourseDomain module; developer reviews and fills `❓` sections.
 
+### Reusable Section Guidance Block Reference
+
+Use the draft section-guidance standard at:
+`docs/implementation_plans/SECTION_GUIDANCE_BLOCK_DRAFT.md`
+
+Phase 2 application scope:
+- Apply the TL;DR guidance block in pilot module template runs so TL;DR output remains business-readable for Product Owner and QA audiences.
+- Collect reviewer feedback on clarity and usefulness during Deliverable 7 retrospective inputs.
+- Promote to normalized template pattern only after pilot validation confirms value and low context overhead.
+
 ### Invocation
 
 **In VS Code Copilot Chat:**
@@ -295,11 +306,13 @@ CI validates final file. modules.yaml updated with draft_output, last_reviewed_a
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
 | Invoke Mode B for CourseDomain | Pilot dev | Agent generates draft documentation | 10 min (agent time) |
+| Apply reusable TL;DR section guidance block in draft review | Pilot dev | TL;DR section aligns with `SECTION_GUIDANCE_BLOCK_DRAFT.md` and is readable by non-implementing stakeholders | 5 min |
 | Review and fill content | Pilot dev | All checklist items completed | 30 min |
 | Run `validate_documentation.py` locally | Pilot dev | Zero errors; all required sections present | 5 min |
 | Open Mode B PR | Pilot dev | Draft PR with completed checklist | 5 min |
 | Tech lead approval | Tech lead | Content accuracy validated; PR approved | 10 min |
 | Record generation time | Standards author | Actual time vs. 30 min target documented | 2 min |
+| Record section-guidance feedback | Standards author | Feedback captured for TL;DR clarity and recommendation status for template normalization | 3 min |
 
 ### Incremental Update Procedure (subsequent Mode B runs after code changes)
 
