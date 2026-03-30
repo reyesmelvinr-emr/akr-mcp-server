@@ -331,6 +331,68 @@ The solution is strict ownership by function: **why (charter), what (copilot ins
 
 Phase 2 should include a targeted "artifact normalization" workstream that updates all four surfaces in one coordinated pass, then validates parity with pilot repos through distribution workflow and CI checks.
 
+### Addendum 1: Charter Normalization Scope — Line-Level Removal Table for AKR_CHARTER_BACKEND.md
+
+| Charter Section | Lines | Action | Rationale |
+|---|---|---|---|
+| Service Naming Conventions | 73–177 | **Retain** — governance rationale for naming | Not duplicated in instructions |
+| Service Documentation Structure (Tiers 1–3) | 179–275 | **Retain** — rationale for section tiers | Informs editorial decisions |
+| Service Documentation Patterns — Business Rules Format | 280–313 | **Retain header/rationale only; remove worked example** | Table schema duplicated in `backend-service.instructions.md §Business Rules Requirements` |
+| Flow Diagrams — Template + Real Example | 316–384 | **Remove both code blocks; retain "why text-based" rationale** | Duplicates template shape already in `lean_baseline_service_template_module.md` |
+| Dependencies/Consumers Documentation — full tables with examples | 387–425 | **Remove example tables; retain column descriptions only** | Schema duplicated in instructions §Module Files Rules |
+| Data Operations Documentation — full tables with examples | 428–466 | **Remove example tables; retain rationale paragraph** | Schema duplicated in instructions §Data Operations Requirements |
+| Enterprise Best Practices §1–7 (entire section, lines 469–935) | 469–935 | **Move to a new file: `docs/patterns/backend-best-practices.md`** | ~466 lines of C# code samples — this is the primary source of the ~8,500-token excess |
+| AI-Assisted Documentation Workflow | 939–1016 | **Remove** — superseded by SKILL.md workflow | Copilot prompt in lines 962–997 conflicts with SKILL.md Mode B step 2 routing |
+| Cross-Repository Integration | 1019–1064 | **Retain** — governance for cross-repo linking not duplicated elsewhere | |
+| Common Anti-Patterns (lines 1068–1290) | 1068–1290 | **Move to `docs/patterns/backend-best-practices.md`** | ~222 more lines of C# code — not a generation-time artifact |
+| Maintenance and Evolution | 1293–1335 | **Retain** — governance intent for update cadence | |
+| Quick Reference (Copilot Steps) | 1339–1366 | **Remove** — superseded by SKILL.md Mode B workflow | |
+
+**Net effect:** Charter reduces from ~1,366 lines (~11,000 tokens) to approximately 350–400 lines (~2,800 tokens). A new `backend-best-practices.md` file receives the code examples for human reference — not removed from the repo, just decoupled from the generation-time load path.
+
+Add the one-line handoff note to the charter `## Purpose` section:
+> `"Reference document for governance intent; runtime constraints enforced via copilot-instructions/backend-service.instructions.md and validate_documentation.py. This document is the rationale reference only."`
+
+### Addendum 2: Template Normalization Scope — Line-Level Removal Table for lean_baseline_service_template_module.md
+
+| Template Element | Lines | Action | Rationale |
+|---|---|---|---|
+| Module Grouping Principle prose block | 44–50 | **Remove entirely** | Governed by SKILL.md Mode A step 3–4; duplication is a drift vector |
+| `Capabilities` section example bullets | 67–71 | **Remove example** | Placeholder examples inflate context; developer sees output from Mode B, not template |
+| `Not Responsible For` example bullets | 78–82 | **Remove example** | Same reason |
+| `File Interaction Pattern` static prose | 217–222 | **Remove** | This is a pattern description, not a structural placeholder; belongs in charter |
+| `Common Questions` sub-bullets in Business Rules | 241–243 | **Remove** | Redundant with marker policy; ❓ marker already instructs same behavior |
+| `Expected vs Unexpected Failures` static prose | 392–401 | **Remove** | Static how-to prose in a generation template; belongs in charter or patterns doc |
+| `Template Metadata` footer (entire section) | 459–471 | **Remove entirely** | Authoring guidance — belongs in `README.md` or onboarding doc, not a generation artifact |
+
+**Net effect:** Template reduces from 472 lines (~7,000 tokens) to approximately 360 lines (~4,200 tokens). A ~2,800-token reduction per Mode B run.
+
+### Addendum 3: SKILL.md and Instructions File Minor Fixes
+
+**For SKILL.md lines 117–121 (Marker policy block):**
+Replace the current:
+```
+Marker policy:
+- Use 🤖 for inferred statements.
+- Use ❓ for unresolved required inputs.
+- Use NEEDS and VERIFY for outstanding checks.
+- Use DEFERRED only with explicit rationale.
+```
+With:
+```
+Marker policy: Apply rules as defined in the loaded condensed charter (copilot-instructions/). 
+Do not restate marker rules here.
+```
+**Rationale:** The identical rules exist at `backend-service.instructions.md §Transparency Marker Rules` lines 40–51. Two sources of truth for the same rule will diverge after the first independent update to either file.
+
+**For `backend-service.instructions.md §Section-Scoped Generation Rules` lines 125–132:**
+These four pass-discipline rules (`Load only needed charter slice...`, `Build forward payload...`, `Do not re-expand...`, `If pass split is used...`) are workflow orchestration. They exist verbatim in SKILL.md at lines 109–115 (SSG rules block).
+Replace with:
+```
+## Section-Scoped Generation Rules
+SSG pass discipline is governed by SKILL.md §SSG rules. This file does not restate workflow steps.
+```
+
 ---
 
 ## Part 4: The `modules.yaml` Schema — Definitive Specification
@@ -1620,6 +1682,7 @@ Gate: Phase 2 stable ≥6 weeks; zero bypass events; all docs tagged.
 | `copilot-instructions.md` character limit | Is ~4,000 characters sufficient for condensed backend charter? | Test during charter compression |
 | Template adaptation acceptance | Does adapted `lean_baseline_service_template.md` produce output matching `courses_service_doc.md`? | Phase 1 deliverable; `courses_service_doc.md` is the spec |
 | Agent Skills hooks support in GitHub Copilot | Do `.github/hooks/postToolUse.json` and `.github/hooks/agentStop.json` trigger in Copilot agent mode (not just Claude Code)? | Test during Phase 1 Deliverable 7A; if not supported, document as known gap in `SKILL-COMPAT.md`; CI gate remains the enforcement backstop |
+| Charter content migration destination | The `Enterprise Best Practices` (lines 469–935, ~466 lines of C# code) and `Common Anti-Patterns` (lines 1068–1290, ~222 lines) sections from `AKR_CHARTER_BACKEND.md` must be relocated before Mode B runs begin. Should a new file `docs/patterns/backend-best-practices.md` be created to house these sections, or should they be archived separately? | **Decision required during Phase 2 Deliverable 11 (Artifact Normalization).** Once resolved, the charter file path and content destination must be updated in all related documentation (`PHASE_2_PILOT_ONBOARDING.md`, tracking table, validator scope). This is not a governance decision — it is a file organization decision — but it must be resolved before charter compression is finalized or the patterns will be lost rather than relocated. **Proposed action:** Create `docs/patterns/backend-best-practices.md` and use it as the archive location; add a reference link in the compressed charter. |
 
 ---
 
