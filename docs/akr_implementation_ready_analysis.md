@@ -1116,6 +1116,7 @@ All five tests must pass (or have documented fallback architectures) before Phas
 |---|---|---|---|
 | 1 — Code Analysis Capability | Copilot + condensed charter extracts module-level content correctly; skill invocation confirmed | Agent correctly groups 5 files into one CourseDomain doc; covers Controller + Service + Repository + DTOs in a single output; ≥90% section match across 3 runs; **self-reporting block present in all 3 runs**; **`<!-- akr-generated -->` metadata header present in output** (Review 9 additions — these are now required pass criteria, not optional observations) | Hybrid: retain `CodeAnalyzer` from `akr-mcp-server` for deterministic extraction; hosted MCP for governance |
 | 2 — Context Source Configuration | `core-akr-templates` available as hosted MCP context source at current plan tier | Context source appears in Settings → Copilot → MCP; available in VS Code + Visual Studio; context pulled on new sessions | Use `.github/copilot-instructions.md` with condensed charter as primary delivery |
+| 2A — GitHub MCP Server Charter Access (Supplemental) | GitHub MCP Server available in VS Code via `@github` tool calls; on-demand charter pull confirmed | `@github get files with names like CHARTER.md` returns `.akr/charters/AKR_CHARTER_BACKEND.md` and compressed charters from `core-akr-templates/copilot-instructions/`; GitHub MCP extension installed and authenticated; no additional licensing required | Visual Studio parity to be determined in Phase 2 Deliverable 5; Test 2 (Hosted MCP) remains FALLBACK |
 | 3 — Large Module Stress Test | Module with 8 files, 2,000+ LOC: no section truncation | All module-required sections present (Module Files, Operations Map, full-stack diagram, Business Rules, Data Operations); validate_documentation.py passes | `max_files: 8` enforced as governance ceiling; provide `max_files: 5` guidance for large-file modules |
 | 4 — GitHub Actions Invocability | Whether Copilot can be invoked from Actions (Phase 4 automation) | Either: working Copilot-from-Actions mechanism documented, or Phase 4 deterministic aggregation design confirmed as sufficient | Phase 4 deterministic aggregation (already designed; this test confirms the fallback is the plan) |
 | 5 — Data Governance / Compliance | Legal and security sign-off on Copilot processing org code | Written approval from governance and legal; Copilot data handling confirmed against org data residency requirements | Manual documentation with templates only; no AI generation assistance |
@@ -2086,6 +2087,17 @@ This rule prevents context re-expansion, where earlier passes accumulate in late
 | Pass 6 → Pass 7 | Full assembled draft (all sections joined; no token limit — this is the document) |
 
 The Pass 6 → Pass 7 handoff carries the complete draft because Pass 7's only job is final assembly, metadata header writing, and validation. No source files are re-read in Pass 7.
+
+### 18.4.1 @github Tool Call Discipline in SSG Passes
+
+When charter loading uses `@github` tool calls (PATH A in SKILL.md Mode B Step 2), the following discipline is mandatory:
+
+1. **Pass 1 only**: Charter and `modules.yaml` are fetched via `@github` in Pass 1. The condensed charter content is placed in the forward payload as a summary (≤500 tokens).
+2. **No re-fetch after Pass 2**: Passes 2 through 7 use only the forward payload summary. No `@github` tool calls are authorized in Passes 2 through 7.
+3. **Premium request budget**: Each `@github` tool call consumes one premium request. Mode B SSG budgets exactly 2 `@github` calls per run (charter + `modules.yaml`). Any additional `@github` calls create unbudgeted premium request consumption.
+4. **Violation impact**: Re-reading charters or source files via `@github` after Pass 2 negates the context-scoping benefit of SSG and inflates premium request counts. SKILL-COMPAT.md documents this as a GPT-4o-specific failure mode due to model tendency to re-request tools at high pass depths.
+
+This discipline is enforced in SKILL.md via an explicit prohibition block in Mode B Step 2.
 
 ---
 

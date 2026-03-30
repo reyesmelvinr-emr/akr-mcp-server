@@ -75,7 +75,8 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 |---|---|---|---|
 | Add `core-akr-templates` as submodule | Pilot dev | Submodule pinned to **v1.0.0 release tag** (not `main`); `.gitmodules` configured | 15 min |
 | Initialize submodule for local hook/runtime use | Pilot dev | `git submodule update --init --recursive` executed; `.akr/templates/.akr/scripts/validate_documentation.py` resolvable in local working tree | 5 min |
-| Configure hosted MCP context source OR `.github/copilot-instructions.md` | Pilot dev | Context source configured; condensed backend charter accessible | 30 min |
+| Step 1a: Confirm GitHub MCP Server (`@github`) available in VS Code | Pilot dev | GitHub MCP extension installed and authenticated; `@github get files with names like CHARTER.md` returns charter files | 10 min |
+| Step 1b: Configure hosted MCP context source OR `.github/copilot-instructions.md` as primary charter delivery fallback | Pilot dev | Context source configured; condensed backend charter accessible | 30 min |
 | Confirm initial skill copy from submodule | Pilot dev | `.github/skills/akr-docs/SKILL.md` copied from `.akr/templates/.github/skills/akr-docs/SKILL.md`; `SKILL_VERSION` matches current release | 10 min |
 | Deploy `validate-documentation.yml` | Pilot dev | Workflow file in `.github/workflows/`; triggered on draft PR | 30 min |
 | Create initial `modules.yaml` | Pilot dev | Project section complete; `modules[]` empty; `database_objects[]` empty | 30 min |
@@ -425,12 +426,13 @@ Validate that workflow functions correctly in Visual Studio (not just VS Code).
 | Run Mode A in Visual Studio | Pilot dev | Grouping proposal generated successfully OR fallback documented | 30 min |
 | Run Mode B in Visual Studio | Pilot dev | Documentation generated successfully OR fallback documented | 30 min |
 | Document Visual Studio-specific steps | Standards author | README includes VS-specific configuration AND fallback workflow | 2 hours |
+| Verify `@github` MCP tool call availability in Visual Studio Copilot Chat | Pilot dev | `@github get files with names like CHARTER.md` returns charter files OR limitation documented; VS parity vs VS Code recorded before Mode A/B VS runs begin | 15 min |
 
 ### Visual Studio Considerations
 
 - **Skill loading:** May require different `.github/` path configuration
 - **Copilot Chat integration:** UI differs from VS Code; document invocation patterns
-- **MCP context source:** Confirm hosted MCP works in VS (if Test 2 passed)
+- **MCP context source:** Confirm hosted MCP works in VS (if Test 2 passed). Also verify `@github` tool call availability: run `@github get files with names like CHARTER.md` in VS Copilot Chat. If `@github` is unavailable in VS, PATH B (local file fallback) in SKILL.md Mode B Step 2 applies for all VS sessions.
 - **Terminal commands:** `validate_documentation.py` runs from Developer PowerShell
 - **Fallback plan:** If Agent Skills are unavailable in VS, document workaround using VS Code for Mode A/B invocations + VS for code editing + CI validation
 
