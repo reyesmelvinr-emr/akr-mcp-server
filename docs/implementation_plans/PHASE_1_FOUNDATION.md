@@ -147,18 +147,12 @@ Create validation script from scratch that distinguishes module docs from databa
       passes that ran before fallback (e.g., `passes-completed: 1,2,3`); emit WARNING:
       "Sections generated via fallback strategy. Additional ❓ markers expected.
        Run Mode C to resolve remaining gaps before production compliance."
-    - If `generation-strategy: developer-elected-single-pass`, `passes-completed`
+    - If `generation-strategy: single-pass`, `passes-completed`
       value is `single-pass`; emit INFO (not WARNING):
-      "Document generated via developer-elected single-pass. Review thoroughly,
+      "Document generated via default single-pass strategy. Review thoroughly,
        especially Operations Map and Business Rules on large modules. Consider
-       re-running with SSG if module has 5+ files or any file >500 LOC."
-      Do NOT count this as a `fallback_strategy_count` event - it is an intentional
-      developer choice, not a generation failure.
-    - If `generation-strategy: developer-elected-single-pass` AND `compliance_mode: production`,
-      emit ERROR (blocking):
-      "Developer-elected single-pass is not permitted in production compliance mode.
-       Re-run with SSG (default) or set compliance_mode to pilot."
-      Exit code must reflect failure; this is not overridable via --fail-on=never.
+       re-running with --use-ssg if module has 5+ files or any file >500 LOC."
+      Do NOT count this as a `fallback_strategy_count` event.
     - If `total-generation-seconds` > 2700 (45 minutes) and not "unavailable",
       emit WARNING: "Module generation exceeded slow threshold. Consider module
       splitting if this recurs. See CHARTER-RESTORATION-PLAN.md."
@@ -200,7 +194,7 @@ Create validation script from scratch that distinguishes module docs from databa
     - `.summary.ssg_slow_modules` (array of module names that exceeded threshold)
     - `.summary.ssg_avg_total_seconds` (average across all validated docs in run)
     - `.summary.fallback_strategy_count` (count of docs using single-pass-fallback - system-triggered)
-    - `.summary.developer_single_pass_count` (count of docs using developer-elected-single-pass - intentional)
+    - `.summary.developer_single_pass_count` (legacy count for docs still using developer-elected-single-pass marker)
     - `.summary.ssg_pass_overrides` (array of `{module_name, override_field, value}` for any module with non-default override)
 
 8. **--changed-files support (workflow compatibility)**
@@ -606,48 +600,29 @@ Replace the original Mode B generation core with this SSG sequence:
 ```text
 3. Determine generation strategy.
 
-   DEFAULT: Section-Scoped Generation (SSG) - multi-pass sequence (Passes 1-7).
-   OVERRIDE: Developer-elected single-pass - skip SSG passes; generate entire
-             document in one consolidated pass using the full condensed charter.
+   DEFAULT: Single-pass strategy - generate entire document in one consolidated pass
+            using the full condensed charter.
+   OVERRIDE: Section-Scoped Generation (SSG) - multi-pass sequence (Passes 1-7).
 
-   Developer may elect single-pass by invoking Mode B with the --single-pass flag
-   or by including "single-pass" in the issue template request:
-     /akr-docs mode-b [ModuleName] --single-pass
-     Issue template field: "Generation mode: single-pass"
+   Developer may opt into SSG by invoking Mode B with the --use-ssg flag:
+     /akr-docs mode-b [ModuleName] --use-ssg
 
-   When to use single-pass (developer's discretion):
-   - Module files are known to be small (e.g., <=3 files, each <200 LOC)
-   - A quick draft is needed for orientation or planning purposes, with the
-     developer explicitly accepting that the output will need thorough review
-   - Time constraints require a faster turnaround and the developer understands
-     the trade-off
-
-   Single-pass is NOT recommended when:
+   When to use --use-ssg (developer's discretion):
    - Module has 5+ files or any file >500 LOC
-   - Documentation will be used as a production reference without Mode C review
+   - Documentation will be used as a high-fidelity production reference
    - The module is at or near the max_files: 8 ceiling
 
-   If single-pass is elected:
+   If --use-ssg is NOT provided (default):
    - Load: All source files + full condensed charter in one context load
    - Generate: Complete document in one pass using the appropriate base template
    - Set in metadata header:
-       generation-strategy: developer-elected-single-pass
+       generation-strategy: single-pass
        passes-completed: single-pass
        pass-timings-seconds: [total time or "unavailable"]
-     - validate_documentation.py emits INFO (not WARNING) when this strategy is present:
-       "Document generated via developer-elected single-pass. Review thoroughly,
-        especially Operations Map and Business Rules on large modules."
-     - Single-pass is BLOCKED if `compliance_mode: production`. SKILL.md must check
-      compliance_mode before proceeding with single-pass generation:
-       If compliance_mode = production AND --single-pass flag present:
-        Halt with message: "Single-pass is not permitted in production compliance mode.
-        Remove --single-pass flag or set compliance_mode: pilot to proceed."
-      validate_documentation.py enforces this independently as a blocking ERROR on
-      any document that carries both markers (belt-and-suspenders enforcement).
     - Proceed directly to Pass 7 (Assembly + Validation) after generation.
-   - No `ssg_slow_modules` event is logged for single-pass runs.
+   - No `ssg_slow_modules` event is logged for default single-pass runs.
 
-   If single-pass is NOT elected (default), begin SSG:
+   If --use-ssg is provided, begin SSG:
 
    Initialize forward payload as an empty object.
    Record pass start time before each pass (if surface supports timing).
@@ -815,7 +790,7 @@ If total elapsed time across all passes exceeds 45 minutes:
 - [ ] `<!-- akr-generated -->` header includes `passes-completed` field
 - [ ] `pass-timings-seconds` field present (or `unavailable` with justification)
 - [ ] If `generation-strategy` is `single-pass-fallback`: Mode C review scheduled
-- [ ] If `generation-strategy` is `developer-elected-single-pass`: reviewer is aware output may have more `❓` markers than SSG-generated docs, especially on large modules; Mode C review recommended before production compliance mode
+- [ ] If `generation-strategy` is `single-pass`: reviewer is aware output may have more `❓` markers than SSG-generated docs on large modules; use `--use-ssg` for high-complexity modules where pass isolation improves fidelity
 - [ ] If `passes-split` is populated: Operations Map reviewed for completeness across sub-passes
 
 ---

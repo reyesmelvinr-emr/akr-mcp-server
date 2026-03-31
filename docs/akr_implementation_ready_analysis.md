@@ -2168,7 +2168,7 @@ This discipline is enforced in SKILL.md via an explicit prohibition block in Mod
 
 The existing `<!-- akr-generated -->` metadata header (Part 5, Mode B Step 8) must be extended to record SSG pass execution evidence. This gives the CI gate visibility into which passes completed and whether any were skipped or split.
 
-**Extended header format (no split):**
+**Extended header format (default single-pass):**
 
 ```markdown
 <!-- akr-generated
@@ -2176,19 +2176,19 @@ skill: akr-docs
 skill-version: v1.0.0
 mode: B
 steps-completed: 1,2,3,4,5,6,7,8,9
-generation-strategy: section-scoped
+generation-strategy: single-pass
 template: lean_baseline_service_template.md
 charter: backend-service.instructions.md
 modules-yaml-status: approved
-passes-completed: 1,2,3,4,5,6,7
+passes-completed: single-pass
 passes-split:
-pass-timings-seconds: pass1=142,pass2=597,pass3=98,pass4=213,pass5=117,pass6=134,pass7=89
-total-generation-seconds: 1390
+pass-timings-seconds: single-pass=742
+total-generation-seconds: 742
 generated-at: 2026-03-17T09:23:41Z
 -->
 ```
 
-**Extended header format (Pass 2 split):**
+**Extended header format (SSG with Pass 2 split, invoked via `--use-ssg`):**
 
 ```markdown
 <!-- akr-generated
@@ -2212,8 +2212,8 @@ generated-at: 2026-03-17T09:23:41Z
 
 | Field | Description | Required |
 |---|---|---|
-| `generation-strategy` | `section-scoped` — SSG multi-pass (default); `developer-elected-single-pass` — developer intentionally chose single-pass via `--single-pass` flag or issue template field; `single-pass-fallback` — system triggered fallback after slow generation; `single-pass` — legacy value for documents generated before SSG was introduced | Yes |
-| `passes-completed` | Comma-separated list of passes that completed. When Pass 2 is split, records `1,2A,2B,3,4,5,6,7` — not `1,2,3,...`. When `single-pass-fallback` occurred mid-run, records only the passes that completed before fallback (e.g., `1,2A,2B,3`). When `developer-elected-single-pass`, value is `single-pass`. This allows the validator to confirm both sub-passes completed, not just that a split was attempted. | Yes |
+| `generation-strategy` | `single-pass` — default Mode B strategy; `section-scoped` — SSG multi-pass when developer explicitly invokes `--use-ssg`; `single-pass-fallback` — system switched to consolidated single-pass during an in-progress SSG run after slow-generation threshold; `developer-elected-single-pass` — legacy value retained for backward compatibility in previously generated documents | Yes |
+| `passes-completed` | Comma-separated list of passes that completed. For default single-pass runs, value is `single-pass`. For SSG runs, when Pass 2 is split, records `1,2A,2B,3,4,5,6,7` — not `1,2,3,...`. When `single-pass-fallback` occurred mid-run, records only the passes that completed before fallback (e.g., `1,2A,2B,3`). This allows the validator to confirm both sub-passes completed, not just that a split was attempted. | Yes |
 | `passes-split` | Records the split type when a pass was divided (e.g., `2A,2B`). Serves as a flag for the split pattern in case future versions support other split types. Empty string if no split occurred. Not applicable for single-pass runs. | No |
 | `pass-timings-seconds` | Per-pass wall-clock time. Keys must match the actual pass IDs in `passes-completed` (e.g., `pass2a`, `pass2b` when split; `pass2` when not split). For single-pass runs, use `single-pass=[seconds]`. Value `unavailable` if the surface does not expose timing. | Yes |
 | `total-generation-seconds` | Sum of all pass timings. Value `unavailable` if timing not available. | Yes |
@@ -2291,7 +2291,7 @@ The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` 
         "mode-b-single-pass": {
           "avg-total-seconds": null,
           "section-completeness-vs-ssg": null,
-          "notes": "Populated when developer-elected-single-pass runs are observed in pilot"
+          "notes": "Populated from default Mode B single-pass runs; compared against opt-in SSG runs"
         }
       }
     },
@@ -2334,7 +2334,7 @@ The existing `benchmark.json` schema (Part 16.4) must be extended with an `ssg` 
 }
 ```
 
-`developer-single-pass-rate` tracks what proportion of Mode B runs in the pilot used developer-elected single-pass. This is an informational metric — it captures how frequently developers bypass SSG, which guides future decisions about whether SSG defaults are calibrated correctly. `mode-b-single-pass` captures average generation time and section completeness compared to SSG runs on equivalent modules, providing a quantitative basis for the quality trade-off discussion.
+`developer-single-pass-rate` now tracks legacy explicit single-pass selections from older flows and should trend toward zero as migrations complete. For current pilots, `mode-b-single-pass` captures the default Mode B baseline, while SSG metrics (`section-scoped`) provide the opt-in comparison set. This preserves a quantitative basis for throughput vs fidelity trade-off decisions.
 
 `null` values are populated after each eval run. `pass-timings-available` in the `coding-agent` block is a boolean populated in Phase 2.5 based on whether the coding agent surface exposes per-pass timing.
 
@@ -2413,7 +2413,7 @@ The 45-minute threshold is set above the ≤30-minute target to distinguish degr
 
 ### Fallback Escalation Path
 
-When total generation exceeds 45 minutes:
+When total generation exceeds 45 minutes during an SSG run (`--use-ssg`):
 
 ```
 SLOW GENERATION DETECTED
@@ -2661,30 +2661,37 @@ The verifiability proxy used is behavioral: the standards author runs a Mode B e
 
 ---
 
-### Design Decision: Developer-Elected Single-Pass Mode
+### Design Decision: Single-Pass Default with Developer-Elected SSG
 
-**Context:** SSG's multi-pass sequence is the default for Mode B and provides the highest quality output per context load. However, there are two legitimate scenarios where a developer may want to bypass SSG:
+**Context:** SSG's multi-pass sequence improves section-level fidelity, but the context window for active sessions keeps growing due to cumulative conversation state and tool-output carry-forward. In practice, repeated multi-pass orchestration adds overhead in time and premium requests for routine modules. The strategy is therefore inverted: single-pass is now the default, and SSG is an explicit opt-in for large or complex modules.
 
-1. **Small module, known files:** The developer knows the module contains <=3 small files and the full condensed charter + all source files will fit comfortably in a single context load without saturation risk.
-2. **Speed over fidelity:** The developer needs a quick orientation draft — a scaffold to review rather than a production reference — and explicitly accepts that the output will need more thorough Mode C review than an SSG-generated draft would.
+This default change is based on three operational observations:
 
-**Decision:** Developer-elected single-pass is supported as a first-class Mode B option, not as an escape hatch. It is distinguishable from system-triggered fallbacks (`single-pass-fallback`) in all tracking fields, so pilot metrics can accurately separate intentional choices from generation failures.
+1. **Context growth pressure:** Even with condensed charters, multi-pass orchestration incurs repeated pass setup and payload handoff overhead as session context accumulates.
+2. **Baseline draft throughput:** For small and medium modules, a single-pass run reliably produces reviewable drafts faster with fewer coordination steps.
+3. **Selective fidelity targeting:** SSG remains valuable, but primarily for known-large modules where operation-map extraction and business-rule decomposition benefit from pass isolation.
+
+There are two legitimate scenarios where a developer should opt into SSG:
+
+1. **Large module, known complexity:** The module contains large files, dense operation paths, or complex dependency flow that benefits from pass isolation.
+2. **Higher-fidelity extraction required:** The output is expected to be near production-reference quality in one run, and extra generation time is acceptable.
+
+**Decision:** Single-pass is the first-class default in Mode B. Developer-elected SSG is supported as an opt-in (`--use-ssg`) when pass-scoped extraction materially improves quality. This remains distinguishable from system-triggered fallbacks (`single-pass-fallback`) in tracking fields.
 
 **How it works:**
-- Invoked via `--single-pass` flag or issue template field `Generation mode: single-pass`
-- Loads full condensed charter + all source files in one context load (same as pre-SSG Mode B)
-- Records `generation-strategy: developer-elected-single-pass` in the metadata header
-- Validator emits INFO (not WARNING) — it does not block CI or flag this as a quality problem
-- Does not log a `ssg-slow-module-event` even if total time exceeds thresholds
-- Tracked separately in `benchmark.json` under `mode-b-single-pass` and in `developer_single_pass_count` validator summary field
+- Default invocation (no strategy flag) runs single-pass and records `generation-strategy: single-pass`
+- SSG is invoked via `--use-ssg`
+- SSG runs record `generation-strategy: section-scoped` and pass-level metadata (`passes-completed`, `passes-split`, `pass-timings-seconds`)
+- `single-pass-fallback` is reserved for in-progress SSG runs that cross slow-generation thresholds and switch strategy mid-run
+- Metrics continue in `benchmark.json` under `mode-b-single-pass` and SSG timing keys for quality and throughput comparison
 
 **Guard rails:**
-- The SKILL.md includes guidance (not enforcement) on when single-pass is and is not recommended, so developers have the information to make a calibrated decision
-- The validator INFO message on any single-pass document reminds the reviewer that extra scrutiny is appropriate on large modules
-- **Production compliance mode is blocked:** If `compliance_mode: production` AND `generation-strategy: developer-elected-single-pass`, `validate_documentation.py` emits ERROR (blocking, not overridable via `--fail-on=never`). SKILL.md halts before generation if `--single-pass` is passed with a production-mode module. Developer must remove the flag or set `compliance_mode: pilot`.
-- Pilot retrospective tracks `developer-single-pass-rate` to assess whether the SSG default needs calibration
+- The SKILL.md includes guidance (not enforcement) on when `--use-ssg` is recommended, so developers can opt in intentionally for large modules
+- SSG still carries slow-generation handling (continue, split module, or `single-pass-fallback`) when long-running conditions are detected
+- Single-pass remains subject to all validation gates (required sections, marker policy, metadata header presence)
+- Pilot retrospective tracks `ssg-opt-in-rate` to assess whether default behavior remains calibrated
 
-**What this does not change:** Single-pass output is still subject to all other CI validation rules — required sections, frontmatter, transparency markers, `<!-- akr-generated -->` header presence. It is not a bypass of governance, only of the multi-pass generation strategy.
+**What this does not change:** Output generated with either strategy remains subject to all CI validation rules — required sections, frontmatter, transparency markers, and `<!-- akr-generated -->` header presence.
 
 ---
 
@@ -2695,8 +2702,8 @@ The following table summarizes where existing parts of this analysis require add
 | Part | Required Addition |
 |---|---|
 | Part 3 (Context Resolution) | Add Layer 5: SSG as a fifth resolution layer (after Layers 1–4) |
-| Part 5 (Agent Skill Specification) | Add SSG pass sequence to Mode B steps 3–4; add `--single-pass` flag; add forward payload discipline; add `passes-completed` + `pass-timings-seconds` to the `akr-generated` header |
-| Part 6 (validate_documentation.py) | Add SSG header field validation; add slow-generation warning; add `passes-split` handling; add `single-pass-fallback` detection; add `developer-elected-single-pass` INFO; add `developer_single_pass_count` to output contract |
+| Part 5 (Agent Skill Specification) | Keep SSG pass sequence as an opt-in path; add `--use-ssg` flag; define single-pass default; keep forward payload discipline for SSG runs; keep `passes-completed` + `pass-timings-seconds` in the `akr-generated` header |
+| Part 6 (validate_documentation.py) | Keep SSG header field validation; keep slow-generation warning; keep `passes-split` handling; keep `single-pass-fallback` detection; treat `developer-elected-single-pass` as a legacy compatibility value |
 | Part 11 (Pre-Pilot Tests) | Add SSG timing measurement to Test 1 and Test 3 acceptance criteria |
 | Part 12A (Schema Audit) | Add `ssg-pass-timings` and `ssg-slow-module-events` to monitoring trackMetrics list |
 | Part 16 (Skill Reliability) | Add SSG execution quality note to LLM-dependent execution quality table; add `ssg-avg-total-seconds` and `developer-single-pass-rate` to benchmark.json schema |
@@ -2710,11 +2717,11 @@ SSG does not change any locked decision. It adds a generation strategy layer on 
 | Existing Decision | SSG Addition |
 |---|---|
 | Charter compression as Phase 0 blocking precondition (Part 3) | SSG reduces per-pass context load; compression still required to keep each pass within budget |
-| Agent Skill Mode B as primary generation workflow (Part 5) | SSG is implemented as a structured Mode B pass sequence, not a separate mode; `--single-pass` flag allows developer to bypass SSG without bypassing governance |
-| `validate_documentation.py` as CI gate (Part 6) | Extended with SSG header field validation, slow-generation warning, and `developer-elected-single-pass` INFO; single-pass output is still subject to all section and frontmatter rules |
+| Agent Skill Mode B as primary generation workflow (Part 5) | Single-pass is the default Mode B path; `--use-ssg` invokes structured SSG pass sequence when higher-fidelity extraction is needed |
+| `validate_documentation.py` as CI gate (Part 6) | Extended with SSG header field validation and slow-generation warning; default single-pass output is still subject to all section and frontmatter rules |
 | Three-layer reliability stack (Part 16) | Unchanged; `passes-completed` field in metadata header is an addition to Layer 3 evidence |
 | Phase 2.5 coding agent test (Phase 2.5) | New Criterion 11 tests SSG pass sequence completion in async context |
-| `benchmark.json` eval framework (Part 16.4) | Extended with `ssg` key per model for timing data; `mode-b-single-pass` key tracks developer-elected single-pass quality vs. SSG |
+| `benchmark.json` eval framework (Part 16.4) | Extended with `ssg` key per model for timing data; `mode-b-single-pass` key tracks default single-pass quality vs. opt-in SSG |
 
 ---
 

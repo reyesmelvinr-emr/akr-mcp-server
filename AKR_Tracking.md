@@ -1,6 +1,6 @@
 # AKR Implementation Tracking
 
-Status date: 2026-03-30
+Status date: 2026-03-31
 Overall status: IN_PROGRESS
 Current phase: Phase 2 - Pilot Onboarding
 
@@ -328,6 +328,9 @@ End date: TBD
 | Visual Studio workflow parity | Mode A and Mode B run in Visual Studio OR fallback procedure documented and tested | TBD | NOT_STARTED |
 
 ### Issues and Clarifications
+- 2026-03-31: Implemented strategy inversion updates for Mode B documentation generation: single-pass is now documented as the default path and SSG is opt-in via `--use-ssg`. Applied to canonical and template SKILL files plus implementation analysis and Phase 0/1 plan references.
+- 2026-03-31: Updated `docs/akr_implementation_ready_analysis.md` rationale to reflect the decision basis for default single-pass (context growth overhead, throughput gains on routine modules, selective SSG use for large/complex modules).
+- 2026-03-31: Tracking-file clarification: no `AKR_training.md` file exists in workspace; progress continues in `AKR_Tracking.md` as the existing governance tracker.
 - 2026-03-19: Decision made not to proceed with human semantic review on PR #4 using the old PR-diff approach. Mode A workflow superseded by committed review sheet model: agent generates docs/modules/.akr/{project}_review.md, developer reviews in VS Code, agent patches modules.yaml and opens PR only after approval. PR #4 to be closed after new Mode A run produces committed review sheet.
 - 2026-03-19: Workflow improvement and governance stability updates incorporated into project plans (consolidated document updates file). Key structural changes: committed review sheet (Mode A), committed draft (Mode B), incremental update workflow, Phase 2.6 Governance Stability Assessment added as mandatory post-Phase 2.5 gate.
 - 2026-03-19: New Phase 2 retrospective data collection requirements added to support Phase 2.6: Operations Map completeness rate (GPT-4o), self-reporting block absent rate, friction score, and reassignment churn rate are now required outputs in addition to existing metrics.
