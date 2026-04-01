@@ -251,7 +251,7 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | 9. **Metadata header and final-doc cleanliness** | `<!-- akr-generated -->` block present with correct review_mode context; final doc free of draft-only front matter fields | Header present with all required fields and no draft-only fields in final doc |
 | 10. **Hook log present** | `.akr/logs/session-*.jsonl` contains file write entry for the output doc path | Hard gate only when Copilot hook support is confirmed in Phase 1; otherwise record as known gap with evidence and continue |
 | 11. **SSG background completion** | `passes-completed` present and complete; split info consistent; timing availability captured | All expected passes present; timing known-gap documented if unavailable |
-| 12. **Committed draft/review sheet handling in async context** | Mode A review sheet committed at `docs/modules/.akr/{project}_review.md`; Mode B draft committed at `docs/modules/.akr/{ModuleName}_draft.md`; final doc contains no draft-only fields | Present in PR Files Changed and issue comments; if async review gate unsupported, record `ASYNC-REVIEW-GATE` known gap |
+| 12. **Committed draft + direct manifest handling in async context** | Mode A review occurs directly in `modules.yaml` with no separate review-sheet artifact; Mode B draft committed at `docs/modules/.akr/{ModuleName}_draft.md`; final doc contains no draft-only fields | Present in PR Files Changed and issue comments; if async review gate unsupported, record `ASYNC-REVIEW-GATE` known gap |
 
 ### Testing Matrix
 
@@ -268,7 +268,7 @@ Test all acceptance criteria from `test_pipeline_e2e.py` against coding agent ou
 | Criterion 9: Metadata header | ⬜ | ⬜ | ⬜ |
 | Criterion 10: Hook log | ⬜ | ⬜ | ⬜ |
 | Criterion 11: SSG completion | ⬜ | ⬜ | ⬜ |
-| Criterion 12: Committed draft + review sheet handling | ⬜ | ⬜ | ⬜ |
+| Criterion 12: Committed draft + direct manifest handling | ⬜ | ⬜ | ⬜ |
 | **Overall** | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL | ⬜ PASS / ❌ FAIL |
 
 ### Pass/Fail Decision Logic

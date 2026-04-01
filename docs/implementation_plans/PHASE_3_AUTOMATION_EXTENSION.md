@@ -451,7 +451,7 @@ These requirements apply to **all custom agents** built in Phase 3, regardless o
 **Decision gate:** Standards author must document in writing why Option D is insufficient before Option A is authorized. This decision is recorded in `ARCHITECTURE.md` (Deliverable 4).
 
 **v2.0 Architecture Note:** If Phase 2.5 authorizes Phase 3 and Phase 2.6 confirms targeted migration, the v2.0 Python skill package is the target architecture for Option D:
-- `akr.module_boundary` skill: Mode A deterministic tasks (boundary inference, review sheet writes)
+- `akr.module_boundary` skill: Mode A deterministic tasks (boundary inference, modules.yaml patching)
 - `akr.module_doc_generation` skill: Mode B deterministic tasks (operation extraction, draft patching, finalization with front matter stripping)
 - `akr.validation_skill`: wraps `validate_documentation.py` as a callable script
 - `akr.consolidation_skill`: Phase 4 deterministic aggregation (alternative to GitHub Actions path)

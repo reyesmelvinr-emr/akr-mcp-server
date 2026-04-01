@@ -20,8 +20,8 @@ Phase 2 validates the entire documentation workflow on a real project from group
 Phase 2 is complete when:
 
 1. ✅ Pilot project selected and onboarded (recommended: TrainingTracker.Api)
-2. ✅ Mode A (grouping proposal) completed; `modules.yaml` approved in ≤15 minutes
-3. ✅ Mode B (documentation generation) completed for 3 modules
+2. ✅ Mode A (grouping proposal) completed; `modules.yaml` grouping approval completed in ≤15 minutes
+3. ✅ Mode B (documentation generation) completed for 3 modules, with document review performed separately from grouping approval
 4. ✅ First documented PR opened; CI validation passes
 5. ✅ Workflow tested in Visual Studio (or documented fallback if skills unavailable)
 6. ✅ Two additional modules documented independently (unassisted)
@@ -170,30 +170,29 @@ Run Agent Skill Mode A to propose module groupings; developer validates and appr
 gh copilot suggest "propose module groupings for TrainingTracker.Api"
 ```
 
-### Expected Output - Two committed artifacts, in sequence
+### Expected Output - Draft manifest review followed by PR
 
-**Step 1 - Semantic Review Sheet (immediate, before PR):**
-`docs/modules/.akr/{project}_review.md` committed to the PR branch and displayed in Copilot Chat.
-Contains: YAML front matter with last-reviewed-at, per-module file-role tables, unassigned rationale,
-reviewer checkboxes, reassignment summary, pre-filled tracker update blocks.
-The developer validates this document in VS Code - not a GitHub PR diff.
-This file is a permanent artifact and the starting context for all future Mode A incremental updates.
+**Step 1 - Draft modules.yaml (immediate, before PR):**
+`modules.yaml` is written as the draft grouping manifest and summarized in Copilot Chat.
+There is no separate Mode A review-sheet artifact.
+The developer validates this file directly in VS Code - not a GitHub PR diff.
+This file is the permanent approval surface and the starting context for all future Mode A incremental updates.
 
-**Step 2 - Final modules.yaml + PR (after review sheet approval):**
-modules.yaml patched with any reassignments; review_sheet and last_reviewed_at fields added.
-PR opened; review sheet visible in PR Files Changed tab under docs/modules/.akr/.
+**Step 2 - Final modules.yaml + PR (after direct manifest approval):**
+Developer and tech lead make any necessary edits directly in `modules.yaml`; module statuses reflect the final human assessment.
+PR opened with `modules.yaml` as the grouping source of truth.
 CI validates modules.yaml schema, enum values, and businessCapability tags.
 
-### Developer Validation Tasks - Using the Committed Review Sheet
+### Developer Validation Tasks - Using modules.yaml Directly
 
 | Validation | Where to Do It | What to Check | Time |
 |---|---|---|---|
-| **Semantic accuracy** | `docs/modules/.akr/{project}_review.md` in VS Code | Does each file's assigned role match what it actually does? | 3 min |
-| **Module naming** | Review sheet, module header | Do module names reflect domain language, not file names? | 2 min |
-| **File count** | Review sheet, max_files status | Any module over limit? Record split recommendation. | 1 min |
-| **Misplaced files** | Review sheet, "Belongs Here?" column | Mark ☐ No; fill "Files to move out" table. | 3 min |
-| **Unassigned rationale** | Review sheet, unassigned section | Is each reason correct? | 2 min |
-| **Business capability tags** | Review sheet, module headers | Does each `businessCapability` value exist in `tag-registry.json`? | 2 min |
+| **Semantic accuracy** | `modules.yaml` in VS Code | Does each file's assigned role match what it actually does? | 3 min |
+| **Module naming** | `modules.yaml`, module entry | Do module names reflect domain language, not file names? | 2 min |
+| **File count** | `modules.yaml`, module entry | Any module over limit? Record split recommendation directly in the manifest update. | 1 min |
+| **Misplaced files** | `modules.yaml`, module_files arrays | Move files to the correct module entry or to `unassigned[]` as needed. | 3 min |
+| **Unassigned rationale** | `modules.yaml`, `unassigned[]` | Is each reason correct? | 2 min |
+| **Business capability tags** | `modules.yaml`, module entries | Does each `businessCapability` value exist in `tag-registry.json`? | 2 min |
 | **Reply to agent** | Copilot Chat | Reply 'approved' or 'N reassignments made'. | 1 min |
 
 **Total validation time target: ≤15 minutes**
@@ -211,24 +210,25 @@ CI validates modules.yaml schema, enum values, and businessCapability tags.
 - [ ] Shared/infrastructure files correctly placed in unassigned[]
 - [ ] All database objects identified and typed correctly
 - [ ] All `businessCapability` tags exist in tag-registry.json
-- [ ] modules.yaml approved before documentation generation begins
+- [ ] modules.yaml grouping approval completed before documentation generation begins
+- [ ] Document front matter status is reviewed as a separate content-maturity decision and is not assumed from modules.yaml approval
 ```
 
 ### Tasks
 
 | Task | Owner | Acceptance Criteria | Estimated Time |
 |---|---|---|---|
-| Invoke Mode A | Pilot dev | Agent generates and commits review sheet at `docs/modules/.akr/` AND displays in chat | 5 min (agent) |
-| Review and validate groupings | Pilot dev | Review sheet annotations complete; reassignment count recorded | 15 min |
+| Invoke Mode A | Pilot dev | Agent generates draft `modules.yaml` and displays grouping summary in chat | 5 min (agent) |
+| Review and validate groupings | Pilot dev | `modules.yaml` edits complete; manifest edit count recorded | 15 min |
 | Confirm to agent | Pilot dev | Reply 'approved' or 'N reassignments' | 1 min |
-| Agent applies reassignments, updates modules.yaml, opens PR | Agent | modules.yaml patched with review_sheet + last_reviewed_at; review sheet committed; PR opened | 3 min (agent) |
-| Tech lead spot-check | Tech lead | Confirms review sheet in PR Files Changed; approves | 3 min |
-| Record validation time | Standards author | Time from review sheet display → agent reply vs. 15 min target; recorded in AKR_Tracking.md | 2 min |
+| Agent preserves reviewed manifest and opens PR | Agent | modules.yaml preserved with human edits and statuses; PR opened | 3 min (agent) |
+| Tech lead spot-check | Tech lead | Confirms modules.yaml reflects final assessment; approves | 3 min |
+| Record validation time | Standards author | Time from modules.yaml review start → agent reply vs. 15 min target; recorded in AKR_Tracking.md | 2 min |
 
 ### Success Metrics
 
 - **Grouping accuracy:** ≥90% of proposed groupings accepted without reassignment
-- **Validation time:** ≤15 minutes from review sheet display to developer reply
+- **Validation time:** ≤15 minutes from modules.yaml review start to developer reply
 - **Friction score:** Developer completes review in VS Code without opening GitHub
 - **Reassignment churn:** Zero PR comments requesting reassignment
 - **Future update speed:** Second Mode A invocation (after code change) completes in ≤5 min
@@ -269,9 +269,11 @@ This file is a permanent artifact and the starting context for all future Mode B
 **Step 2 - Final doc_output + PR (after developer confirms):**
 Final `docs/modules/{ModuleName}_doc.md` written from the confirmed draft.
 Draft-only front matter fields stripped; final-doc front matter injected (Step 6a).
+For first-generation output, final-doc front matter status remains `draft` unless document-content approval has already been explicitly completed and recorded.
 PR opened with validation summary block in PR description.
 PR body notes: "Pre-commit draft reviewed at docs/modules/.akr/{ModuleName}_draft.md before PR open."
 CI validates final file. modules.yaml updated with draft_output, last_reviewed_at, review_mode.
+`modules.yaml` approval remains the grouping-control record; it is not the document approval record.
 
 ### Developer Content Review Tasks - Using the Committed Draft
 
@@ -286,7 +288,7 @@ CI validates final file. modules.yaml updated with draft_output, last_reviewed_a
 | **Reply to agent** | Copilot Chat | Reply 'ready to commit'. | 1 min |
 
 **Total content review time target: ≤30 minutes**
-**Note:** Review is done in VS Code. The draft file is both the review surface and the permanent record of the developer's annotations.
+**Note:** Review is done in VS Code. The draft file is both the review surface and the permanent record of the developer's annotations. This review governs document maturity. It is distinct from the earlier Mode A review that governed module grouping correctness.
 
 ### Mode B PR Checklist (Auto-Generated by Agent Skill)
 
@@ -532,7 +534,7 @@ Conduct retrospective with quantitative metrics and qualitative feedback; decide
 7. **Phase 2.5 readiness:** Do metrics support expanding to coding agent?
 8. **Skill reliability:** Was the self-reporting block present in 100% of sessions? If not, when was it absent - and did the metadata header check in CI catch the gap?
 9. **Model compatibility:** Did any GPT-4o-specific failure modes emerge (e.g., Mode B truncation on large modules)? Document specific module/file-count where truncation first occurred, if any.
-10. **Review surface effectiveness:** Did committed review sheets reduce reassignment PR comments to zero? Did committed drafts eliminate first-run CI failures? Were developers able to complete reviews without opening GitHub?
+10. **Review surface effectiveness:** Did direct `modules.yaml` review reduce reassignment PR comments to zero? Did committed drafts eliminate first-run CI failures? Were developers able to complete reviews without opening GitHub?
 11. **Incremental update scenario:** Were any committed drafts used as starting context for an update-scenario Mode B run? Was the incremental path faster than full re-generation?
 12. **Staleness management:** Were any committed drafts found stale relative to code changes? How were they detected?
 13. **Governance stability baseline (feeds Phase 2.6):** Record first-run CI pass rate AND Operations Map completeness rate now, before Phase 2.5. These are the baseline measurements Phase 2.6 requires.

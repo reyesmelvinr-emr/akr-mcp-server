@@ -129,6 +129,7 @@ Create validation script from scratch that distinguishes module docs from databa
    - Business Rules (with "Why It Exists" + "Since When" columns)
    - Data Operations (all reads and writes)
   - YAML front matter: `businessCapability`, `feature` (work-item), `layer`, `project_type`, `status`, `compliance_mode`
+  - Status semantics rule: front matter `status` is the generated document's maturity field and must not be auto-derived from `modules.yaml` grouping approval state
   - `<!-- akr-generated -->` metadata header block (presence check; fail with `"AKR metadata header missing — skill may not have been properly invoked"` if absent)
   - SSG metadata validation (when `generation-strategy = section-scoped`):
     - `passes-completed` field present; contains expected pass numbers
@@ -229,12 +230,15 @@ When `--preview` is passed:
 **v1.0 draft presence check (WARNING level - no new ERRORs introduced):**
 All new checks added in this update are WARNING-level in v1.0. No existing ERROR behaviors are modified.
 - modules.yaml declares `draft_output` but file absent → WARNING: "Draft declared but not found. Run Mode B."
-- modules.yaml declares `review_sheet` but file absent → WARNING: "Review sheet declared but not found. Run Mode A."
+
+Mode A grouping review happens directly in `modules.yaml`; there is no separate review-sheet artifact requirement in the active workflow.
 
 **v1.0 final doc cleanliness check (ERROR level - enforced at finalization):**
 - Final doc at doc_output path contains draft-only fields (`preview-generated-at`, `review-mode`) → ERROR:
   "Final doc contains draft-only front matter fields. Re-run Mode B Step 6a to strip before committing."
 This check applies only to files matching a modules[].doc_output path (not draft_output paths).
+
+The validator's final-doc cleanliness rules must be read alongside this governance rule: a final doc may be structurally final for CI purposes while still carrying `status: draft` until document-content approval is completed through the documented review flow.
 
 ### Tasks
 
@@ -251,7 +255,7 @@ This check applies only to files matching a modules[].doc_output path (not draft
 | Document CLI usage | Standards author | `--file`, `--changed-files`, `--module-name`, `--fail-on`, `--output` flags documented in README | Day 5 (1 hour) |
 | Add `pyyaml` to `requirements.txt` | Standards author | `pyyaml` listed as explicit dependency; `pip install -r requirements.txt` installs cleanly on all platforms | 15 min |
 | Implement `<!-- akr-generated -->` metadata header check | Standards author | Validator checks for header presence in MODULE docs; fails with exact message: `"AKR metadata header missing — skill may not have been properly invoked"` | 2 hours |
-| Add `--preview` flag and draft presence check | Standards author | Flag produces human-readable summary block with review-mode field; presence checks emit WARNING (not ERROR) for declared but absent draft_output / review_sheet; final doc cleanliness check emits ERROR for draft-only fields in final docs; tested against CourseDomain in both full and incremental scenarios | 2.5 hours |
+| Add `--preview` flag and draft presence check | Standards author | Flag produces human-readable summary block with review-mode field; presence checks emit WARNING (not ERROR) for declared but absent draft_output; final doc cleanliness check emits ERROR for draft-only fields in final docs; tested against CourseDomain in both full and incremental scenarios | 2.5 hours |
 
 ### Test Cases (Port from `test_validation_library.py`)
 
@@ -812,9 +816,9 @@ Adapt `lean_baseline_service_template.md` and `ui_component_template.md` for mod
 | Adapt `lean_baseline_service_template.md` | Standards author | Module Files, Operations Map, full-stack diagram sections added | 4 hours |
 | Update existing `lean_baseline_service_template.md` front matter block | Standards author | Existing front matter includes both `businessCapability` (PascalCase) and `feature` (work-item ID format) to match Phase 1 validation contract | 30 min |
 | Adapt `ui_component_template.md` | Standards author | Module Files, component hierarchy diagram sections added | 3 hours |
-| Add module-scope YAML front matter | Standards author | `businessCapability`, `feature`, `layer`, `project_type`, `status` fields documented | 1 hour |
+| Add module-scope YAML front matter | Standards author | `businessCapability`, `feature`, `layer`, `project_type`, `status` fields documented, with explicit separation between document maturity status and `modules.yaml` grouping approval status | 1 hour |
 | **Update all YAML front matter examples to PascalCase** | Standards author | All `businessCapability` examples use PascalCase matching `tag-registry.json` (e.g., `CourseCatalogManagement` not `course-catalogmanagement`) | 1 hour |
-| Create `{project}_review.md` template in core-akr-templates | Standards author | Template contains: YAML front matter (project, last-reviewed-at, review-mode); per-module sections with file-role table and checkbox column; unassigned rationale table; reassignment summary; review decision checkboxes; pre-filled AKR_Tracking.md update blocks; incremental update section | 1.5 hours |
+| Document direct Mode A manifest review checklist in core-akr-templates | Standards author | Guidance makes `modules.yaml` the only grouping review artifact; checklist covers file-role validation, unassigned rationale review, and human status updates directly in the manifest | 1.5 hours |
 | Create `{ModuleName}_draft.md` front matter spec and sample | Standards author | Draft front matter fields defined: preview-generated-at, review-mode (full/incremental), passes-completed, generation-strategy; draft-only fields clearly marked; spec added to DEVELOPER_REFERENCE.md; sample CourseDomain_draft.md in core-akr-templates/examples/ | 1 hour |
 | Test backend template on CourseDomain | Standards author | Output matches `courses_service_doc.md` structure | 2 hours |
 | Test UI template on sample UI module | Standards author | Component grouping logic works; hierarchy clear | 2 hours |
@@ -872,6 +876,7 @@ Adapt `lean_baseline_service_template.md` and `ui_component_template.md` for mod
    layer: API
    project_type: api-backend
    status: draft
+  # Draft is the default for first-generation Mode B output. Do not replace with the module's grouping approval state from modules.yaml.
    compliance_mode: pilot
    ---
    ```
@@ -1029,7 +1034,6 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
 
 | Field | Type | Validation Rule |
 |---|---|---|
-| `review_sheet` | string (path) | Must be under `docs/` tree; WARNING if declared but absent |
 | `draft_output` | string (path) | Must be under `docs/` tree; must not duplicate another module's draft_output |
 | `last_reviewed_at` | string (ISO 8601) | Parseable as datetime; staleness check deferred to v1.1 |
 | `review_mode` | enum: `full` \| `incremental` | Records last Mode B run type; present in draft front matter only, not in final doc |

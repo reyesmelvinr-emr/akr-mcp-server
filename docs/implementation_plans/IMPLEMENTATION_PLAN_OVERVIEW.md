@@ -82,7 +82,7 @@ Targeted migrations authorized by Phase 2.6 run in parallel with Phase 4 and do 
 - **SSG per-pass timing data:** Collected from >=80% of Mode B runs by end of Phase 2 pilot (timing unavailable on some surfaces is acceptable; see Part 18.5)
 - **Slow-module rate:** <10% of modules trigger the 45-minute fallback threshold (tracked in `ssg-slow-module-events` monitoring metric)
 - **Grouping validation:** ≤15 minutes per project (developer time)
-- **Mode A update-run time (new file added to existing module):** ≤5 minutes (reads committed review sheet; proposes targeted addition; developer confirms) - baseline established in Phase 2 retrospective
+- **Mode A update-run time (new file added to existing module):** ≤5 minutes (reads `modules.yaml`; proposes targeted addition; developer confirms) - baseline established in Phase 2 retrospective
 - **Mode B update-run time (one file changed in existing module):** ≤10 minutes (reads committed draft; patches affected sections only; developer confirms) - baseline established in Phase 2 retrospective
 - **CI validation pass rate:** ≥95% on first PR
 - **Unresolved ❓ marker rate:** <5% after developer review
@@ -109,7 +109,7 @@ Targeted migrations authorized by Phase 2.6 run in parallel with Phase 4 and do 
 | **Cross-platform validator failures** | 🟠 Low | Test Ubuntu + macOS + Windows in Phase 1 | Fix platform-specific file path or YAML parsing issues |
 | **Copilot (GPT-4o) skill non-invocation** | 🟡 Medium | `disable-model-invocation: true` frontmatter; interactive runs use explicit `/akr-docs` commands, coding-agent runs use issue-template Mode B instructions; CI metadata header check enforces completion | Document in `SKILL-COMPAT.md`; treat as known limitation, not blocker |
 | **SSG generation time exceeds developer patience on large modules** | 🟡 Medium | Per-pass timing targets in Part 18.2; slow-generation fallback at 45-minute threshold; coding agent background execution eliminates active wait time | Module splitting into sub-modules (<=8 files each); single-pass fallback for remaining sections with additional `❓` markers expected |
-| **PR-gated review loop creates reassignment churn** | 🟡 Medium | Committed review sheet (Mode A) and committed draft (Mode B) decouple human validation from CI/merge loop; incremental update path eliminates full re-generation cost for ongoing changes | Metric: reassignment count per Mode A PR should trend to 0 after first two pilots |
+| **Duplicate Mode A review artifacts create reassignment churn** | 🟡 Medium | Review groupings directly in `modules.yaml` and keep committed drafts only for Mode B; incremental update path eliminates full re-generation cost for ongoing changes | Metric: reassignment count per Mode A PR should trend to 0 after first two pilots |
 | **Stale committed draft misleads incremental update agent** | 🟡 Medium | `last_reviewed_at` in modules.yaml + v1.1 `--check-sync` WARNING when draft older than most recent file change | v1.0 mitigation: committed drafts older than most recent code change are advisory; v1.1 automates detection |
 
 ### Deferred Risks (Post-Pilot)

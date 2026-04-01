@@ -151,7 +151,7 @@ Both can be active simultaneously - they are independent authorizations with sep
 |---|---|---|---|---|
 | Operations Map extraction | NOT_STARTED | `akr.module_doc_generation.extract_operations` | NOT_VERIFIED | - |
 | Draft writing | NOT_STARTED | `akr.module_doc_generation.build_initial_draft` | NOT_VERIFIED | - |
-| Review sheet writing | NOT_STARTED | `akr.module_boundary.write_review_sheet` | NOT_VERIFIED | - |
+| Mode A manifest patching | NOT_STARTED | `akr.module_boundary.patch_modules_manifest` | NOT_VERIFIED | - |
 | Validation | NOT_STARTED | `akr.validation_skill.validate_file` | NOT_VERIFIED | - |
 ```
 

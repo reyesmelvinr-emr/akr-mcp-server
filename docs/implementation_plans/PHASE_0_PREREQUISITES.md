@@ -59,6 +59,7 @@ Backend charter at ~11,000 tokens + lean baseline template at ~7,000 tokens = ~1
 **In all condensed charters:**
 - Required section headings and minimum content criteria
 - Required YAML front matter fields (`businessCapability`, `feature` (work-item tag), `layer`, `project_type`, `status`, `compliance_mode`)
+- Status semantics clarification: document front matter `status` represents document maturity, while `modules.yaml` module `status` represents Mode A grouping approval state
 - Transparency marker syntax: `🤖`, `❓`, `NEEDS`, `VERIFY`, `DEFERRED` with placement rules
 - Quality thresholds (minimum word counts, required structural elements)
 - Cross-references to full charter location
@@ -166,11 +167,11 @@ Create `.github/skills/akr-docs/SKILL.md` encoding Mode A (grouping proposal), M
 |---|---|---|---|
 | Author `SKILL.md` with Mode A workflow | Standards author | Full specification from Part 5 of analysis document implemented | 2 hours |
 | Author `SKILL.md` with Mode B workflow | Standards author | Loads condensed charter based on `project_type`; references `modules.yaml` | 2 hours |
-| Author Mode A Semantic Review Sheet template | Standards author | `docs/modules/.akr/` directory structure documented in core-akr-templates; review sheet template covers: YAML front matter with last-reviewed-at, per-module file-role table, unassigned rationale table, reviewer checkboxes, reassignment summary, pre-filled AKR_Tracking.md update blocks; incremental update trigger condition documented in SKILL.md Step 7.6 | 1.5 hours |
+| Document direct Mode A modules.yaml review workflow | Standards author | `modules.yaml` is documented as the sole Mode A review surface; reviewer checklist covers per-module file-role validation, unassigned rationale review, and status updates directly in the manifest; incremental update trigger condition documented in SKILL.md | 1.5 hours |
 | Author Mode B Draft format and validation summary block | Standards author | Draft front matter fields defined (preview-generated-at, review-mode, passes-completed, generation-strategy); full and incremental validation summary block syntax defined; SKILL.md Steps 5.5 and 5.6 authored; tested against CourseDomain sample | 1.5 hours |
 | Author Mode B Incremental Update workflow in SKILL.md | Standards author | Incremental branch of Step 5.5 authored; trigger condition (draft_output path exists) clearly specified; charter section targeting logic per changed file type defined; draft-only front matter stripping sub-step (Step 6a) present in Mode B finalization | 1 hour |
 | Author `SKILL.md` with Mode C workflow | Standards author | Enumerates unresolved `❓` markers; guides interactive in-editor resolution; re-runs validator after each batch | 2 hours |
-| Add prerequisite check in Mode B | Standards author | Mode B stops if `modules.yaml` status is `draft` | 30 min |
+| Add prerequisite check in Mode B | Standards author | Mode B stops if `modules.yaml` grouping status is `draft`; this check authorizes generation only and does not set the generated document's front matter status | 30 min |
 | Document skill invocation patterns | Standards author | "propose module groupings" → Mode A; "generate documentation for X" → Mode B; "walk me through ❓ sections" → Mode C | 1 hour |
 | Validate skill loads in VS Code | Pilot rep | Skill appears in agent mode skill list; all three modes trigger correctly | 15 min |
 | Add `SKILL_VERSION` header to `SKILL.md` | Standards author | First line is `<!-- SKILL_VERSION: v1.0.0 -->` matching release tag | 5 min |
@@ -241,7 +242,7 @@ The version header makes drift visible and gives distribution automation a relia
 
 ### Mode B Workflow Summary
 
-1. Read `modules.yaml`; find requested module; check `status != draft`
+1. Read `modules.yaml`; find requested module; check grouping `status != draft`
 2. Load condensed charter from `copilot-instructions/` based on `project_type`
 3. Read all source files listed in module's `files[]` array
 4. Generate module documentation using appropriate base template
@@ -265,6 +266,7 @@ mode: B
 template: {name of template used}
 charter: {condensed charter filename loaded}
 modules-yaml-status: approved
+# Traceability only: this records grouping approval state from Mode A and must not be interpreted as final document approval.
 steps-completed: 1,2,3,4,5,6,7,8,9
 generated-at: {ISO 8601 timestamp}
 -->
@@ -332,7 +334,7 @@ Define the complete `modules.yaml` schema and create reference examples for API 
 - `max_files` (integer, default: 8, hard ceiling)
 - `files[]` (array of workspace-relative paths)
 - `doc_output` (workspace-relative output path)
-- `status` (enum: draft, review, approved, deprecated)
+- `status` (enum: draft, review, approved, deprecated) for Mode A grouping approval state only; do not reuse this field as the generated document's content-approval state without an explicit governance rule
 - `compliance_mode` (optional; overrides project default)
 
 **Database objects (`database_objects[]`):**
@@ -370,10 +372,9 @@ core-akr-templates/
       CourseDomain_doc.md                 # Final Level 1 documentation (existing)
       .akr/                               # AKR working artifacts - committed, CODEOWNERS-gated
         CourseDomain_draft.md             # Mode B committed draft (permanent)
-        {project}_review.md               # Mode A committed semantic review sheet (permanent)
   .akr/
     logs/                                 # Session logs - gitignored, NOT committed
-  modules.yaml                            # Updated with review_sheet, draft_output, last_reviewed_at fields
+  modules.yaml                            # Mode A review surface; updated with draft_output and last_reviewed_at fields
 ```
 
 ⚠️ Do not conflate the two .akr directories:
@@ -599,7 +600,7 @@ Validate seven foundational assumptions before Phase 1 investment. Each test mus
 - Rejection behavior documented with evidence (alternative path vs. informative failure)
 
 **Additional acceptance criteria for Test 7:**
-- Mode A invocation generates and commits `docs/modules/.akr/{project}_review.md` alongside modules.yaml
+- Mode A invocation writes draft `modules.yaml` only; no separate Mode A committed review artifact is created
 - Mode B invocation writes committed draft to `docs/modules/.akr/{ModuleName}_draft.md` and displays validation summary in chat before committing to doc_output
 - Mode B incremental invocation (with pre-existing committed draft) reads draft, patches only affected sections, displays incremental summary block
 - Final doc at doc_output does not contain draft-only front matter fields (`preview-generated-at`, `review-mode`)

@@ -98,18 +98,22 @@ A module is a **logical grouping of source files that together implement a singl
 |---|---|---|---|
 | Mode A — Grouping proposal | Copilot coding agent | Scans project; groups by domain noun; writes draft `modules.yaml`; opens PR | Automated |
 | Mode A — Grouping validation | Developer who knows the codebase | Reviews groupings; reassigns misplaced files; names modules correctly; splits over-large groups | 5–10 min per project |
-| Mode A — Pre-commit review sheet | Copilot agent | Before committing modules.yaml, generates a Semantic Review Sheet at `docs/modules/.akr/{project}_review.md`. Lists each proposed module with file-role table, unassigned rationale, and reviewer checkboxes. Commits the sheet alongside modules.yaml. | <1 min (agent) |
-| Mode A — Review sheet validation | Developer who knows the codebase | Opens `docs/modules/.akr/{project}_review.md` in VS Code. Marks files, records reassignments. Agent reads completed sheet, patches modules.yaml, opens PR. | 5–10 min |
-| Mode A — Incremental update (new/changed file) | Copilot agent + developer | Agent reads committed review sheet; proposes targeted update to affected module section only; displays change in chat. Developer confirms. Agent patches review sheet and modules.yaml in-place. | ≤5 min |
-| Mode B — Documentation generation | Copilot coding agent | Reads approved `modules.yaml`; loads condensed charter; reads source files; generates doc; opens draft PR | Automated |
+| Mode A — Draft manifest review | Copilot agent | Writes draft `modules.yaml`, summarizes the proposed boundaries in chat, and stops for direct human review of the manifest in VS Code. | <1 min (agent) |
+| Mode A — Manifest validation | Developer who knows the codebase | Opens `modules.yaml` in VS Code, corrects groupings directly, validates naming and file placement, and sets module status based on assessment. | 5–10 min |
+| Mode A — Incremental update (new/changed file) | Copilot agent + developer | Agent reads the current `modules.yaml`, proposes only the affected module entry changes in chat, and patches the manifest directly on confirmation. | ≤5 min |
+| Mode B — Documentation generation | Copilot coding agent | Reads a grouping-approved `modules.yaml`; loads condensed charter; reads source files; generates a draft module document; opens draft PR | Automated |
 | Mode B — Pre-commit draft (committed) | Copilot agent | Before writing to doc_output, generates draft at `docs/modules/.akr/{ModuleName}_draft.md` and displays validation summary in chat. Developer edits draft in VS Code. Agent writes final doc from confirmed draft. Draft is a permanent committed artifact. | <1 min (agent) |
-| Mode B — In-editor content review | Developer + tech lead | Opens draft in VS Code Markdown Preview. Fills ❓ sections, validates business rules, confirms architecture. Replies 'ready to commit'. | 20–30 min |
+| Mode B — In-editor content review | Developer + tech lead | Opens draft in VS Code Markdown Preview. Fills ❓ sections, validates business rules, confirms architecture, and reviews document maturity independently from module grouping approval. Replies 'ready to commit'. | 20–30 min |
 | Mode B — Incremental update (code change) | Copilot agent + developer | Agent reads committed draft; reads only changed source files; loads only relevant charter sections; patches affected sections. Developer confirms targeted changes only. Does not re-read all files or re-run full SSG unless patch scope expands. | ≤10 min |
-| Mode B — Content review | Developer + tech lead | Fills `❓` sections; validates business rules; confirms data operations accuracy | 20–30 min per module |
+| Mode B — Content review | Developer + tech lead | Fills `❓` sections; validates business rules; confirms data operations accuracy; determines whether the document remains draft or is promoted through a separate content-approval decision | 20–30 min per module |
 | Mode C — Interactive HITL completion | Copilot agent mode + developer | Guides developer through unresolved `❓` one section at a time in existing documents; records accepted edits and deferred items | 10–20 min per document |
 | CI gate | `validate_documentation.py` + Vale | Validates required sections, markers, `project_type`, `feature_tag` format | Automated at PR merge |
 
-This is the correct HITL model: **validate the grouping** (Mode A), **generate and review module content** (Mode B), then **interactively resolve remaining `❓` markers in the editor** (Mode C) before merge.
+Governance clarification: the module `status` recorded in `modules.yaml` is the approval state for the module boundary produced by Mode A. It authorizes Mode B to run, but it does not certify the generated document content. A generated module document therefore begins life as a draft artifact unless document-content approval is separately completed and explicitly recorded.
+
+Critical assessment: a separate Mode A review sheet duplicates the exact boundary decision that already lives in `modules.yaml`, but without becoming the authoritative input to Mode B or CI. That duplication adds a second mutable artifact, creates drift risk between the review sheet and the manifest, and weakens ownership by forcing a technical lead to reconcile two representations of the same approval. For initial module grouping, the real governance object is `modules.yaml`; review should happen directly there. The committed draft remains justified in Mode B because it captures generated narrative and unresolved content that do not otherwise exist in source form.
+
+This is the correct HITL model: **validate the grouping** (Mode A), **generate draft module content and review that content** (Mode B), then **interactively resolve remaining `❓` markers in the editor** (Mode C) before merge. Grouping approval and document-content approval are separate governance decisions and must not share a single ambiguous status value.
 
 ---
 
@@ -216,7 +220,7 @@ Produce condensed "dense summary" versions of each charter. Target: ~2,500 token
 
 What the condensed charter retains:
 - All required section headings and minimum content criteria
-- Required YAML front matter fields (`feature`, `layer`, `project_type`, `status`, `compliance_mode`)
+- Required YAML front matter fields (`feature`, `layer`, `project_type`, `status`, `compliance_mode`), where `status` represents document maturity and must not be inferred from `modules.yaml` grouping approval alone
 - `🤖` / `❓` / `NEEDS` / `VERIFY` / `DEFERRED` marker syntax and placement rules
 - Quality thresholds (minimum word counts, required structural elements)
 - Module-level section requirements (Module Files header, Operations Map, full-stack architecture diagram)
@@ -540,45 +544,29 @@ When asked to "propose module groupings", "initialize modules.yaml", or
 7. Write draft modules.yaml to project root.
    Set status: draft on all modules and unassigned items.
 
-7.5. BEFORE opening a PR, generate a Semantic Review Sheet and commit it alongside modules.yaml.
-     Output the review sheet to `docs/modules/.akr/{project-name}_review.md`.
-     Review sheet must contain:
-     - YAML front matter: project, last-reviewed-at (ISO 8601), review-mode: full
-     - One section per proposed module with:
-       - Module name, businessCapability, feature tag, max_files status
-       - File-role table with "Belongs Here? ☐ Yes ☐ No" column per file
-       - "Files to move out" table (empty rows for reviewer to fill)
-       - Free-text notes field
-     - One section for unassigned files with:
-       - Each file path, proposed reason, "Reason correct? ☐ Yes ☐ No" column
-       - "Files to move from unassigned → module" table
-     - Summary table: modules reviewed, total reassignment count
-     - Review decision checkboxes: ☐ Approve ☐ Request changes
-     - Pre-filled AKR_Tracking.md update blocks for both outcomes
+7.5. Write draft modules.yaml to the project root and stop for direct human review in VS Code.
+  The manifest is the sole Mode A review surface.
+  In chat, summarize the proposed modules, unassigned files, and any low-confidence placements.
+  Instruct: "Review `modules.yaml` in VS Code. Make edits directly in the file, update module status based on your assessment, then reply 'approved'."
 
-     After generating and committing the review sheet:
-     - Display it inline in Copilot Chat
-     - Instruct: "Review `docs/modules/.akr/{project}_review.md` in VS Code. Mark reassignments,
-       then reply 'approved' or 'N reassignments made'."
-
-7.6. IF modules.yaml and a committed review sheet already exist (incremental update scenario):
-     DO NOT run a full scan. Instead:
-     - Read the existing committed review sheet
-     - Identify files that are new or changed since last-reviewed-at
-     - Propose only the affected module section updates in chat
-     - Ask: "X new/changed file(s) detected. Proposed: [module]. Confirm?"
-     - On confirmation: patch review sheet in-place; update last-reviewed-at; update modules.yaml
+7.6. IF modules.yaml already exists (incremental update scenario):
+  DO NOT run a full scan. Instead:
+  - Read the existing modules.yaml
+  - Identify files that are new or changed since the last approved grouping
+  - Propose only the affected module entry updates in chat
+  - Ask: "X new/changed file(s) detected. Proposed: [module]. Confirm?"
+  - On confirmation: patch modules.yaml in-place and preserve existing human edits
 
 8. ONLY after developer confirms approval:
-   Patch modules.yaml with reassignments; add review_sheet and last_reviewed_at fields.
+   Preserve the reviewed modules.yaml as the authoritative grouping artifact.
    Open draft PR titled: "docs(mode-a): propose module groupings for [project name]"
-   Review sheet is committed as part of the PR branch (written in Step 7.5).
+   modules.yaml is the review source of truth for the PR branch.
    Include standard PR checklist.
 
 ---
 
 ## Mode B — Generate Module Documentation
-## (Run only after modules.yaml is approved — status on target module is not draft)
+## (Run only after modules.yaml grouping approval is complete — target module status is not draft)
 
 When asked to "generate documentation for [ModuleName]" or
 "document the [ModuleName] module":
@@ -2750,7 +2738,7 @@ The three HITL layers documented across Parts 16, 17, and the committed-draft ad
 
 **Layer 1 — Script Approval (pre-execution):** Required before any file-modifying operation executes. In SKILL.md architecture: `disable-model-invocation: true` + explicit `/akr-docs` command. In code-defined skill architecture (Phase 3+): `require_script_approval=True` in `SkillsProvider`. Prevents unauthorized automated file writes.
 
-**Layer 2 — Draft Review (in-editor):** Developer validates committed draft at `docs/modules/.akr/{ModuleName}_draft.md` in VS Code before confirming 'ready to commit'. Decouples semantic content validation from the CI/merge loop. Applies to both Mode A (review sheet) and Mode B (documentation draft).
+**Layer 2 — Draft Review (in-editor):** Developer validates committed draft at `docs/modules/.akr/{ModuleName}_draft.md` in VS Code before confirming 'ready to commit'. Decouples semantic content validation from the CI/merge loop. Applies to Mode B documentation drafts; Mode A grouping review happens directly in `modules.yaml`.
 
 **Layer 3 — PR Approval (post-commit):** Tech lead reviews and approves merged diff. Final governance gate before documentation enters the canonical `docs/modules/` tree.
 
@@ -2761,7 +2749,7 @@ Mode A states: `COLLECT_INPUTS` -> `PROPOSE_BOUNDARIES` -> **[HITL: DEVELOPER_RE
 Mode B states: `DETERMINE_STRATEGY` -> `GENERATE_OR_PATCH` -> **[HITL: DEVELOPER_REVIEW]** -> `FINALIZE` -> `CREATE_PR`
 
 HITL checkpoints are named state transitions, not implied steps. Conditional branches (full vs. incremental) are explicit:
-- Mode A: if committed review sheet exists -> `INCREMENTAL_UPDATE` branch; else -> `FULL_SCAN` branch
+- Mode A: if `modules.yaml` already exists with approved boundaries -> `INCREMENTAL_UPDATE` branch; else -> `FULL_SCAN` branch
 - Mode B: if draft_output exists and status is approved -> `INCREMENTAL_UPDATE` branch; else -> `FULL_GENERATION` branch
 
 ## 19.4 Surface Compatibility — SKILL.md vs. Code-Defined Skills
