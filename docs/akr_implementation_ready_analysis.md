@@ -22,6 +22,7 @@ This is the definitive pre-implementation analysis for the AKR Documentation Gov
 | Review 7 — GitHub Copilot (Final File Inspection) | Direct read of `copilot-instructions.md`, `.akr/workflows/`, `tag-registry.json` | Confirmed `copilot-instructions.md` is a full replacement (not partial edit); confirmed two existing workflows (`validate-documentation.yml` already calls the script); confirmed `tag-registry.json` PascalCase format incompatible with free-text `feature` field examples |
 | Module Architecture Clarification | Owner-provided | `courses_service_doc.md` confirmed as Level 1 spec; module grouping rules; database object separation; template adaptation requirements |
 | Workflow Clarifications (Owner-provided) | Owner-provided | `/docs.interview` original purpose clarified as HITL completion for `❓` sections in existing docs; Agent Skill Mode C added for interactive HITL; zero-cloud/no-incremental-cost constraint made explicit; original `core-akr-templates` ↔ `akr-mcp-server` design intent documented |
+| Review 10 — GitHub Copilot (Pilot Manifest Simplification) | Direct repo + pilot manifest inspection | Confirmed training-tracker-backend testing supports a lean `modules.yaml` schema (`name`, `grouping_status`, `doc_output`, `files` only), removed `modules-yaml-status` metadata header field as non-value traceability, and retained `status: draft` as the default generated-document maturity state |
 | Review 9 — Skill Optimization Analysis | Post-implementation planning conversation | Three failure modes of Copilot skill non-invocation identified; three-layer reliability stack specified (`disable-model-invocation` frontmatter + session hooks + in-document metadata contract); LLM execution quality variance quantified (Claude Sonnet 4.6 ≥90% vs. GPT-4o ~75%); eval framework and `benchmark.json` schema defined; `SKILL-COMPAT.md` as companion model compatibility matrix introduced; hooks (`postToolUse` + `agentStop`) specified as Layer 2 enforcement |
 
 ---
@@ -99,17 +100,17 @@ A module is a **logical grouping of source files that together implement a singl
 | Mode A — Grouping proposal | Copilot coding agent | Scans project; groups by domain noun; writes draft `modules.yaml`; opens PR | Automated |
 | Mode A — Grouping validation | Developer who knows the codebase | Reviews groupings; reassigns misplaced files; names modules correctly; splits over-large groups | 5–10 min per project |
 | Mode A — Draft manifest review | Copilot agent | Writes draft `modules.yaml`, summarizes the proposed boundaries in chat, and stops for direct human review of the manifest in VS Code. | <1 min (agent) |
-| Mode A — Manifest validation | Developer who knows the codebase | Opens `modules.yaml` in VS Code, corrects groupings directly, validates naming and file placement, and sets module status based on assessment. | 5–10 min |
+| Mode A — Manifest validation | Developer who knows the codebase | Opens `modules.yaml` in VS Code, corrects groupings directly, validates naming and file placement, and sets `grouping_status` based on assessment. | 5–10 min |
 | Mode A — Incremental update (new/changed file) | Copilot agent + developer | Agent reads the current `modules.yaml`, proposes only the affected module entry changes in chat, and patches the manifest directly on confirmation. | ≤5 min |
 | Mode B — Documentation generation | Copilot coding agent | Reads a grouping-approved `modules.yaml`; loads condensed charter; reads source files; generates a draft module document; opens draft PR | Automated |
-| Mode B — Pre-commit draft (committed) | Copilot agent | Before writing to doc_output, generates draft at `docs/modules/.akr/{ModuleName}_draft.md` and displays validation summary in chat. Developer edits draft in VS Code. Agent writes final doc from confirmed draft. Draft is a permanent committed artifact. | <1 min (agent) |
+| Mode B — Pre-commit draft (committed) | Copilot agent | Before writing to doc_output, generates draft at `docs/modules/.akr/{ModuleName}_draft.md` and displays validation summary in chat. Developer edits draft in VS Code. Agent writes final doc from confirmed draft. Draft is a permanent committed artifact. | <1 min (agent); no `modules-yaml-status` field is written into the metadata header |
 | Mode B — In-editor content review | Developer + tech lead | Opens draft in VS Code Markdown Preview. Fills ❓ sections, validates business rules, confirms architecture, and reviews document maturity independently from module grouping approval. Replies 'ready to commit'. | 20–30 min |
 | Mode B — Incremental update (code change) | Copilot agent + developer | Agent reads committed draft; reads only changed source files; loads only relevant charter sections; patches affected sections. Developer confirms targeted changes only. Does not re-read all files or re-run full SSG unless patch scope expands. | ≤10 min |
 | Mode B — Content review | Developer + tech lead | Fills `❓` sections; validates business rules; confirms data operations accuracy; determines whether the document remains draft or is promoted through a separate content-approval decision | 20–30 min per module |
 | Mode C — Interactive HITL completion | Copilot agent mode + developer | Guides developer through unresolved `❓` one section at a time in existing documents; records accepted edits and deferred items | 10–20 min per document |
 | CI gate | `validate_documentation.py` + Vale | Validates required sections, markers, `project_type`, `feature_tag` format | Automated at PR merge |
 
-Governance clarification: the module `status` recorded in `modules.yaml` is the approval state for the module boundary produced by Mode A. It authorizes Mode B to run, but it does not certify the generated document content. A generated module document therefore begins life as a draft artifact unless document-content approval is separately completed and explicitly recorded.
+Governance clarification: the module `grouping_status` recorded in `modules.yaml` is the approval state for the module boundary produced by Mode A. It authorizes Mode B to run, but it does not certify the generated document content. A generated module document therefore begins life as a draft artifact unless document-content approval is separately completed and explicitly recorded.
 
 Critical assessment: a separate Mode A review sheet duplicates the exact boundary decision that already lives in `modules.yaml`, but without becoming the authoritative input to Mode B or CI. That duplication adds a second mutable artifact, creates drift risk between the review sheet and the manifest, and weakens ownership by forcing a technical lead to reconcile two representations of the same approval. For initial module grouping, the real governance object is `modules.yaml`; review should happen directly there. The committed draft remains justified in Mode B because it captures generated narrative and unresolved content that do not otherwise exist in source form.
 
@@ -239,11 +240,11 @@ With compressed charters:
 
 **Layer 2 — `max_files: 8` Governance Constraint**
 
-Enforced in `modules.yaml` schema. `validate_documentation.py` fails validation if a module's `files` array exceeds `max_files`. Modules exceeding 8 files must be split by the developer during Mode A validation. This bounds the worst-case token load by governance design.
+Enforced by the `modules.yaml` `files` array ceiling and corresponding schema validation. `validate_documentation.py` fails validation if a module lists more than 8 files. Modules exceeding 8 files must be split by the developer during Mode A validation. This bounds the worst-case token load by governance design.
 
 **Layer 3 — Agent Skills for On-Demand Charter Loading**
 
-Agent Skills load contextually, not as a monolithic pre-load. The condensed charter is queried in Step 2 of Mode B — after `modules.yaml` has been read and `project_type` is known. This means the charter is loaded only when needed, in the correct variant, rather than loading all charters as ambient context.
+Agent Skills load contextually, not as a monolithic pre-load. The condensed charter is queried in Step 2 of Mode B — after `modules.yaml` has been read and `project_type` has been inferred from the module file set. This means the charter is loaded only when needed, in the correct variant, rather than loading all charters as ambient context.
 
 **Layer 4 — `.github/copilot-instructions.md` as Fallback**
 
@@ -424,30 +425,15 @@ project:
 # Module groupings — API and UI projects
 # Each module produces ONE Level 1 document covering all listed files
 modules:
-  - name: CourseDomain                   # PascalCase; becomes doc filename prefix
-    project_type: api-backend            # api-backend | ui-component |
-                                         # microservice | general
-                                         # Maps to condensed charter selection
-    feature: CourseCatalogManagement    # PascalCase key — must exactly match a key in tag-registry.json
-                                        # Format enforced by tag-registry-schema.json patternProperties: ^[A-Z][a-zA-Z0-9]*$
-                                        # Starts with uppercase letter, contains only letters and digits (no spaces, hyphens, underscores)
-                                        # Valid examples: ApplicationEditor, UserAuthentication, DocumentGeneration, CourseCatalogManagement
-                                        # Invalid: "Course Catalog Management", "course-catalog-management"
-                                        # Schema validated by distribute-tag-registry.yml before distribution
-                                        # Add missing entries to tag-registry.json before using in modules.yaml;
-                                        # distribute-tag-registry.yml auto-distributes on commit
-    domain: Backend                      # Logical domain grouping label
-    layer: API                           # Architectural layer for this module
-    max_files: 8                         # Override project default; hard ceiling
+  - name: courses                        # Lean grouping key used in doc path and review workflow
+    grouping_status: draft               # draft | approved
+    doc_output: docs/modules/courses.md
     files:
       - TrainingTracker.Api/Controllers/CoursesController.cs
       - TrainingTracker.Api/Domain/Services/ICourseService.cs
       - TrainingTracker.Api/Contracts/Courses/CourseDtos.cs
       - TrainingTracker.Api/Domain/Repositories/ICourseRepository.cs
       - TrainingTracker.Api/Infrastructure/Persistence/EfCourseRepository.cs
-    doc_output: docs/modules/CourseDomain_doc.md
-    status: draft                        # draft | review | approved | deprecated
-    compliance_mode: pilot               # Module-level override; inherits project default
 
 # Unassigned files — output of Mode A when agent cannot confidently group
 unassigned:
@@ -465,15 +451,14 @@ database_objects:
 
 ### Schema Validation Rules for `validate_documentation.py` v1.0
 
-> **Schema note (Review 6):** `modules-schema.json` does not yet exist in the repository. It is a Phase 1 deliverable. Until it exists, `validate_documentation.py` enforces the rules below programmatically. Once `modules-schema.json` is authored, the script can reference it directly for enum validation.
+> **Schema note:** `modules-schema.json` is now the canonical schema for the lean manifest model. `validate_documentation.py` and related tooling should validate against that schema rather than assuming the earlier rich module-entry shape.
 
 | Field | Rule | Error Behavior |
 |---|---|---|
 | `project.layer` | Must be in `["UI", "API", "Database", "Integration", "Infrastructure", "Full-Stack"]` (mirrors `akr-config-schema.json` `projectInfo.layer` enum; validated against `modules-schema.json` at runtime) | Fail with enum error |
 | `project.standards_version` | Must be ≥ `minimum_standards_version` | Fail with version lag error |
-| `modules[].project_type` | Must be in `[api-backend, ui-component, microservice, general]` | Fail with unknown type error |
-| `modules[].feature` | Must exactly match a PascalCase key in `tag-registry.json` (e.g., `CourseCatalogManagement`). Synonym lookup optional but adds complexity. Missing entries must be added to `tag-registry.json` before use. | Fail with unregistered feature error |
-| `modules[].files` length | Must not exceed `max_files` (default: 8) | Fail with module size error |
+| `modules[].grouping_status` | Must be in `[draft, approved]` | Fail with unknown grouping status error |
+| `modules[].files` length | Must not exceed 8 | Fail with module size error |
 | `modules[].doc_output` | Must not be used by more than one module | Fail with duplicate output error |
 | `database_objects[].type` | Must be in `[table, view, procedure, function]` | Fail with unknown type error |
 | `project.compliance_mode` | Must be `pilot` or `production` | Fail with invalid mode error |
@@ -535,14 +520,10 @@ When asked to "propose module groupings", "initialize modules.yaml", or
 5. Files that cannot be confidently assigned to a domain group → add to
    unassigned[] with a reason string.
 
-6. Apply project_type based on project structure:
-   - .cs Controller + Service + Repository pattern → api-backend
-   - .tsx/.ts component + hook + types pattern → ui-component
-   - Mixed patterns or orchestration services → microservice
-   - No clear pattern → general
+6. Group files only; do not write `project_type` or business metadata into modules.yaml.
 
 7. Write draft modules.yaml to project root.
-   Set status: draft on all modules and unassigned items.
+  Set grouping_status: draft on all modules.
 
 7.5. Write draft modules.yaml to the project root and stop for direct human review in VS Code.
   The manifest is the sole Mode A review surface.
@@ -566,15 +547,16 @@ When asked to "propose module groupings", "initialize modules.yaml", or
 ---
 
 ## Mode B — Generate Module Documentation
-## (Run only after modules.yaml grouping approval is complete — target module status is not draft)
+## (Run only after modules.yaml grouping approval is complete — target module grouping_status is not draft)
 
 When asked to "generate documentation for [ModuleName]" or
 "document the [ModuleName] module":
 
 1. Read modules.yaml from the project root.
    Find the module matching the requested name.
-   If status is draft → stop and instruct developer to complete Mode A first.
-   Load: file list, project_type, feature, doc_output path.
+  If grouping_status is draft → stop and instruct developer to complete Mode A first.
+  Load: file list and doc_output path.
+  Infer project_type from the module file set.
 
 2. Load the condensed charter from copilot-instructions/ based on project_type:
    - api-backend     → copilot-instructions/backend-service.instructions.md
@@ -628,7 +610,7 @@ When asked to "generate documentation for [ModuleName]" or
     IF this is an incremental update (draft_output path exists):
      Read committed draft as primary context. DO NOT re-read all files or re-run full SSG
      unless patch scope expands beyond the initially identified changed files.
-     Read only changed files (from developer instruction or git diff).
+     Read only changed files (from developer instruction or git diff). [For later analysis (01-Apr-2026): What if there are multiple versions of the changed file(s) in git history since last_reviewed_at? Use the most recent version, but warn the developer about potential context drift if there are multiple changes. Do we also need to track the last git commit hash that was included in the draft context to detect rebases or force pushes that could cause drift?]
      Load only relevant charter sections for changed files:
      - Controller changed    → Operations Map charter section
      - Service/Repository    → Business Rules + Data Operations charter sections
@@ -663,9 +645,9 @@ When asked to "generate documentation for [ModuleName]" or
      must be removed here. Failure to strip these fields is a validator error on the
      final doc (see validate_documentation.py: "Final doc must not contain draft-only fields").
 
-  6b. Inject final-doc front matter:
-     - Ensure businessCapability, feature, layer, project_type, status, compliance_mode
-      are present and correctly populated from modules.yaml.
+    6b. Inject final-doc front matter:
+      - Ensure businessCapability, feature, layer, project_type, status, compliance_mode
+      are present and correctly populated from source evidence plus GenerateDocumentation inference.
      - Carry the akr-generated metadata header forward from the draft (do not strip it).
 
   Write final version to the doc_output path on a new feature branch.
@@ -686,7 +668,6 @@ When asked to "generate documentation for [ModuleName]" or
   mode: B
   template: {template used}
   charter: {condensed charter filename}
-  modules-yaml-status: approved
   steps-completed: 1,2,3,4,5,6,7,8
   generated-at: {ISO 8601 timestamp}
   -->
@@ -805,9 +786,8 @@ Execution flow:
 3. Validate modules.yaml itself (separate validation pass):
    - project.layer in akr-config-schema.json enum
    - project.standards_version >= minimum_standards_version
-   - Each module: project_type in allowed values
-   - Each module: feature exists in tag-registry.json
-   - Each module: files count <= max_files
+  - Each module: grouping_status in allowed values
+  - Each module: files count <= 8
    - No duplicate doc_output paths
 
 4. Apply section rules based on doc type:
@@ -882,7 +862,7 @@ Port structural assertions from `akr-mcp-server/tests/test_validation_library.py
 - Module doc with unresolved `❓` in production mode → FAIL
 - DB object doc missing Relationships section → FAIL
 - `modules.yaml` with module exceeding `max_files` → FAIL
-- `modules.yaml` with unknown `project_type` → FAIL
+- `modules.yaml` with unknown `grouping_status` → FAIL
 - `modules.yaml` absent from project → WARN, do not fail
 
 ---
@@ -950,13 +930,13 @@ This was conflated in prior analyses and is now definitively clarified. An impor
 | Field | Level | Values | Source | Purpose |
 |---|---|---|---|---|
 | `layer` | **Project-level** in `modules.yaml project:` section | `UI`, `API`, `Database`, `Integration`, `Infrastructure`, `Full-Stack` | Enum values sourced from `akr-config-schema.json`'s `projectInfo.layer` — **but `modules.yaml` is a new artifact validated by `modules-schema.json`, not by `akr-config-schema.json` directly** | Describes the architectural tier of the whole repository |
-| `project_type` | **Module-level** in `modules.yaml modules[]:` entries | `api-backend`, `ui-component`, `microservice`, `general` | Defined in new `modules-schema.json` | Drives charter selection and template selection for each documentation unit |
+| `project_type` | **Generated-document field** inferred from module file patterns during Mode B | `api-backend`, `ui-component`, `microservice`, `general` | Inference logic defined in `SKILL.md` GenerateDocumentation Step 2 | Drives charter selection and template selection for each documentation unit without bloating `modules.yaml` |
 
-A repository with `layer: API` (the whole project is an API) can contain modules of `project_type: api-backend` (standard CRUD modules) and `project_type: microservice` (lightweight orchestration services). A repository with `layer: UI` contains modules of `project_type: ui-component`.
+A repository with `layer: API` (the whole project is an API) can contain modules whose file patterns infer `project_type: api-backend` (standard CRUD modules) or `project_type: microservice` (lightweight orchestration services). A repository with `layer: UI` contains modules whose file patterns infer `project_type: ui-component`.
 
 **Critical schema correction (Review 6):** `akr-config-schema.json` is the schema for `.akr-config.json` — a separate project-level configuration object covering `projectInfo`, `documentation`, `crossRepository`, `tags`, `validation`, `humanInput`, and `monitoring`. It is **not** a schema for `modules.yaml`. The `layer` enum lives inside `projectInfo.layer` within that config schema and is the source of valid values, but `modules.yaml` validation must reference the new `modules-schema.json`, not `akr-config-schema.json` directly.
 
-**Consequence for implementation:** `modules-schema.json` does not yet exist in the repository. It is a Phase 1 deliverable. `validate_documentation.py` validates `layer` against the enum values defined in `modules-schema.json` (which mirrors `akr-config-schema.json`'s `projectInfo.layer` enum) and `project_type` against the separate allowed values list in that same new schema. They are not the same validation rule, and neither references `akr-config-schema.json` at runtime.
+**Consequence for implementation:** `modules-schema.json` validates the lean manifest structure, while `project_type` is inferred at generation time and written into document front matter rather than stored in `modules.yaml`. `validate_documentation.py` validates `layer` against the enum values defined in `modules-schema.json` (which mirrors `akr-config-schema.json`'s `projectInfo.layer` enum) and validates generated document front matter `project_type` as part of document-content checks. They are not the same validation rule, and neither references `akr-config-schema.json` at runtime.
 
 ---
 
@@ -1038,7 +1018,7 @@ The repository serves as the single source of truth for all governance artefacts
 
 **Developer Workflow Layer — Agent Skills + Copilot Surfaces**
 
-The Agent Skill (`SKILL.md`) is authored once and auto-loads across three surfaces simultaneously: VS Code agent mode (developer-present, interactive), the Copilot coding agent (asynchronous, issue-to-PR), and the Copilot CLI. Mode A proposes module groupings and writes a draft `modules.yaml`; Mode B generates module documentation after groupings are human-validated. The `project_type` field in `modules.yaml` drives charter selection — the skill reads it and loads the correct condensed charter in step 2 of Mode B. `.github/copilot-instructions.md` carries global style rules and acts as the Assumption 2 fallback if hosted MCP context sources are unavailable at the current plan tier.
+The Agent Skill (`SKILL.md`) is authored once and auto-loads across three surfaces simultaneously: VS Code agent mode (developer-present, interactive), the Copilot coding agent (asynchronous, issue-to-PR), and the Copilot CLI. Mode A proposes module groupings and writes a draft `modules.yaml`; Mode B generates module documentation after groupings are human-validated. `project_type` is inferred from the module file set during Mode B step 2, and the skill then loads the correct condensed charter. `.github/copilot-instructions.md` carries global style rules and acts as the Assumption 2 fallback if hosted MCP context sources are unavailable at the current plan tier.
 
 **CI / Governance Layer — GitHub Actions**
 
@@ -1244,7 +1224,7 @@ Phase 1 should cross-reference `humanInput.defaultRole` against the "who provide
 | Agent Skill has three modes (not one) | Workflow clarification + module architecture | 🟡 High | Mode A (DocumentPlanner grouping) must precede Mode B (generation); Mode C handles interactive `❓` completion for existing drafts |
 | Mode A sequencing not enforced | Module architecture | 🟡 High | Skill checks `modules.yaml` status before Mode B |
 | Pre-pilot assumptions are load-bearing | Review 1 + all | 🟡 High | Blocking gate before Phase 1 |
-| Charter selection logic undefined | Review 3 + Module arch | 🟡 High | `project_type` field + Agent Skill step 2 |
+| Charter selection logic undefined | Review 3 + Module arch | 🟡 High | `project_type` inference rule + Agent Skill step 2 |
 | `TEMPLATE_MANIFEST.json` disposition unresolved | Review 3 / M365 | 🟡 High | Narrow to version registry; deprecate other roles |
 | `--fail-on` graduation criteria undefined | Review 1 + 2 | 🟡 High | `compliance_mode` field in `modules.yaml`; formal approval process |
 | Premium request metering unmodeled | Review 4 (M365) | 🟡 High | Model before Phase 2.5; use GitHub billing dashboard |
@@ -2167,7 +2147,6 @@ steps-completed: 1,2,3,4,5,6,7,8,9
 generation-strategy: single-pass
 template: lean_baseline_service_template.md
 charter: backend-service.instructions.md
-modules-yaml-status: approved
 passes-completed: single-pass
 passes-split:
 pass-timings-seconds: single-pass=742
@@ -2187,7 +2166,6 @@ steps-completed: 1,2,3,4,5,6,7,8,9
 generation-strategy: section-scoped
 template: lean_baseline_service_template.md
 charter: backend-service.instructions.md
-modules-yaml-status: approved
 passes-completed: 1,2A,2B,3,4,5,6,7
 passes-split: 2A,2B
 pass-timings-seconds: pass1=142,pass2a=287,pass2b=310,pass3=98,pass4=213,pass5=117,pass6=134,pass7=89

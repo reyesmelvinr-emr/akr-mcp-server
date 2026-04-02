@@ -112,10 +112,8 @@ Create validation script from scratch that distinguishes module docs from databa
 3. **modules.yaml schema validation** (9 rules from Part 6 of analysis)
    - `project.layer` in allowed enum
    - `project.standards_version >= minimum_standards_version`
-   - `modules[].project_type` in allowed values
-  - `modules[].businessCapability` exists in `tag-registry.json` (PascalCase match)
-     **Lookup path:** Check submodule first (`core-akr-templates/tag-registry.json`), fallback to `tag-registry.json` in project root if submodule unavailable, fail if neither exists
-   - `modules[].files` count ≤ `max_files`
+  - `modules[].grouping_status` in allowed values
+  - `modules[].files` count ≤ 8
    - No duplicate `doc_output` paths
    - `database_objects[].type` in allowed enum
    - `project.compliance_mode` in {pilot, production}
@@ -275,8 +273,8 @@ def test_db_object_doc_missing_relationships():
 def test_modules_yaml_exceeds_max_files():
     # modules.yaml with module exceeding max_files → FAIL
     
-def test_modules_yaml_unknown_project_type():
-    # modules.yaml with unknown project_type → FAIL with enum error
+def test_modules_yaml_unknown_grouping_status():
+  # modules.yaml with unknown grouping_status → FAIL with enum error
     
 def test_modules_yaml_absent():
     # Project without modules.yaml → WARN, do not fail
@@ -1023,8 +1021,8 @@ Author new `modules-schema.json`; update `akr-config-schema.json` for `project_t
 
 **Why needed:** Does not exist in repository; `validate_documentation.py` cannot reference schemas until this exists.
 
-**Critical note:** `modules-schema.json` `project_type` enum **MUST include `Full-Stack`** for parity with `akr-config-schema.json` `projectInfo.layer`. This is intentionally different from `tag-registry-schema.json` and `consolidation-config-schema.json` which omit `Full-Stack` for governance reasons. The layer enums serve different purposes:
-- `modules-schema.json` (module taxonomy): includes `Full-Stack`
+**Critical note:** `modules-schema.json` `project.layer` enum **MUST include `Full-Stack`** for parity with `akr-config-schema.json` `projectInfo.layer`. This is intentionally different from `tag-registry-schema.json` and `consolidation-config-schema.json` which omit `Full-Stack` for governance reasons. The layer enums serve different purposes:
+- `modules-schema.json` (project layer taxonomy): includes `Full-Stack`
 - `tag-registry-schema.json` (business capability governance): excludes `Full-Stack`
 - `consolidation-config-schema.json` (cross-repo aggregation): excludes `Full-Stack`
 
@@ -1071,31 +1069,19 @@ All four fields are optional. Their absence does not cause validation errors on 
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "project_type", "businessCapability", "domain", "layer", "files", "doc_output", "status"],
+        "required": ["name", "grouping_status", "files", "doc_output"],
         "properties": {
-          "name": { "type": "string", "pattern": "^[A-Z][a-zA-Z0-9]*$" },
-          "project_type": {
+          "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9-]*$" },
+          "grouping_status": {
             "type": "string",
-            "enum": ["api-backend", "ui-component", "microservice", "general"]
+            "enum": ["draft", "approved"]
           },
-          "businessCapability": { "type": "string", "pattern": "^[A-Z][a-zA-Z0-9]*$" },
-          "domain": { "type": "string" },
-          "layer": { "type": "string" },
-          "max_files": { "type": "integer", "default": 8, "maximum": 8 },
           "files": {
             "type": "array",
             "items": { "type": "string" },
             "maxItems": 8
           },
           "doc_output": { "type": "string" },
-          "status": {
-            "type": "string",
-            "enum": ["draft", "review", "approved", "deprecated"]
-          },
-          "compliance_mode": {
-            "type": "string",
-            "enum": ["pilot", "production"]
-          },
           "ssg_pass4_source_reread": {
             "type": "boolean",
             "default": false,

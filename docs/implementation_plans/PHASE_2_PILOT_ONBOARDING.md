@@ -99,7 +99,7 @@ Recommended CODEOWNERS additions:
 
 **Note on skill maintenance:** After onboarding, developers should never manually edit `.github/skills/akr-docs/SKILL.md` in application repositories. All updates originate in `core-akr-templates` and are delivered automatically via pull request.
 
-**Critical:** `modules.yaml` must be in CODEOWNERS to prevent rogue changes to `compliance_mode` or `max_files` limits without standards team review.
+**Critical:** `modules.yaml` must be in CODEOWNERS to prevent rogue changes to module boundaries, grouping approvals, or output paths without standards team review.
 
 **Critical:** `.github/skills/akr-docs/SKILL.md` must be in CODEOWNERS so manual edits cannot bypass standards-team review.
 
@@ -205,11 +205,11 @@ CI validates modules.yaml schema, enum values, and businessCapability tags.
 
 - [ ] All module groupings reviewed for semantic accuracy
 - [ ] Module names reflect domain language (not file names)
-- [ ] No module exceeds max_files: 8
+- [ ] No module exceeds 8 files
 - [ ] Misplaced files reassigned to correct module
 - [ ] Shared/infrastructure files correctly placed in unassigned[]
 - [ ] All database objects identified and typed correctly
-- [ ] All `businessCapability` tags exist in tag-registry.json
+- [ ] Approved modules are marked with `grouping_status: approved`
 - [ ] modules.yaml grouping approval completed before documentation generation begins
 - [ ] Document front matter status is reviewed as a separate content-maturity decision and is not assumed from modules.yaml approval
 ```

@@ -236,14 +236,13 @@ The version header makes drift visible and gives distribution automation a relia
 4. Identify file roles: Controller, Service, Repository, DTOs (backend) or Page, Components, Hooks, Types (UI)
 5. Mark database files as `database_objects[]` — never group with app code
 6. Unassignable files → `unassigned[]` with reason
-7. Apply `project_type` based on project structure detection
-8. Write draft `modules.yaml` with `status: draft` on all modules
+7. Write draft `modules.yaml` with `grouping_status: draft` on all modules
 9. Open draft PR with grouping validation checklist
 
 ### Mode B Workflow Summary
 
-1. Read `modules.yaml`; find requested module; check grouping `status != draft`
-2. Load condensed charter from `copilot-instructions/` based on `project_type`
+1. Read `modules.yaml`; find requested module; check grouping `grouping_status != draft`
+2. Infer `project_type` from the module file set, then load the matching condensed charter from `copilot-instructions/`
 3. Read all source files listed in module's `files[]` array
 4. Generate module documentation using appropriate base template
 5. Apply transparency markers: `🤖` for inferred, `❓` for required human input
@@ -265,8 +264,6 @@ skill-version: v1.0.0
 mode: B
 template: {name of template used}
 charter: {condensed charter filename loaded}
-modules-yaml-status: approved
-# Traceability only: this records grouping approval state from Mode A and must not be interpreted as final document approval.
 steps-completed: 1,2,3,4,5,6,7,8,9
 generated-at: {ISO 8601 timestamp}
 -->
@@ -326,16 +323,12 @@ Define the complete `modules.yaml` schema and create reference examples for API 
 - `project.compliance_mode` (enum: pilot, production)
 
 **Module groupings (`modules[]`):**
-- `name` (PascalCase string)
-- `project_type` (enum: api-backend, ui-component, microservice, general)
-- `businessCapability` (PascalCase key from `tag-registry.json`)
-- `domain` (string)
-- `layer` (string)
-- `max_files` (integer, default: 8, hard ceiling)
+- `name` (string; lowercase-kebab or camelCase domain key)
+- `grouping_status` (enum: draft, approved) for Mode A grouping approval state only
 - `files[]` (array of workspace-relative paths)
 - `doc_output` (workspace-relative output path)
-- `status` (enum: draft, review, approved, deprecated) for Mode A grouping approval state only; do not reuse this field as the generated document's content-approval state without an explicit governance rule
-- `compliance_mode` (optional; overrides project default)
+
+`project_type`, `businessCapability`, `feature`, `layer`, document `status`, and `compliance_mode` are generated during Mode B and written into the document front matter rather than stored in `modules.yaml`.
 
 **Database objects (`database_objects[]`):**
 - `name` (schema-qualified string)
@@ -1027,7 +1020,6 @@ case: mode-b-coursedomain
 description: Mode B output for CourseDomain must match courses_service_doc.md structure
 inputs:
   module: CourseDomain
-  project_type: api-backend
   files: [datasets/coursedomain-files/]
 assertions:
   - section_present: "Module Files"
