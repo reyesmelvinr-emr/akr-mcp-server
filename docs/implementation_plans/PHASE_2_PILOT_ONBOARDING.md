@@ -81,6 +81,7 @@ Onboard pilot project with all Phase 1 deliverables; configure tooling end-to-en
 | Deploy `validate-documentation.yml` | Pilot dev | Workflow file in `.github/workflows/`; triggered on draft PR | 30 min |
 | Create initial `modules.yaml` | Pilot dev | Project section complete; `modules[]` empty; `database_objects[]` empty | 30 min |
 | Copy Vale rules bundle into application repo | Pilot dev | `validation/vale-rules/AKR/` and `validation/.vale.ini` present; files copied from `core-akr-templates` submodule path or delivered via distribution PR - not manually authored | 20 min |
+| Run onboarding bundle distribution workflow (recommended) | Pilot dev + standards author | `core-akr-templates/.github/workflows/distribute-onboarding-bundle.yml` executed for target repo; source directories confirmed: `.github/pull_request_template/` and `examples/onboarding/`; PR template + seed assets arrive via PR | 20 min |
 | Add Vale files to CODEOWNERS | Pilot dev | `validation/vale-rules/    @org/standards-team` and `validation/.vale.ini    @org/standards-team` present in CODEOWNERS; prevents local rule edits without standards-team review | 10 min |
 | Test CI workflow | Pilot dev | Trigger workflow on draft PR; verify it runs without errors | 30 min |
 | Create CODEOWNERS file | Pilot dev | Standards team + tech lead as owners for `docs/**`, `modules.yaml`, and `.github/skills/akr-docs/SKILL.md` | 20 min |

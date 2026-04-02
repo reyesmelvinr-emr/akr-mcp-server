@@ -368,12 +368,16 @@ Adapt existing `.akr/workflows/validate-documentation.yml` to work with new `val
     curl -o validate_documentation.py \
       https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/scripts/validate_documentation.py
 
-# AFTER (correct path)
+# AFTER (correct path + branch-safe reference)
 - name: Download validation script
   run: |
     curl -o validate_documentation.py \
-      https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/main/.akr/scripts/validate_documentation.py
+      https://raw.githubusercontent.com/reyesmelvinr-emr/core-akr-templates/master/.akr/scripts/validate_documentation.py
 ```
+
+> **Branch safety note (required):** `core-akr-templates` default branch is currently `master`.
+> If the default branch changes later, update this URL in the same PR as the branch change, or pin
+> to a release tag/ref in the raw URL to avoid fallback drift.
 
 #### Change 3: Add modules.yaml to Trigger
 
@@ -794,6 +798,183 @@ If total elapsed time across all passes exceeds 45 minutes:
 - [ ] If `generation-strategy` is `single-pass-fallback`: Mode C review scheduled
 - [ ] If `generation-strategy` is `single-pass`: reviewer is aware output may have more `❓` markers than SSG-generated docs on large modules; use `--use-ssg` for high-complexity modules where pass isolation improves fidelity
 - [ ] If `passes-split` is populated: Operations Map reviewed for completeness across sub-passes
+
+---
+
+## Deliverable 2B: Onboarding Bundle Distribution Workflow
+
+### Objective
+
+Build `.github/workflows/distribute-onboarding-bundle.yml` in `core-akr-templates` to distribute one-time onboarding scaffolds to new application repositories via manual dispatch. This workflow is the canonical delivery mechanism for governance artifacts that should be placed once (or refreshed on demand), not re-distributed with every skill release.
+
+### Why Separate From Deliverable 2A
+
+`distribute-skill.yml` (Deliverable 2A) is tag-triggered and designed for recurring artifact updates across all registered repositories. Merging one-time onboarding scaffolds into that workflow creates PR noise in already-onboarded repos and couples unrelated release cadences. The onboarding bundle workflow runs on `workflow_dispatch` only and targets specific repositories selected at dispatch time.
+
+This split model is confirmed per `akr_implementation_ready_analysis.md` section 2.1C (decision date: 2026-04-02). Any future one-time governance scaffold (additional PR templates, CODEOWNERS guidance docs, optional schema seeds, etc.) follows this same pattern: add to the onboarding bundle, not to `distribute-skill.yml`.
+
+### Trigger Conditions
+
+- `workflow_dispatch` only — no tag trigger, no push trigger.
+- Input: `target_repo` (required) — the full `owner/repo` name of the repository to onboard.
+- Optional input: `dry_run` (boolean, default `false`) — when true, generates a workflow summary of what would be distributed without opening a PR.
+
+### Bundle Contents
+
+| Artifact | Source in `core-akr-templates` | Destination in Application Repo | Notes |
+|---|---|---|---|
+| PR template | `.github/pull_request_template/documentation.md` | `.github/pull_request_template/documentation.md` | Governance checklist for documentation PRs |
+| CODEOWNERS baseline | `examples/onboarding/CODEOWNERS.baseline` | `.github/CODEOWNERS` (append-mode) | Adds required review paths; does not overwrite existing CODEOWNERS |
+| `modules.yaml` seed | `examples/onboarding/modules.yaml.seed` | `modules.yaml` (only if not already present) | Skip if `modules.yaml` exists in target repo |
+
+> **CODEOWNERS note:** The workflow must use append-mode for CODEOWNERS, not a full overwrite. It inserts a clearly delimited AKR governance block so existing team ownership rules are preserved. If `modules.yaml` already exists in the target repo, the seed file is skipped — the step must check for file existence before writing.
+
+### Tasks
+
+| Task | Owner | Acceptance Criteria | Estimated Time |
+|---|---|---|---|
+| Create `core-akr-templates/.github/pull_request_template/documentation.md` | Standards author | File present in core-akr-templates; content matches pilot copy in training-tracker-backend | 15 min |
+| Create `examples/onboarding/CODEOWNERS.baseline` | Standards author | File present; contains AKR governance block with delimiters; covers: `.github/pull_request_template/`, `validation/vale-rules/`, `validation/.vale.ini`, `.akr/` | 30 min |
+| Create `examples/onboarding/modules.yaml.seed` | Standards author | File present; minimal valid `modules.yaml` with `modules: []` placeholder and inline comments; passes `validate_documentation.py --all` without content errors | 30 min |
+| Author `distribute-onboarding-bundle.yml` | Standards author | Workflow present in `core-akr-templates/.github/workflows/`; syntax valid; `workflow_dispatch` trigger with `target_repo` (required) and `dry_run` (optional, default false) inputs | 2 hours |
+| Implement PR template sync step | Standards author | Step clones target repo, copies `.github/pull_request_template/documentation.md`, commits, opens PR; PR title: `chore: add AKR documentation PR template` | 45 min |
+| Implement CODEOWNERS append step | Standards author | Step reads existing CODEOWNERS (empty if absent), appends AKR governance block within `# BEGIN AKR GOVERNANCE` / `# END AKR GOVERNANCE` delimiters; idempotent (re-run does not duplicate block) | 1 hour |
+| Implement `modules.yaml` seed step | Standards author | Step checks if `modules.yaml` exists; skips write if it does; writes seed file if absent; PR body notes file was created as a seed | 30 min |
+| Implement dry-run mode | Standards author | When `dry_run: true`, workflow logs which files would be created/modified and exits with no PR opened; summary lists all planned changes | 30 min |
+| Add post-sync verification step | Standards author | Workflow summary lists: which files were distributed, PR URL opened, list of CODEOWNERS paths requiring branch protection configuration (as a human-action checklist) | 30 min |
+| Test on `training-tracker-backend` | Standards author + infrastructure | Dry-run confirms correct file set; live run opens PR with expected content; CODEOWNERS append does not overwrite existing lines | 1 hour |
+| Add `AKR_DISTRIBUTION_PAT` secret note | Infrastructure lead | Confirm same PAT from Deliverable 2A is sufficient (same scope requirements: `contents: write`, `pull-requests: write`, `metadata: read`) | 15 min |
+| Document `dry_run` usage in developer reference | Standards author | Developer reference includes example of using dry-run mode to preview onboarding bundle before live dispatch | 20 min |
+
+### Required Secret
+
+`AKR_DISTRIBUTION_PAT` — same fine-grained PAT as Deliverable 2A. No additional scopes required.
+
+### Workflow Sketch
+
+```yaml
+name: Distribute Onboarding Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: "Full repo name to onboard (owner/repo)"
+        required: true
+        type: string
+      dry_run:
+        description: "Preview only — no PR will be opened"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  distribute-onboarding:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout core-akr-templates
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout target repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.target_repo }}
+          token: ${{ secrets.AKR_DISTRIBUTION_PAT }}
+          path: target
+
+      - name: Copy PR template
+        run: |
+          mkdir -p target/.github/pull_request_template
+          cp source/.github/pull_request_template/documentation.md \
+             target/.github/pull_request_template/documentation.md
+
+      - name: Append CODEOWNERS governance block (idempotent)
+        run: |
+          CODEOWNERS_PATH="target/.github/CODEOWNERS"
+          if grep -q "BEGIN AKR GOVERNANCE" "$CODEOWNERS_PATH" 2>/dev/null; then
+            echo "AKR governance block already present — skipping."
+          else
+            cat source/examples/onboarding/CODEOWNERS.baseline >> "$CODEOWNERS_PATH"
+          fi
+
+      - name: Seed modules.yaml if absent
+        run: |
+          if [ -f "target/modules.yaml" ]; then
+            echo "modules.yaml already exists — skipping seed."
+          else
+            cp source/examples/onboarding/modules.yaml.seed target/modules.yaml
+          fi
+
+      - name: Dry-run summary
+        if: ${{ inputs.dry_run == true }}
+        run: |
+          echo "## Dry Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Would distribute to: ${{ inputs.target_repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "- .github/pull_request_template/documentation.md" >> $GITHUB_STEP_SUMMARY
+          echo "- .github/CODEOWNERS (append AKR governance block)" >> $GITHUB_STEP_SUMMARY
+          echo "- modules.yaml (seed only if absent)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Open PR
+        if: ${{ inputs.dry_run == false }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.AKR_DISTRIBUTION_PAT }}
+          path: target
+          branch: akr/onboarding-bundle
+          commit-message: "chore: add AKR onboarding bundle"
+          title: "chore: add AKR documentation governance scaffolds"
+          body: |
+            ## AKR Onboarding Bundle
+
+            Distributed from `core-akr-templates` via `distribute-onboarding-bundle.yml`.
+
+            ### Files distributed
+            - `.github/pull_request_template/documentation.md` — PR review checklist for AKR documentation PRs
+            - `.github/CODEOWNERS` — AKR governance block appended (existing lines preserved)
+            - `modules.yaml` — seed file added (only if not previously present)
+
+            ### Required follow-up (human action)
+            - [ ] Enable branch protection on default branch
+            - [ ] Add required status check: `AKR Documentation Validation`
+            - [ ] Confirm CODEOWNERS review is enforced for `.github/pull_request_template/` and `validation/` paths
+```
+
+### Output Locations
+
+```
+core-akr-templates/
+  .github/
+    workflows/
+      distribute-onboarding-bundle.yml             (NEW)
+    pull_request_template/
+      documentation.md                             (NEW — canonical source)
+  examples/
+    onboarding/
+      CODEOWNERS.baseline                          (NEW — AKR governance block only)
+      modules.yaml.seed                            (NEW — minimal valid seed)
+```
+
+### Acceptance Criteria
+
+- [ ] `distribute-onboarding-bundle.yml` present; syntax valid; `workflow_dispatch` trigger only.
+- [ ] `target_repo` input required; `dry_run` input optional with default `false`.
+- [ ] Dry-run mode produces a workflow summary with no PR opened.
+- [ ] CODEOWNERS append step is idempotent — re-running does not duplicate the AKR governance block.
+- [ ] `modules.yaml` seed step skips write if file already exists.
+- [ ] PR body includes a human-action required checklist (branch protection, required status checks, CODEOWNERS review confirmation).
+- [ ] Workflow tested against `training-tracker-backend`: dry-run confirms expected file set; live run opens PR with correct content.
+- [ ] `AKR_DISTRIBUTION_PAT` confirmed sufficient — no additional PAT scopes required beyond Deliverable 2A.
+- [ ] Canonical `.github/pull_request_template/documentation.md` present in `core-akr-templates`.
+- [ ] `examples/onboarding/CODEOWNERS.baseline` and `examples/onboarding/modules.yaml.seed` present in `core-akr-templates`.
+
+### Implementation Status (2026-04-02)
+
+- Complete: canonical PR template source directory created at `core-akr-templates/.github/pull_request_template/`.
+- Complete: onboarding seed source directory created at `core-akr-templates/examples/onboarding/`.
+- Complete: onboarding distribution workflow created at `core-akr-templates/.github/workflows/distribute-onboarding-bundle.yml`.
+- Complete: seed source files added at `core-akr-templates/examples/onboarding/CODEOWNERS.baseline` and `core-akr-templates/examples/onboarding/modules.yaml.seed`.
 
 ---
 

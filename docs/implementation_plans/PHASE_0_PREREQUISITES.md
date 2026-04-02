@@ -630,7 +630,7 @@ Audit existing `.akr/` infrastructure to migrate rather than rebuild; identify h
 ### `.akr/workflows/` Audit Results (From Analysis)
 
 **1. `validate-documentation.yml` — PRIMARY MIGRATION TARGET**
-- Already calls `validate_documentation.py` from `core-akr-templates/main/scripts/`
+- Already calls `validate_documentation.py` from `core-akr-templates/.akr/scripts/` (raw fallback must track repository default branch or a pinned release ref)
 - Already runs Vale with `.akr/.vale.ini` config
 - Already uses `tj-actions/changed-files@v41` for diff detection
 - Already has Checks API permissions configured

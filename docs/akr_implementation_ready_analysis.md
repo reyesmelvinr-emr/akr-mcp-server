@@ -154,6 +154,54 @@ The historical relationship between the two repositories was under-documented an
 
 **Consequence:** The current strategy is architectural continuity, not architectural reversal. The intermediary changed; the source-of-truth model did not.
 
+### 2.1B Canonical Validator Ownership and CI Fallback Clarification
+
+To avoid recurring confusion in governance assessments, validator ownership is explicit:
+
+- The canonical script is `core-akr-templates/.akr/scripts/validate_documentation.py`.
+- Any copy under `akr-mcp-server/scripts/validation/` is legacy-only and must not be treated as an active dependency in end-state architecture decisions.
+- Application-repo workflows should resolve validator execution from `core-akr-templates` first (submodule/local clone path), then use raw-download fallback.
+- Raw fallback URLs must track the `core-akr-templates` default branch (currently `master`) or use a pinned release ref. Hardcoding `main` for this repository creates a latent 404 path under degraded fallback conditions.
+
+**Consequence:** Governance maturity and merge-gate readiness must be assessed against `core-akr-templates` assets and workflow behavior, not legacy `akr-mcp-server` script copies.
+
+### 2.1C PR Template Handling for Onboarding Repositories
+
+> **Decision: CONFIRMED** (2026-04-02). The recommended distribution model and optimal onboarding implementation steps below have been reviewed and agreed. See `PHASE_1_FOUNDATION.md` Deliverable 2B for concrete implementation tasks, workflow YAML sketch, output locations, and acceptance criteria.
+
+The file `.github/pull_request_template/documentation.md` is a governance artifact and should be sourced from `core-akr-templates`, not authored independently in each application repository. This pattern applies to any future one-time onboarding scaffolds defined for `core-akr-templates` (for example: CODEOWNERS baseline snippets, onboarding checklist seeds, or optional `modules.yaml` scaffolds).
+
+**Confirmed distribution model:**
+
+- Keep a canonical copy in `core-akr-templates` (single source of truth).
+- Distribute via a dedicated onboarding-only workflow (`distribute-onboarding-bundle.yml`) rather than extending the recurring `distribute-skill.yml`.
+- Use `distribute-skill.yml` only for high-frequency artifacts (SKILL, compatibility guidance, hooks, and shared validator/lint governance assets).
+- Re-runs of the onboarding bundle workflow are manual/on-demand (`workflow_dispatch` only), not tag-triggered.
+
+Why this split is preferred:
+
+- Reduces unnecessary PR noise in already-onboarded repos when recurring artifacts change.
+- Avoids coupling one-time onboarding scaffolds with frequent skill release cadence.
+- Keeps ownership clear: **onboarding bundle** (one-time scaffolds) vs. **operational skill bundle** (recurring updates).
+- Allows targeted re-onboarding (governance baseline refresh) without triggering a skill update across all registered repos.
+
+Confirmed implementation steps (see Deliverable 2B in `PHASE_1_FOUNDATION.md` for full task breakdown):
+
+1. Add canonical template file to `core-akr-templates` under `.github/pull_request_template/documentation.md`.
+2. Create `distribute-onboarding-bundle.yml` in `core-akr-templates/.github/workflows/` with `workflow_dispatch` trigger and per-repo targeting.
+3. Sync onboarding bundle artifacts in one PR per target repo: PR template, CODEOWNERS baseline snippet, optional `modules.yaml` seed.
+4. Add post-sync verification step in workflow summary: file-presence check, branch protection reminder, required CODEOWNERS paths listed.
+5. Keep re-runs manual only. New repos trigger a fresh dispatch; governance baseline refreshes may trigger targeted re-dispatch without affecting already-current repos.
+
+**Consequence:** This preserves strict governance consistency while keeping routine distribution lean and reducing maintenance churn across onboarded repositories. Any future one-time governance scaffold defined in `core-akr-templates` follows the same pattern: add to the onboarding bundle, not to `distribute-skill.yml`.
+
+Implementation status (2026-04-02):
+
+- Canonical PR template source directory established: `core-akr-templates/.github/pull_request_template/`.
+- Onboarding seed source directory established: `core-akr-templates/examples/onboarding/`.
+- Onboarding distribution workflow added: `core-akr-templates/.github/workflows/distribute-onboarding-bundle.yml`.
+- Seed artifacts added under `examples/onboarding/`: `CODEOWNERS.baseline`, `modules.yaml.seed`.
+
 ### 2.2 `core-akr-templates` — Asset Inventory
 
 **Templates — 10 confirmed (strategy documents referenced 8):**

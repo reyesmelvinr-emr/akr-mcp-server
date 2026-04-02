@@ -130,7 +130,7 @@ Create and configure the centralized feature documentation repository (`feature-
 |---|---|---|---|
 | **Create `feature-docs` repository** | Infrastructure lead | Repository created in org with appropriate visibility (private/internal) | 30 min |
 | Initialize with README | Standards author | README explains purpose: "Cross-repository feature documentation consolidation" | 30 min |
-| Configure branch protection | Infrastructure lead | `main` branch requires PR reviews; no direct commits  | 15 min |
+| Configure branch protection | Infrastructure lead | `main` requires PRs, requires status checks to pass (including `AKR Documentation Validation` where applicable), and requires CODEOWNERS review before merge; no direct commits | 15 min |
 | Add CODEOWNERS | Standards author | Product Owners + Standards team own `docs/features/**` | 15 min |
 | Create directory structure | Standards author | `docs/features/` directory created | 5 min |
 | Configure GitHub Actions permissions | Infrastructure lead | Workflow can read from other repos (use PAT), write to this repo | 30 min |
@@ -572,12 +572,12 @@ jobs:
       - name: Download consolidate.py
         run: |
           curl -o consolidate.py \
-            https://raw.githubusercontent.com/org/core-akr-templates/main/scripts/consolidate.py
+            https://raw.githubusercontent.com/org/core-akr-templates/master/scripts/consolidate.py
       
       - name: Download consolidation config
         run: |
           curl -o consolidation-config.json \
-            https://raw.githubusercontent.com/org/core-akr-templates/main/config/consolidation-config.json
+            https://raw.githubusercontent.com/org/core-akr-templates/master/config/consolidation-config.json
       
       - name: Run consolidation
         env:
@@ -588,6 +588,9 @@ jobs:
             --feature-tag "${{ github.event.inputs.feature_tag }}" \
             --config consolidation-config.json \
             --output docs/features/
+
+> **Branch safety note:** Use the repository default branch (currently `master`) or, preferably,
+> pin to a release ref to avoid failures when default branch names change.
       
       - name: Open PR with consolidated doc
         uses: peter-evans/create-pull-request@v5

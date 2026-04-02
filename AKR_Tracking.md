@@ -345,6 +345,17 @@ End date: TBD
 - 2026-03-20: Historical note: Phase 2 was temporarily moved to BLOCKED during external review reconciliation while Phase 1 remediation items were reopened.
 - 2026-03-20: Phase 2 status restored to IN_PROGRESS after Phase 1 gate approval and closure of reopened remediation items.
 - 2026-03-20: Implementation kickoff executed by expanding Phase 2 deliverable tracking to include task-level rows for Deliverables 1 through 10, including previously missing Deliverable 5 (Visual Studio testing), Deliverable 9 (checklist finalization), and Deliverable 10 (second project onboarding). Progress tracking remains centralized in AKR_Tracking.md only.
+- 2026-04-02: Governance controls follow-up completed for pilot readiness:
+  1. Created application-repo PR template at `training-tracker-backend/.github/pull_request_template/documentation.md` with structural + content review checklist.
+  2. Added module front matter completeness checks to canonical validator at `core-akr-templates/.akr/scripts/validate_documentation.py`.
+     - Enforces required keys: `businessCapability`, `feature`, `layer`, `project_type`, `status`, `compliance_mode`.
+     - Validates enum values for `layer`, `project_type`, `status`, and `compliance_mode`.
+  This closes requested implementation items 2 and 3 from governance assessment.
+- 2026-04-02: Onboarding bundle implementation completed in `core-akr-templates`:
+  1. Created canonical onboarding PR-template source directory and file at `core-akr-templates/.github/pull_request_template/documentation.md`.
+  2. Created onboarding seed source directory `core-akr-templates/examples/onboarding/` with `CODEOWNERS.baseline` and `modules.yaml.seed`.
+  3. Added onboarding distribution workflow `core-akr-templates/.github/workflows/distribute-onboarding-bundle.yml` (manual `workflow_dispatch`, `target_repo`, optional `dry_run`).
+  4. Updated implementation plans and analysis docs to explicitly reference onboarding source directories and workflow path.
 - 2026-03-20: Deliverable 1 execution started in repository: synchronized onboarding artifacts from templates/core into pilot repo (.github/workflows/validate-documentation.yml, .github/hooks/*.json, .github/skills/akr-docs/*, .vale.ini, validation/vale-rules/*), created root modules.yaml scaffold, and created .github/CODEOWNERS.
 - 2026-03-21: Gap audit completed against PHASE_2_PILOT_ONBOARDING.md. Identified 10 task rows defined in the plan that were not yet tracked: 3 in Deliverable 1 (friction doc, tooling validation, Mode A scheduling), 1 in Deliverable 2 (tech lead spot-check), 2 in Deliverable 7 (template iteration and CHANGELOG rationale), and 4 in Deliverable 8 (retrospective deck preparation, recommendations document, template update task, v1.1.0 tag task). All 10 rows added to Deliverable Tracking table. No new files created.
 - 2026-03-23: Submodule pin decision: v1.1.0 baseline accepted (Option B).

@@ -217,6 +217,13 @@ Each phase has a dedicated implementation plan document:
 - **Level 2 (DB object docs):** DBA or backend lead owns
 - **Level 3 (Feature consolidation):** Product owner owns; QA lead + tech lead approve
 
+### Merge Gate Baseline (Required)
+
+- Branch protection on `main` must require pull requests and disallow direct commits.
+- Required status checks must include `AKR Documentation Validation` for repositories using Mode B outputs.
+- CODEOWNERS review must be required for documentation-governed paths (at minimum: `docs/**`, `modules.yaml`, `.github/skills/akr-docs/SKILL.md`, and Vale governance files).
+- Governance readiness assessments must evaluate active controls in application repos and `core-akr-templates` workflows, not legacy `akr-mcp-server` script copies.
+
 ---
 
 ## Monitoring and Reporting
